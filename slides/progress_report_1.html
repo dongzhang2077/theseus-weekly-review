@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Theseus Progress Report 1</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #5c6670;
+      --line: #d7dde3;
+      --paper: #f7f8fa;
+      --panel: #ffffff;
+      --blue: #1f5f99;
+      --green: #2d7a52;
+      --gold: #a56a16;
+      --red: #a13d36;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      line-height: 1.45;
+    }
+
+    main {
+      display: grid;
+      gap: 28px;
+      padding: 28px;
+    }
+
+    section {
+      width: min(1120px, 100%);
+      min-height: 630px;
+      margin: 0 auto;
+      padding: 48px 56px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: 0 10px 30px rgba(23, 33, 43, 0.08);
+      page-break-after: always;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 48px;
+      line-height: 1.05;
+      max-width: 900px;
+    }
+
+    h2 {
+      font-size: 34px;
+      line-height: 1.15;
+      margin-bottom: 28px;
+    }
+
+    h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      margin-top: 22px;
+      max-width: 820px;
+      font-size: 23px;
+      color: var(--muted);
+    }
+
+    .kicker {
+      margin-bottom: 18px;
+      color: var(--blue);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 24px;
+      padding-top: 28px;
+      color: var(--muted);
+      font-size: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 20px;
+      background: #fbfcfd;
+    }
+
+    .card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 22px;
+      font-size: 21px;
+    }
+
+    li + li {
+      margin-top: 12px;
+    }
+
+    .small-list {
+      font-size: 18px;
+    }
+
+    .small-list li + li {
+      margin-top: 8px;
+    }
+
+    .status-row {
+      display: grid;
+      grid-template-columns: 170px 1fr;
+      gap: 18px;
+      align-items: start;
+      padding: 18px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .status-row:last-child {
+      border-bottom: 0;
+    }
+
+    .tag {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 6px 10px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .tag.done { background: var(--green); }
+    .tag.next { background: var(--blue); }
+    .tag.open { background: var(--gold); }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .step {
+      position: relative;
+      min-height: 120px;
+      padding: 18px;
+      border: 2px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .step:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      right: -17px;
+      width: 20px;
+      height: 2px;
+      background: var(--blue);
+    }
+
+    .step h3 {
+      color: var(--blue);
+    }
+
+    .architecture {
+      display: grid;
+      gap: 12px;
+    }
+
+    .arch-box {
+      display: grid;
+      grid-template-columns: 230px 1fr;
+      gap: 18px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-left: 8px solid var(--blue);
+      border-radius: 8px;
+      padding: 15px 18px;
+      background: #fff;
+    }
+
+    .arch-box:nth-child(2) { border-left-color: var(--green); }
+    .arch-box:nth-child(3) { border-left-color: var(--gold); }
+    .arch-box:nth-child(4) { border-left-color: var(--red); }
+    .arch-box:nth-child(5) { border-left-color: #6d597a; }
+
+    .metric {
+      font-size: 42px;
+      font-weight: 700;
+      color: var(--blue);
+    }
+
+    code {
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: #eef2f6;
+      font-size: 0.9em;
+    }
+
+    .demo-output {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      font-size: 17px;
+    }
+
+    .demo-output .card {
+      min-height: 94px;
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      main {
+        display: block;
+        padding: 0;
+      }
+
+      section {
+        width: 100%;
+        min-height: 100vh;
+        margin: 0;
+        box-shadow: none;
+        border: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <section>
+    <div>
+      <p class="kicker">CSIS 4495 Progress Report 1</p>
+      <h1>Theseus: Weekly AI Review for Goal-Time Alignment</h1>
+      <p class="subtitle">From proposal scope to an implementation-ready MVP plan, with a working rule-based review demo.</p>
+    </div>
+    <div class="footer">
+      <span>Progress Report 1</span>
+      <span>June 13, 2026</span>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <p class="kicker">Current Status</p>
+      <h2>Sprint 0 is complete</h2>
+      <div class="grid-2">
+        <div class="card">
+          <strong>Completed</strong>
+          <ul class="small-list">
+            <li>Proposal submitted on 2026-06-09.</li>
+            <li>MVP scope narrowed to a weekly review layer.</li>
+            <li>Architecture, data model, API contract, and backlog documented.</li>
+            <li>Rule-based sample review runs locally.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <strong>Next</strong>
+          <ul class="small-list">
+            <li>Sprint 1 starts backend persistence.</li>
+            <li>SQLite schema and repositories come next.</li>
+            <li>CRUD APIs and sample data loader will connect the demo path to FastAPI.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Approved claim: current demo proves review logic with sample data</span>
+      <span>2</span>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <p class="kicker">Scoped MVP</p>
+      <h2>Theseus is the review layer between intention and actual time</h2>
+      <div class="grid-3">
+        <div class="card">
+          <strong>Inputs</strong>
+          <ul class="small-list">
+            <li>Goals and projects</li>
+            <li>Weekly plan</li>
+            <li>Time logs</li>
+            <li>Daily reflections</li>
+          </ul>
+        </div>
+        <div class="card">
+          <strong>Analysis</strong>
+          <ul class="small-list">
+            <li>Goal-time alignment</li>
+            <li>Plan-vs-actual drift</li>
+            <li>Activity energy mix</li>
+            <li>Dormancy and slack risk</li>
+          </ul>
+        </div>
+        <div class="card">
+          <strong>Outputs</strong>
+          <ul class="small-list">
+            <li>Wins</li>
+            <li>Insights</li>
+            <li>Risk flags</li>
+            <li>Next steps</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Not a calendar replacement, not autonomous planning, not a mental health tool</span>
+      <span>3</span>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <p class="kicker">Architecture Visual</p>
+      <h2>Evidence first, advice second</h2>
+      <div class="architecture">
+        <div class="arch-box">
+          <strong>Frontend UI</strong>
+          <span>Goal setup, weekly plan, time logs, review report</span>
+        </div>
+        <div class="arch-box">
+          <strong>FastAPI Backend</strong>
+          <span>Validation, CRUD APIs, review orchestration, persistence boundary</span>
+        </div>
+        <div class="arch-box">
+          <strong>SQLite Database</strong>
+          <span>Goals, projects, plans, logs, reflections, weekly reviews</span>
+        </div>
+        <div class="arch-box">
+          <strong>Review Engine</strong>
+          <span>Deterministic checks produce evidence-backed findings before AI wording</span>
+        </div>
+        <div class="arch-box">
+          <strong>Evaluation Layer</strong>
+          <span>Sample weeks, rubric scoring, user feedback, final validation</span>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Source: docs/project_map.md and docs/02_system_architecture.md</span>
+      <span>4</span>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <p class="kicker">Implemented Demo</p>
+      <h2>The current path is sample data into the rule engine</h2>
+      <div class="pipeline">
+        <div class="step">
+          <h3>Sample week</h3>
+          <p><code>data/sample/sample_week.json</code></p>
+        </div>
+        <div class="step">
+          <h3>Load</h3>
+          <p><code>scripts/run_sample_review.py</code></p>
+        </div>
+        <div class="step">
+          <h3>Analyze</h3>
+          <p><code>review_engine.rules</code></p>
+        </div>
+        <div class="step">
+          <h3>Evidence</h3>
+          <p>planned, actual, activity mix, reflections</p>
+        </div>
+        <div class="step">
+          <h3>Review</h3>
+          <p>wins, insights, risks, next steps</p>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Demo command: python3 scripts/run_sample_review.py</span>
+      <span>5</span>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <p class="kicker">Demo Output</p>
+      <h2>The review is structured and evidence-backed</h2>
+      <div class="demo-output">
+        <div class="card">
+          <strong>Win</strong>
+          <p>Theseus backend received 4.0 hours.</p>
+        </div>
+        <div class="card">
+          <strong>Insight</strong>
+          <p>Build Theseus MVP received 5.0 hours of goal-linked work.</p>
+        </div>
+        <div class="card">
+          <strong>Risk</strong>
+          <p>Internship preparation received 0 goal-linked minutes.</p>
+        </div>
+        <div class="card">
+          <strong>Next step</strong>
+          <p>Protect one small restart block for an under-supported goal.</p>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>The AI layer will later word the review from this evidence package</span>
+      <span>6</span>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <p class="kicker">Project Board View</p>
+      <h2>Development work and course deliverables are tracked together</h2>
+      <div>
+        <div class="status-row">
+          <span class="tag done">Done</span>
+          <p>Sprint 0 setup, architecture docs, data model, API contract, review engine demo.</p>
+        </div>
+        <div class="status-row">
+          <span class="tag open">Open</span>
+          <p>Progress Report 1 slides, speaker script, architecture and roadmap visuals.</p>
+        </div>
+        <div class="status-row">
+          <span class="tag next">Next Sprint</span>
+          <p>SQLite schema, repository layer, CRUD APIs, sample loader, persisted weekly review path.</p>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Board: Theseus MVP Development</span>
+      <span>7</span>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <p class="kicker">Roadmap Visual</p>
+      <h2>Next sprint turns the demo into a persisted backend path</h2>
+      <div class="pipeline">
+        <div class="step">
+          <h3>Sprint 0</h3>
+          <p>Scope, architecture, backlog, sample review demo</p>
+        </div>
+        <div class="step">
+          <h3>Sprint 1</h3>
+          <p>SQLite schema, repositories, CRUD APIs, sample loader</p>
+        </div>
+        <div class="step">
+          <h3>Sprint 2</h3>
+          <p>Harden rule checks and review output with more sample weeks</p>
+        </div>
+        <div class="step">
+          <h3>Sprint 3</h3>
+          <p>Frontend input flow and weekly review result page</p>
+        </div>
+        <div class="step">
+          <h3>Sprint 4+</h3>
+          <p>AI wording layer, evaluation, demo preparation</p>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Midterm implementation checkpoint: 2026-07-18</span>
+      <span>8</span>
+    </div>
+  </section>
+
+  <section>
+    <div>
+      <p class="kicker">Next Step</p>
+      <h2>Progress Report 1 message</h2>
+      <ul>
+        <li>We moved from proposal to implementation planning.</li>
+        <li>The MVP scope is narrow and testable.</li>
+        <li>The first review path works with sample data.</li>
+        <li>Sprint 1 will connect this same review path to SQLite and FastAPI persistence.</li>
+      </ul>
+    </div>
+    <div class="footer">
+      <span>Theseus: weekly review for goal-time alignment</span>
+      <span>9</span>
+    </div>
+  </section>
+</main>
+</body>
+</html>
