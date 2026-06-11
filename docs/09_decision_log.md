@@ -8,11 +8,12 @@ Create a new GitHub-ready workspace named `theseus-weekly-review`.
 
 Reason:
 
-The previous workspace contains valuable exploration but mixes personal LifeOS ideas, proposal files, slides, historical data, and prototype code. A clean repo is easier for team collaboration, GitHub issues, sprint tracking, and final submission.
+Pre-proposal work contains useful exploration but mixes personal notes, proposal files, slides, historical data, and prototype code. A clean repo is easier for team collaboration, GitHub issues, sprint tracking, and final submission.
 
 Consequences:
 
-- Only selected assets from the earlier LifeOS work should be migrated.
+- Theseus implementation work should happen in the clean course repo.
+- Prior exploration may inform requirements and architecture, while implementation work remains in this course repo.
 - The new repo follows the proposal scope.
 - The old workspace remains an archive and reference source.
 
@@ -63,4 +64,3 @@ Consequences:
 
 - No cloud database setup is required for early development.
 - Schema should still be designed so PostgreSQL can be used later.
-

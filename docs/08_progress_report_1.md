@@ -12,7 +12,7 @@ Theseus is now defined as a weekly AI review layer. It does not replace calendar
 
 ## 2. Scope Refinement
 
-Earlier exploration included a broader LifeOS concept. For the course project, the team narrowed the scope to the proposal baseline:
+Pre-proposal exploration included a broader personal productivity concept. For the course project, the team narrowed the scope to the proposal baseline:
 
 - Goal-time alignment
 - Plan-vs-actual review
@@ -23,18 +23,18 @@ Earlier exploration included a broader LifeOS concept. For the course project, t
 
 This keeps the project feasible for the July and August course deadlines.
 
-## 3. Existing Prototype Assets
+## 3. Prior Design References
 
-The team already has reusable exploratory assets:
+The team has prior design references from early exploration:
 
-- Historical time-log data
+- time-log data requirements
 - SQLite schema ideas
-- Project lifecycle concepts
-- Activity energy-impact model
-- Weekly review script logic
-- Early FastAPI and Flutter prototype material
+- project lifecycle concepts
+- activity energy-impact model
+- evidence-first review logic
+- mobile capture and sync architecture ideas
 
-These assets will be selectively migrated into a clean Theseus repository.
+The Theseus implementation will be developed in the course repository using these references as design input.
 
 ## 4. Architecture Direction
 
@@ -61,4 +61,3 @@ Before the midterm checkpoint, the team will:
 The key progress message:
 
 > We have moved from proposal to implementation planning. The MVP is now scoped, the architecture is defined, the team responsibilities are clear, and the next sprint will build the backend data foundation and rule-based weekly review.
-

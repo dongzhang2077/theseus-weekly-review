@@ -102,7 +102,7 @@ Acceptance criteria:
 | Safety | The system must not provide mental health diagnosis. |
 | Privacy | MVP should be local-first with SQLite. |
 | Maintainability | Review checks should be separated from API and UI code. |
-| Portability | Schema should be compatible with future PostgreSQL migration. |
+| Portability | Schema should be compatible with a future PostgreSQL upgrade. |
 | Usability | The user should enter a weekly log without complex setup. |
 
 ## 7. Out of Scope
@@ -113,4 +113,3 @@ Acceptance criteria:
 - Production-grade authentication
 - Complete mobile app
 - Long-term behavior-change proof
-

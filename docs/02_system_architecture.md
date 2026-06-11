@@ -135,16 +135,15 @@ Load weekly context
 | Frontend | React or Next.js | Familiar, fast to prototype, easy to deploy. |
 | AI provider | Adapter interface | Avoids locking the project to one provider. |
 
-## 7. Reused Assets From Earlier LifeOS Work
+## 7. Design References
 
-The previous LifeOS workspace is treated as research and prototype material. Useful assets include:
+Theseus implementation should be built independently in this repository. Useful design reference areas include:
 
-- Historical time-log data
+- time-log data requirements
 - SQLite schema ideas
-- Project lifecycle and dormancy concepts
-- Activity energy-impact labels
-- Weekly review script logic
-- Flutter/FastAPI exploratory prototype
+- project lifecycle and dormancy concepts
+- activity energy-impact labels
+- evidence-first weekly review flow
+- mobile capture and sync architecture experiments
 
-These assets should be migrated selectively, not copied wholesale.
-
+These references should inform the design while the course implementation remains independent.

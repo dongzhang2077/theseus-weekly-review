@@ -66,6 +66,8 @@ flowchart LR
 | June 13 progress report | [08_progress_report_1.md](08_progress_report_1.md) |
 | Decisions and rationale | [09_decision_log.md](09_decision_log.md) |
 | GitHub collaboration workflow | [10_github_workflow.md](10_github_workflow.md) |
+| Sustainable architecture runway | [11_architectural_runway.md](11_architectural_runway.md) |
+| Mobile capture plan | [mobile_capture_plan.md](mobile_capture_plan.md) |
 
 ## 5. MVP Execution Flow
 
@@ -98,4 +100,3 @@ Use repository Markdown as the source of truth during development:
 - GitHub renders Mermaid diagrams directly.
 
 GitHub Wiki can be added later as a polished presentation layer after the project structure stabilizes. It should not replace `docs/` during active development.
-

@@ -171,15 +171,14 @@ DailyReflection
 | model_name | text | Optional |
 | created_at | datetime | System timestamp |
 
-## 4. Migration Notes
+## 4. Reference Mapping Notes
 
-Earlier LifeOS fields can map into the MVP schema:
+If importing records from a timer or historical tracking source, fields can map into the Theseus schema as follows:
 
-| LifeOS Field | Theseus Field |
+| Source Field | Theseus Field |
 |---|---|
 | `time_entries.activity` | `time_logs.activity_name` |
 | `time_entries.duration_minutes` | `time_logs.duration_minutes` |
 | `time_entries.bandwidth_type` | `time_logs.activity_type` |
 | `projects.current_stage` | `projects.stage` |
 | `reviews.summary` | `weekly_reviews.generated_text` |
-
