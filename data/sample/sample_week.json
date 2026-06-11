@@ -1,0 +1,146 @@
+{
+  "goals": [
+    {
+      "id": 1,
+      "title": "Build Theseus MVP",
+      "description": "Create a working weekly review prototype for CSIS 4495.",
+      "priority": 1,
+      "active_status": true
+    },
+    {
+      "id": 2,
+      "title": "Internship preparation",
+      "description": "Maintain job search and interview preparation.",
+      "priority": 2,
+      "active_status": true
+    }
+  ],
+  "projects": [
+    {
+      "id": 1,
+      "goal_id": 1,
+      "title": "Theseus backend",
+      "stage": "startup",
+      "deadline": "2026-07-18",
+      "weekly_min_minutes": 180,
+      "weekly_target_minutes": 480,
+      "status": "active",
+      "last_activity_date": "2026-06-10"
+    },
+    {
+      "id": 2,
+      "goal_id": 1,
+      "title": "Theseus frontend",
+      "stage": "startup",
+      "deadline": "2026-07-18",
+      "weekly_min_minutes": 120,
+      "weekly_target_minutes": 360,
+      "status": "active",
+      "last_activity_date": "2026-06-09"
+    },
+    {
+      "id": 3,
+      "goal_id": 2,
+      "title": "Resume and applications",
+      "stage": "stable",
+      "deadline": null,
+      "weekly_min_minutes": 60,
+      "weekly_target_minutes": 180,
+      "status": "active",
+      "last_activity_date": "2026-05-15"
+    }
+  ],
+  "weekly_plan": {
+    "week_start": "2026-06-08",
+    "week_end": "2026-06-14",
+    "planned_capacity_minutes": 1800,
+    "slack_target_percent": 20,
+    "items": [
+      {
+        "project_id": 1,
+        "title": "Design backend schema and API",
+        "planned_minutes": 300,
+        "priority": 1
+      },
+      {
+        "project_id": 2,
+        "title": "Draft review page layout",
+        "planned_minutes": 240,
+        "priority": 2
+      },
+      {
+        "project_id": 3,
+        "title": "Update resume and apply to two roles",
+        "planned_minutes": 120,
+        "priority": 3
+      }
+    ],
+    "note": "Progress report preparation week."
+  },
+  "time_logs": [
+    {
+      "project_id": 1,
+      "date": "2026-06-10",
+      "start_time": "09:00",
+      "end_time": "11:00",
+      "duration_minutes": 120,
+      "activity_name": "Backend architecture",
+      "activity_type": "consuming",
+      "type_source": "user_selected",
+      "note": "Mapped entities and review flow."
+    },
+    {
+      "project_id": 1,
+      "date": "2026-06-11",
+      "start_time": "13:00",
+      "end_time": "15:00",
+      "duration_minutes": 120,
+      "activity_name": "Review engine rules",
+      "activity_type": "consuming",
+      "type_source": "user_selected",
+      "note": "Drafted deterministic checks."
+    },
+    {
+      "project_id": 2,
+      "date": "2026-06-11",
+      "start_time": "16:00",
+      "end_time": "17:00",
+      "duration_minutes": 60,
+      "activity_name": "Frontend sketch",
+      "activity_type": "consuming",
+      "type_source": "user_selected",
+      "note": "Outlined review page sections."
+    },
+    {
+      "project_id": null,
+      "date": "2026-06-12",
+      "start_time": "19:00",
+      "end_time": "20:00",
+      "duration_minutes": 60,
+      "activity_name": "Walk and decompression",
+      "activity_type": "restore",
+      "type_source": "user_selected",
+      "note": "Recovery activity."
+    },
+    {
+      "project_id": null,
+      "date": "2026-06-12",
+      "start_time": "22:00",
+      "end_time": "23:30",
+      "duration_minutes": 90,
+      "activity_name": "Late scrolling",
+      "activity_type": "destroy",
+      "type_source": "user_selected",
+      "note": "Attention leakage."
+    }
+  ],
+  "daily_reflections": [
+    {
+      "date": "2026-06-11",
+      "small_win": "The MVP architecture became much clearer.",
+      "mood_note": "",
+      "free_note": "Need to keep the first sprint small."
+    }
+  ]
+}
+
