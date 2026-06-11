@@ -36,10 +36,13 @@ The MVP does not support:
 
 ## Repository Structure
 
+For a visual overview, see [Project Map](docs/project_map.md).
+
 ```text
 theseus-weekly-review/
   README.md
   docs/
+    project_map.md
     00_project_charter.md
     01_product_requirements.md
     02_system_architecture.md
