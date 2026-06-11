@@ -10,6 +10,7 @@ The MVP is intentionally narrow. Theseus is not a full autonomous planner, not a
 - Progress Report 1: 2026-06-13
 - Midterm implementation checkpoint: 2026-07-18
 - Final defense and report: 2026-08-01
+- GitHub Project board: [Theseus MVP Development](https://github.com/users/dongzhang2077/projects/3)
 
 ## MVP Scope
 
@@ -143,6 +144,16 @@ git branch -M main
 git add .
 git commit -m "chore: initialize theseus project workspace"
 git push -u origin main
+```
+
+Use the [Theseus MVP Development](https://github.com/users/dongzhang2077/projects/3) Project board for sprint tracking. The board has a `Workflow Status` field with these options:
+
+```text
+Backlog
+Ready
+In Progress
+Review
+Done
 ```
 
 ## Team Responsibilities

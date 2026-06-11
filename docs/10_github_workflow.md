@@ -75,6 +75,24 @@ Suggested GitHub Project columns:
 Backlog -> Ready -> In Progress -> Review -> Done
 ```
 
+Project board:
+
+```text
+https://github.com/users/dongzhang2077/projects/3
+```
+
+The project includes a `Workflow Status` single-select field with:
+
+```text
+Backlog
+Ready
+In Progress
+Review
+Done
+```
+
+GitHub Projects may open in table view by default. In the web UI, create or switch to a Board view and group by `Workflow Status` to see these as workflow columns.
+
 ## 7. Initial GitHub Setup Commands
 
 If Git reports dubious ownership on the Windows-mounted workspace, add this once:
