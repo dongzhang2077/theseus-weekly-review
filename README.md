@@ -55,6 +55,10 @@ theseus-weekly-review/
     08_progress_report_1.md
     09_decision_log.md
     10_github_workflow.md
+  slides/
+    progress_report_1.html
+    progress_report_1_script.md
+    progress_report_1_visuals.md
   backend/
     app/
       main.py
@@ -103,6 +107,12 @@ See [System Architecture](docs/02_system_architecture.md) for the full design.
 5. Validate generated reviews using the quality rubric.
 
 ## Quick Start
+
+Progress Report 1 presentation deliverables:
+
+- [Slide deck](slides/progress_report_1.html)
+- [Speaker script](slides/progress_report_1_script.md)
+- [Architecture and roadmap visuals](slides/progress_report_1_visuals.md)
 
 Run the sample rule-based review:
 
