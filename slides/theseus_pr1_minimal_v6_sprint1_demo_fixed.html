@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Theseus PR1 — 5-Minute Sprint Progress</title>
+<style>
+  :root{
+    --bg:#0b0b0d;
+    --paper:#fbfbfd;
+    --ink:#111113;
+    --muted:#6e6e73;
+    --line:#dedee3;
+    --soft:#f5f5f7;
+    --accent:#0071e3;
+    --green:#1d7f43;
+    --amber:#a15c00;
+    --red:#9f2d20;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",Arial,sans-serif;color:var(--ink);overflow:hidden}
+  body{letter-spacing:-0.015em}
+  .slide{display:none;width:100vw;height:100vh;align-items:center;justify-content:center;padding:3vh 3vw;background:var(--bg)}
+  .slide.active{display:flex}
+  .canvas{position:relative;width:min(94vw,1280px);aspect-ratio:16/9;max-height:92vh;background:var(--paper);border-radius:20px;overflow:hidden;box-shadow:0 34px 90px rgba(0,0,0,.48)}
+  .content{position:absolute;inset:70px 86px 64px 86px;display:flex;flex-direction:column;justify-content:center;z-index:1}
+  .top{position:absolute;top:32px;left:86px;right:86px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px;font-weight:650;letter-spacing:.01em;z-index:2}
+  .brand{color:var(--ink);font-weight:820}.sectionTag{font-size:13px;color:var(--muted);text-align:right}
+  h1,h2,h3,p{margin:0}
+  h1{font-size:clamp(62px,7.5vw,102px);line-height:.9;font-weight:820;letter-spacing:-.07em;max-width:950px}
+  h2{font-size:clamp(44px,5.1vw,70px);line-height:.97;font-weight:820;letter-spacing:-.06em;max-width:1080px}
+  h3{font-size:clamp(22px,2.2vw,30px);line-height:1.08;font-weight:760;letter-spacing:-.035em}
+  .lead{font-size:clamp(22px,2.1vw,30px);line-height:1.24;color:var(--muted);max-width:940px;margin-top:22px;font-weight:500}
+  .subtitle{font-size:clamp(30px,3.3vw,46px);line-height:1.05;color:var(--ink);max-width:880px;margin-top:24px;font-weight:780;letter-spacing:-.045em}
+  .callout{display:inline-flex;align-items:center;width:max-content;max-width:100%;padding:14px 20px;border-radius:999px;background:#111113;color:#fff;font-weight:800;font-size:18px;margin-top:26px;letter-spacing:-.02em}
+  .small{font-size:clamp(15px,1.22vw,18px);line-height:1.38;color:var(--muted);font-weight:520}
+  .tiny{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800}
+  .label{font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:820;margin-bottom:20px}
+  .pill{display:inline-flex;align-items:center;width:max-content;max-width:100%;padding:10px 16px;border-radius:999px;background:#fff;border:1px solid var(--line);font-weight:760;font-size:16px;margin-top:26px;color:var(--ink)}
+  .coverGrid{display:grid;grid-template-columns:1.04fr .96fr;gap:42px;align-items:end}
+  .coverTitle{align-self:center}.coverMeta{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-self:end}
+  .metaCard{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px;min-height:94px}
+  .metaCard b{display:block;font-size:18px;letter-spacing:-.025em;margin-top:8px}.metaCard span{color:var(--muted);font-size:14px;font-weight:650}
+  .loop{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:40px;align-items:stretch}
+  .loopItem{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px 16px;min-height:88px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:17px;font-weight:760;position:relative}
+  .loopItem:not(:last-child):after{content:"→";position:absolute;right:-14px;top:50%;transform:translateY(-50%);color:var(--muted);font-weight:760;z-index:2}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:34px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:32px;align-items:start}
+  .card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:22px;min-height:132px;display:flex;flex-direction:column;justify-content:space-between}
+  .card .status{font-size:12px;font-weight:820;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}.card.done .status{color:var(--green)}.card.working .status{color:var(--accent)}.card.next .status{color:var(--accent)}.card.plan .status{color:var(--muted)}.card.warn .status{color:var(--amber)}
+  .statusRows{display:grid;gap:0;margin-top:26px;background:#fff;border:1px solid var(--line);border-radius:20px;overflow:hidden}
+  .row{display:grid;grid-template-columns:1fr 132px;align-items:center;border-bottom:1px solid var(--line);padding:13px 18px;font-size:18px;background:#fff}.row:last-child{border-bottom:none}.row span:last-child{text-align:right;font-weight:820}.green{color:var(--green)}.blue{color:var(--accent)}.muted{color:var(--muted)}.amber{color:var(--amber)}.red{color:var(--red)}
+  .metricGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:34px}
+  .metric{background:#fff;border:1px solid var(--line);border-radius:20px;padding:20px 22px;min-height:118px}.metric b{display:block;font-size:28px;letter-spacing:-.04em;margin-bottom:11px}.metric span{font-size:14px;color:var(--muted);font-weight:660;line-height:1.35}.metric.done b{color:var(--green)}.metric.working b{color:var(--accent)}.metric.next b{color:var(--amber)}.metric.plan b{color:var(--muted)}
+  .demo{display:grid;grid-template-columns:1.08fr .92fr;gap:34px;align-items:center;margin-top:30px}
+  .terminal{background:#111113;color:#f2f2f2;border-radius:22px;padding:26px;font-family:"SFMono-Regular",Consolas,monospace;font-size:15px;line-height:1.52;min-height:292px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+  .terminal .muted{color:#9a9aa0}.terminal .ok{color:#7ee787}.terminal .blue{color:#79c0ff}.terminal .no{color:#ffb86c}
+  .quote{font-size:clamp(30px,3.2vw,44px);line-height:1.1;font-weight:800;letter-spacing:-.05em;max-width:960px}
+  .ganttWrap{margin-top:32px;background:#fff;border:1px solid var(--line);border-radius:24px;padding:18px 18px 16px}
+  .ganttHead,.ganttRow{display:grid;grid-template-columns:205px repeat(8,1fr);gap:0;align-items:center}
+  .ganttHead{height:32px;border-bottom:1px solid var(--line);color:var(--muted);font-size:11.5px;font-weight:760;text-align:center}.ganttHead div:first-child{text-align:left}
+  .ganttRow{height:47px;border-bottom:1px solid #ededf0}.ganttRow:last-child{border-bottom:none}
+  .task{display:flex;gap:8px;align-items:center;min-width:0;padding-right:10px}.task b{font-size:15px;white-space:nowrap}.task span{font-size:12px;color:var(--muted);font-weight:760;white-space:nowrap}
+  .dot{width:9px;height:9px;border-radius:99px;background:#c7c7cc;flex:0 0 auto}.dot.done{background:var(--green)}.dot.next{background:var(--accent)}
+  .bar{height:16px;border-radius:999px;align-self:center;box-shadow:inset 0 0 0 1px rgba(0,0,0,.04)}.bar.done{background:var(--green)}.bar.next{background:var(--accent)}.bar.plan{background:#b9b9bd}
+  .legend{display:flex;gap:18px;align-items:center;margin-top:12px;color:var(--muted);font-size:13px;font-weight:700}.legend span{display:inline-flex;align-items:center;gap:6px}.legend i{width:18px;height:9px;border-radius:99px;display:inline-block;background:#b9b9bd}.legend .iDone{background:var(--green)}.legend .iNext{background:var(--accent)}
+  .riskGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:28px}.risk{background:#fff;border:1px solid var(--line);border-radius:20px;padding:20px;min-height:136px}.risk b{font-size:21px;letter-spacing:-.035em}.risk p{margin-top:11px;font-size:15px;line-height:1.32;color:var(--muted);font-weight:520}
+  .nextStrip{display:grid;grid-template-columns:1.08fr .92fr;gap:18px;margin-top:20px}.stripBox{background:#fff;border:1px solid var(--line);border-radius:20px;padding:17px 20px;min-height:104px}.stripBox b{font-size:19px;display:block;margin-bottom:9px}.miniFlow{display:flex;gap:7px;flex-wrap:wrap}.miniFlow span{background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:7px 10px;font-size:13px;font-weight:720;color:var(--ink)}
+  .controls{position:fixed;right:22px;bottom:20px;display:flex;gap:8px;z-index:5;opacity:.28;transition:opacity .2s}.controls:hover{opacity:1}.controls button{width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#fff;font-size:19px;cursor:pointer}.controls button:hover{background:rgba(255,255,255,.16)}
+  .notesPanel{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);width:min(760px,88vw);background:rgba(17,17,19,.92);color:#fff;border:1px solid rgba(255,255,255,.16);border-radius:18px;padding:16px 20px;font-size:15px;line-height:1.45;display:none;z-index:10;backdrop-filter:blur(14px)}.notesPanel.show{display:block}
+  @media(max-width:900px){.canvas{width:100vw;height:100vh;max-height:none;border-radius:0;aspect-ratio:auto}.content{inset:72px 28px 58px}.top{left:28px;right:28px}.coverGrid,.demo,.grid2,.nextStrip{grid-template-columns:1fr;gap:22px}.grid3,.metricGrid,.riskGrid{grid-template-columns:1fr}.coverMeta{grid-template-columns:1fr 1fr}.loop{grid-template-columns:1fr}.loopItem:after{display:none}.ganttHead,.ganttRow{grid-template-columns:150px repeat(8,70px);min-width:720px}.ganttWrap{overflow:auto}.terminal{font-size:13px;min-height:250px}.row{grid-template-columns:1fr 112px}}
+  @media print{html,body{height:auto;overflow:visible;background:#fff}.slide{display:flex !important;width:100vw;height:100vh;page-break-after:always;padding:0;background:#fff}.slide:not(.active){display:flex}.canvas{width:100vw;height:100vh;max-height:none;border-radius:0;box-shadow:none}.controls,.notesPanel{display:none!important}}
+</style>
+</head>
+<body>
+
+<section class="slide active" data-notes="0:00–0:35. Introduce team and one-line status: Sprint 0 is complete; the product is not complete yet.">
+  <div class="canvas">
+    <div class="top"><div class="brand">THESEUS / PR1</div><div class="sectionTag">5-minute progress presentation</div></div>
+    <div class="content coverGrid">
+      <div class="coverTitle">
+        <div class="label">Team Zisyphuz</div>
+        <h1>Theseus</h1>
+        <p class="subtitle">Weekly AI Review for Goal-Time Alignment</p>
+        <div class="pill">Sprint 0 complete · Sprint 1 starts with backend persistence</div>
+      </div>
+      <div class="coverMeta">
+        <div class="metaCard"><span>Members</span><b>Dong Zhang<br>Zhi Kang</b></div>
+        <div class="metaCard"><span>Course</span><b>CSIS 4495–071</b></div>
+        <div class="metaCard"><span>Instructor</span><b>Michael Ma</b></div>
+        <div class="metaCard"><span>Date</span><b>June 13, 2026</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-notes="0:35–1:10. Project update. Do not say the direction changed; explain the fixed project position and the MVP loop.">
+  <div class="canvas">
+    <div class="top"><div class="brand">THESEUS</div><div class="sectionTag">Project update</div></div>
+    <div class="content">
+      <div class="label">What we are building</div>
+      <h2>A weekly AI review system.</h2>
+      <p class="lead">Theseus helps users review whether their actual weekly time supported their important goals.</p>
+      <div class="loop">
+        <div class="loopItem">Goals</div>
+        <div class="loopItem">Weekly plan</div>
+        <div class="loopItem">Actual time logs</div>
+        <div class="loopItem">Evidence checks</div>
+        <div class="loopItem">Next-week adjustment</div>
+      </div>
+      <p class="small" style="margin-top:34px"><b>Since the proposal:</b> the idea has been turned into a GitHub-tracked Sprint 0 foundation.</p>
+      <p class="small" style="margin-top:10px">Positioning: not a calendar, not a task manager, and not an automatic scheduler.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-notes="1:10–1:55. Show the whole sprint rhythm. Main point: Sprint 0 is complete; Sprint 1 is a two-week backend persistence sprint.">
+  <div class="canvas">
+    <div class="top"><div class="brand">THESEUS</div><div class="sectionTag">Roadmap + current status</div></div>
+    <div class="content">
+      <div class="label">Sprint rhythm</div>
+      <h2>Foundation is done. Persistence is next.</h2>
+      <div class="ganttWrap">
+        <div class="ganttHead">
+          <div>Sprint</div><div>Jun 9–15</div><div>Jun 16–22</div><div>Jun 23–29</div><div>Jun 30–Jul 6</div><div>Jul 7–13</div><div>Jul 14–20</div><div>Jul 21–27</div><div>Jul 28–Aug 1</div>
+        </div>
+        <div class="ganttRow">
+          <div class="task"><i class="dot done"></i><div><b>Sprint 0</b><br><span>Foundation · complete</span></div></div>
+          <div class="bar done" style="grid-column:2 / 3"></div>
+        </div>
+        <div class="ganttRow">
+          <div class="task"><i class="dot next"></i><div><b>Sprint 1</b><br><span>Backend persistence · two-week build</span></div></div>
+          <div class="bar next" style="grid-column:3 / 5"></div>
+        </div>
+        <div class="ganttRow">
+          <div class="task"><i class="dot"></i><div><b>Sprint 2</b><br><span>Review hardening · frontend preparation</span></div></div>
+          <div class="bar plan" style="grid-column:5 / 7"></div>
+        </div>
+        <div class="ganttRow">
+          <div class="task"><i class="dot"></i><div><b>Sprint 3</b><br><span>Frontend review prototype</span></div></div>
+          <div class="bar plan" style="grid-column:7 / 8"></div>
+        </div>
+        <div class="ganttRow">
+          <div class="task"><i class="dot"></i><div><b>Sprint 4</b><br><span>Evaluation + polish</span></div></div>
+          <div class="bar plan" style="grid-column:8 / 9"></div>
+        </div>
+        <div class="ganttRow">
+          <div class="task"><i class="dot"></i><div><b>Final</b><br><span>Defense package</span></div></div>
+          <div class="bar plan" style="grid-column:9 / 10"></div>
+        </div>
+        <div class="legend"><span><i class="iDone"></i>Complete</span><span><i class="iNext"></i>Next</span><span><i></i>Planned</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-notes="1:55–2:45. Deliverables update. Stay factual: repo, docs, skeleton, sample data, local demo, rubric, issues board.">
+  <div class="canvas">
+    <div class="top"><div class="brand">THESEUS</div><div class="sectionTag">Deliverables update</div></div>
+    <div class="content">
+      <div class="label">Sprint 0 outputs</div>
+      <h2>Proposal became a buildable project foundation.</h2>
+      <div class="grid3">
+        <div class="card done"><div class="status">Done</div><h3>Repository base</h3><p class="small">backend · frontend · review_engine · docs · data · evaluation</p></div>
+        <div class="card done"><div class="status">Done</div><h3>Core documentation</h3><p class="small">requirements, architecture, data model, API contract, delivery plan, backlog</p></div>
+        <div class="card working"><div class="status">Working locally</div><h3>Local review demo</h3><p class="small">sample_week.json runs through a rule-based review engine; not persisted yet</p></div>
+      </div>
+      <div class="statusRows">
+        <div class="row"><span>FastAPI skeleton + health/analyze route</span><span class="green">Exists</span></div>
+        <div class="row"><span>Review quality rubric</span><span class="green">Ready</span></div>
+        <div class="row"><span>GitHub issues / project board</span><span class="green">Organized</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-notes="2:45–3:40. Concrete demo proof. Also clearly state what is not implemented: SQLite persistence and frontend prototype.">
+  <div class="canvas">
+    <div class="top"><div class="brand">THESEUS</div><div class="sectionTag">Demo evidence</div></div>
+    <div class="content">
+      <div class="label">Local review engine</div>
+      <h2>Sample data produces a structured weekly review.</h2>
+      <div class="demo">
+        <div class="terminal">
+          <span class="muted">$</span> python3 scripts/run_sample_review.py<br>
+          <span class="ok">✓</span> loaded data/sample/sample_week.json<br>
+          <span class="ok">✓</span> called review_engine.rules.analyze_week<br>
+          <span class="ok">✓</span> generated weekly review<br><br>
+          <span class="blue">outputs</span>: wins · insights · risk_flags · next_steps · evidence · generated_text<br><br>
+          <span class="no">not yet</span>: SQLite storage · CRUD flows · frontend review page
+        </div>
+        <div>
+          <div class="callout">Working locally · not yet persisted</div>
+          <p class="lead" style="font-size:24px;margin-top:22px">Current path:<br>sample_week.json → review_engine → structured weekly review.</p>
+          <p class="small" style="margin-top:22px">Example result: risk flag for a goal with 0 linked minutes, followed by one small restart block.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-notes="3:40–4:35. Required section: issues, assumptions, actions after proposal. Keep it short, then name the Sprint 1 tasks and AI documentation plan.">
+  <div class="canvas">
+    <div class="top"><div class="brand">THESEUS</div><div class="sectionTag">Issues · actions · next</div></div>
+    <div class="content">
+      <div class="label">Controls for Sprint 1</div>
+      <h2>Evidence first. Then generated wording.</h2>
+      <div class="riskGrid">
+        <div class="risk"><b>AI vagueness</b><p>Deterministic checks first; AI wording only explains the evidence.</p></div>
+        <div class="risk"><b>Incomplete logs</b><p>Start with clean sample weeks and add validation before user testing.</p></div>
+        <div class="risk"><b>Feedback tone</b><p>Keep the review format: win → insight → next step.</p></div>
+      </div>
+      <div class="nextStrip">
+        <div class="stripBox">
+          <b>Sprint 1: backend persistence</b>
+          <div class="miniFlow"><span>SQLite schema</span><span>Repository layer</span><span>CRUD APIs</span><span>Sample loader</span><span>Stored review path</span></div>
+        </div>
+        <div class="stripBox">
+          <b>AI usage</b>
+          <p class="small">AI supported planning, drafting, review, and wording. Final scope and claims were checked by the team.</p>
+          <p class="small" style="margin-top:8px">AI usage documentation will be submitted with the progress report.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-notes="4:35–5:00. Close the presentation. Thank the instructor and class; invite questions if time remains.">
+  <div class="canvas">
+    <div class="top"><div class="brand">THESEUS</div><div class="sectionTag">Thank you</div></div>
+    <div class="content" style="justify-content:center;text-align:left">
+      <div class="label">Team Zisyphuz</div>
+      <h1>Thank you.</h1>
+      <p class="lead">Questions?</p>
+      <div class="grid2" style="max-width:860px;margin-top:42px">
+        <div class="card" style="min-height:112px"><div class="status">Team</div><h3>Dong Zhang · Zhi Kang</h3></div>
+        <div class="card next" style="min-height:112px"><div class="status">Next</div><h3>Sprint 1: backend persistence</h3></div>
+      </div>
+      <div class="pill">Sprint 0 complete → Sprint 1 begins with backend persistence</div>
+    </div>
+  </div>
+</section>
+
+<div class="controls" aria-label="slide controls">
+  <button onclick="prevSlide()" aria-label="Previous slide">‹</button>
+  <button onclick="nextSlide()" aria-label="Next slide">›</button>
+  <button onclick="toggleFullscreen()" aria-label="Toggle fullscreen">⛶</button>
+</div>
+<div id="notes" class="notesPanel"></div>
+<script>
+  const slides=[...document.querySelectorAll('.slide')];
+  const notes=document.getElementById('notes');
+  let idx=0;
+  function show(i){
+    idx=Math.max(0,Math.min(slides.length-1,i));
+    slides.forEach((s,n)=>s.classList.toggle('active',n===idx));
+    history.replaceState(null,'','#s'+(idx+1));
+    updateNotes();
+  }
+  function updateNotes(){notes.textContent=slides[idx].dataset.notes || ''}
+  function nextSlide(){show(idx+1)}
+  function prevSlide(){show(idx-1)}
+  function toggleNotes(){notes.classList.toggle('show');updateNotes()}
+  function toggleFullscreen(){if(!document.fullscreenElement){document.documentElement.requestFullscreen?.()}else{document.exitFullscreen?.()}}
+  window.addEventListener('keydown',e=>{
+    if(['ArrowRight',' ','PageDown'].includes(e.key)){e.preventDefault();nextSlide()}
+    if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();prevSlide()}
+    if(e.key==='Home'){e.preventDefault();show(0)}
+    if(e.key==='End'){e.preventDefault();show(slides.length-1)}
+    if(e.key.toLowerCase()==='f'){toggleFullscreen()}
+    if(e.key.toLowerCase()==='n'){toggleNotes()}
+  });
+  let startX=null;
+  window.addEventListener('touchstart',e=>startX=e.touches[0].clientX,{passive:true});
+  window.addEventListener('touchend',e=>{if(startX===null)return;const dx=e.changedTouches[0].clientX-startX;if(Math.abs(dx)>50){dx<0?nextSlide():prevSlide()}startX=null},{passive:true});
+  const match=location.hash.match(/^#s(\d+)$/); if(match) show(Number(match[1])-1); else updateNotes();
+</script>
+</body>
+</html>
