@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Theseus PR1 — Revised Progress Slides</title>
+<style>
+  :root{
+    --bg:#050706;
+    --paper:#07120e;
+    --panel:#0b1a14;
+    --panel2:#101711;
+    --ink:#d8ffd1;
+    --muted:#7ea68d;
+    --line:#1f5f3c;
+    --soft:#0e2319;
+    --accent:#ffb86c;
+    --green:#7CFF8E;
+    --amber:#ffb86c;
+    --cyan:#80ffd7;
+    --shadow:rgba(124,255,142,.16);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#020403;font-family:"SFMono-Regular","Cascadia Mono","Menlo","Consolas","Courier New",monospace;color:var(--ink);overflow:hidden}
+  body{letter-spacing:-0.01em;text-rendering:geometricPrecision}
+  .slide{display:none;width:100vw;height:100vh;align-items:center;justify-content:center;padding:3vh 3vw;background:
+    radial-gradient(circle at 50% 12%, rgba(124,255,142,.08), transparent 34%),
+    radial-gradient(circle at 50% 110%, rgba(255,184,108,.055), transparent 38%),
+    var(--bg)}
+  .slide.active{display:flex}
+  .canvas{position:relative;width:min(94vw,1280px);aspect-ratio:16/9;max-height:92vh;background:
+    linear-gradient(180deg, rgba(255,255,255,.018), rgba(255,255,255,0) 18%),
+    radial-gradient(circle at 22% 18%, rgba(124,255,142,.055), transparent 24%),
+    var(--paper);border-radius:12px;overflow:hidden;border:1px solid rgba(124,255,142,.38);box-shadow:0 0 0 1px rgba(255,184,108,.08),0 28px 80px rgba(0,0,0,.58),0 0 54px rgba(124,255,142,.1)}
+  .canvas:before{content:"";position:absolute;inset:0;pointer-events:none;z-index:4;background:
+    repeating-linear-gradient(to bottom, rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 1px, transparent 1px, transparent 5px);mix-blend-mode:screen;opacity:.20}
+  .canvas:after{content:"";position:absolute;inset:0;pointer-events:none;z-index:5;box-shadow:inset 0 0 90px rgba(0,0,0,.55), inset 0 0 18px rgba(124,255,142,.12);border-radius:12px}
+  .content{position:absolute;inset:86px 86px 70px 86px;display:flex;flex-direction:column;justify-content:center;z-index:1}
+  .logo{position:absolute;top:36px;left:86px;color:var(--green);font-size:13px;font-weight:800;letter-spacing:.12em;z-index:2;text-shadow:0 0 12px rgba(124,255,142,.42)}
+  .logo:before{content:"> ";color:var(--accent)}
+  h1,h2,h3,p{margin:0}
+  h1{font-size:clamp(68px,7.7vw,108px);line-height:.9;font-weight:800;letter-spacing:-.055em;max-width:960px;color:var(--ink);text-shadow:0 0 16px rgba(124,255,142,.20)}
+  h2{font-size:clamp(42px,4.85vw,68px);line-height:.98;font-weight:800;letter-spacing:-.048em;max-width:1040px;color:var(--ink);text-shadow:0 0 14px rgba(124,255,142,.18)}
+  h3{font-size:clamp(22px,2.15vw,30px);line-height:1.08;font-weight:800;letter-spacing:-.03em;color:var(--ink)}
+  .small{font-size:clamp(15px,1.18vw,17px);line-height:1.35;color:var(--muted);font-weight:540}
+  .coverGrid{display:grid;grid-template-columns:1.05fr .95fr;gap:44px;align-items:end}
+  .coverTitle{align-self:center}.coverMeta{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-self:end}
+  .metaCard{background:rgba(11,26,20,.78);border:1px solid rgba(124,255,142,.31);border-radius:6px;padding:18px;min-height:94px;box-shadow:inset 0 0 0 1px rgba(255,184,108,.035),0 0 22px rgba(124,255,142,.035)}
+  .metaCard b{display:block;font-size:18px;letter-spacing:-.015em;margin-top:8px;color:var(--ink)}.metaCard span{color:var(--accent);font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.09em}
+  .loop{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:44px;align-items:stretch}
+  .loopItem{background:rgba(11,26,20,.78);border:1px solid rgba(124,255,142,.34);border-radius:5px;padding:16px 16px;min-height:92px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:17px;font-weight:800;position:relative;color:var(--ink);box-shadow:0 0 18px rgba(124,255,142,.04)}
+  .loopItem:not(:last-child):after{content:"→";position:absolute;right:-14px;top:50%;transform:translateY(-50%);color:var(--accent);font-weight:900;z-index:2;text-shadow:0 0 10px rgba(255,184,108,.38)}
+  .ganttWrap{margin-top:36px;background:rgba(7,18,14,.84);border:1px solid rgba(124,255,142,.34);border-radius:7px;padding:18px 18px 16px;box-shadow:inset 0 0 0 1px rgba(255,184,108,.04)}
+  .ganttHead,.ganttRow{display:grid;grid-template-columns:205px repeat(8,1fr);gap:0;align-items:center}
+  .ganttHead{height:32px;border-bottom:1px solid rgba(124,255,142,.24);color:var(--muted);font-size:11.5px;font-weight:800;text-align:center}.ganttHead div:first-child{text-align:left;color:var(--accent)}
+  .ganttRow{height:48px;border-bottom:1px solid rgba(124,255,142,.12)}.ganttRow:last-child{border-bottom:none}
+  .task{display:flex;gap:8px;align-items:center;min-width:0;padding-right:10px}.task b{font-size:15px;white-space:nowrap;color:var(--ink)}.task span{font-size:12px;color:var(--muted);font-weight:760;white-space:nowrap}
+  .dot{width:10px;height:10px;border-radius:0;background:#2c5740;flex:0 0 auto}.dot.done{background:var(--green);box-shadow:0 0 9px rgba(124,255,142,.75)}.dot.next{background:var(--accent);box-shadow:0 0 9px rgba(255,184,108,.65)}
+  .bar{height:16px;border-radius:2px;align-self:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 0 10px rgba(124,255,142,.08)}.bar.done{background:linear-gradient(90deg,var(--green),#a9ffb4)}.bar.next{background:linear-gradient(90deg,var(--accent),#ffd39a)}.bar.plan{background:#355840}
+  .legend{display:flex;gap:18px;align-items:center;margin-top:12px;color:var(--muted);font-size:13px;font-weight:700}.legend span{display:inline-flex;align-items:center;gap:6px}.legend i{width:18px;height:9px;border-radius:2px;display:inline-block;background:#355840}.legend .iDone{background:var(--green)}.legend .iNext{background:var(--accent)}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:38px}
+  .grid3 .card{align-items:center;text-align:center;padding:22px 16px}
+  .grid3 .card h3{white-space:nowrap;font-size:clamp(18px,1.9vw,25px);line-height:1.08;letter-spacing:-.04em}
+  .card{background:rgba(11,26,20,.78);border:1px solid rgba(124,255,142,.34);border-radius:6px;padding:24px;min-height:138px;display:flex;align-items:flex-start;justify-content:center;flex-direction:column;box-shadow:inset 0 0 0 1px rgba(255,184,108,.035),0 0 22px rgba(124,255,142,.035)}
+  .card h3:before{content:"[ ";color:var(--accent)}.card h3:after{content:" ]";color:var(--accent)}
+  .statusRows{display:grid;gap:0;margin-top:24px;background:rgba(7,18,14,.84);border:1px solid rgba(124,255,142,.34);border-radius:6px;overflow:hidden}
+  .row{display:grid;grid-template-columns:1fr 132px;align-items:center;border-bottom:1px solid rgba(124,255,142,.18);padding:13px 18px;font-size:18px;background:transparent;color:var(--ink)}.row:last-child{border-bottom:none}.row span:last-child{text-align:right;font-weight:820}.green{color:var(--green);text-shadow:0 0 8px rgba(124,255,142,.45)}
+  .terminalCenter{display:flex;justify-content:center;align-items:center;margin-top:38px}
+  .terminal{background:#050806;color:var(--ink);border-radius:7px;padding:30px 34px;font-family:"SFMono-Regular","Cascadia Mono","Menlo","Consolas","Courier New",monospace;font-size:18px;line-height:1.55;min-height:340px;width:min(900px,100%);border:1px solid rgba(124,255,142,.42);box-shadow:inset 0 0 40px rgba(124,255,142,.055),0 0 30px rgba(124,255,142,.09)}
+  .terminal .muted{color:var(--muted)}.terminal .ok{color:var(--green);text-shadow:0 0 8px rgba(124,255,142,.55)}.terminal .blue{color:var(--cyan);text-shadow:0 0 8px rgba(128,255,215,.35)}.terminal .no{color:var(--amber);text-shadow:0 0 8px rgba(255,184,108,.35)}
+  .riskGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:32px}.risk{background:rgba(11,26,20,.78);border:1px solid rgba(124,255,142,.34);border-radius:6px;padding:24px;min-height:110px;display:flex;align-items:center}.risk b{font-size:24px;letter-spacing:-.03em;color:var(--ink)}.risk b:before{content:"// ";color:var(--accent)}
+  .nextStrip{display:grid;grid-template-columns:1.08fr .92fr;gap:18px;margin-top:20px}.stripBox{background:rgba(11,26,20,.78);border:1px solid rgba(124,255,142,.34);border-radius:6px;padding:20px 22px;min-height:116px}.stripBox b{font-size:21px;display:block;margin-bottom:14px;letter-spacing:-.02em;color:var(--ink)}.stripBox b:before{content:"> ";color:var(--accent)}.miniFlow{display:flex;gap:8px;flex-wrap:wrap}.miniFlow span{background:rgba(14,35,25,.9);border:1px solid rgba(124,255,142,.28);border-radius:3px;padding:8px 11px;font-size:13px;font-weight:800;color:var(--ink)}
+  .thanks{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;height:100%;gap:42px}.thanksInner{text-align:left;transform:none}.thanks h1{font-size:clamp(82px,8.6vw,118px);line-height:.9;white-space:nowrap}.thanks p{font-size:clamp(24px,2.4vw,34px);line-height:1.25;color:var(--muted);font-weight:700;margin-top:22px}.thanks p:before{content:"> ";color:var(--accent)}.nextGoal{background:transparent;border:0;border-left:1px solid rgba(124,255,142,.34);border-radius:0;padding:4px 0 4px 28px;min-height:auto;display:flex;flex-direction:column;justify-content:center;box-shadow:none;margin-left:6px}.nextGoal .tag{font-size:17px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:860;margin-bottom:12px}.nextGoal .tag:before{content:"> ";}.nextGoal h3{font-size:clamp(28px,3vw,42px);line-height:1.05;letter-spacing:-.04em;color:var(--ink);white-space:nowrap}
+  .controls{position:fixed;right:22px;bottom:20px;display:flex;gap:8px;z-index:8;opacity:.28;transition:opacity .2s}.controls:hover{opacity:1}.controls button{width:42px;height:42px;border-radius:50%;border:1px solid rgba(124,255,142,.28);background:rgba(5,8,6,.72);color:var(--green);font-size:19px;cursor:pointer}.controls button:hover{background:rgba(124,255,142,.08)}
+  .notesPanel{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);width:min(760px,88vw);background:rgba(5,8,6,.94);color:var(--ink);border:1px solid rgba(124,255,142,.32);border-radius:8px;padding:16px 20px;font-size:15px;line-height:1.45;display:none;z-index:10;backdrop-filter:blur(14px)}.notesPanel.show{display:block}
+  @media(max-width:900px){.canvas{width:100vw;height:100vh;max-height:none;border-radius:0;aspect-ratio:auto}.content{inset:78px 28px 58px}.logo{left:28px}.coverGrid,.nextStrip{grid-template-columns:1fr;gap:22px}.thanks{gap:28px}.grid3,.riskGrid{grid-template-columns:1fr}.coverMeta{grid-template-columns:1fr 1fr}.loop{grid-template-columns:1fr}.loopItem:after{display:none}.ganttHead,.ganttRow{grid-template-columns:150px repeat(8,70px);min-width:720px}.ganttWrap{overflow:auto}.terminal{font-size:13px;min-height:250px}.row{grid-template-columns:1fr 112px}.nextGoal{min-height:140px;padding:24px}}
+  @media print{html,body{height:auto;overflow:visible;background:#fff}.slide{display:flex !important;width:100vw;height:100vh;page-break-after:always;padding:0;background:#fff}.slide:not(.active){display:flex}.canvas{width:100vw;height:100vh;max-height:none;border-radius:0;box-shadow:none}.controls,.notesPanel{display:none!important}}
+</style>
+</head>
+<body>
+
+<section class="slide active" data-notes="0:00–0:35. Introduce team and one-line status: Sprint 0 is complete; Sprint 1 begins with backend persistence.">
+  <div class="canvas">
+    <div class="logo">THESEUS</div>
+    <div class="content coverGrid">
+      <div class="coverTitle">
+        <h1>Theseus</h1>
+      </div>
+      <div class="coverMeta">
+        <div class="metaCard"><span>Team</span><b>Team Zisyphuz</b></div>
+        <div class="metaCard"><span>Members</span><b>Dong Zhang<br>Zhi Kang</b></div>
+        <div class="metaCard"><span>Course</span><b>CSIS 4495–071</b></div>
+        <div class="metaCard"><span>Date</span><b>June 13, 2026</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-notes="0:35–1:10. Explain the MVP loop without extra positioning text.">
+  <div class="canvas">
+    <div class="logo">THESEUS</div>
+    <div class="content">
+      <h2>A weekly AI review system.</h2>
+      <div class="loop">
+        <div class="loopItem">Goals</div>
+        <div class="loopItem">Weekly plan</div>
+        <div class="loopItem">Actual time logs</div>
+        <div class="loopItem">Evidence checks</div>
+        <div class="loopItem">Next-week adjustment</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-notes="1:10–1:55. Sprint 0 is complete; Sprint 1 is the two-week backend persistence sprint.">
+  <div class="canvas">
+    <div class="logo">THESEUS</div>
+    <div class="content">
+      <h2>Foundation is done. Persistence is next.</h2>
+      <div class="ganttWrap">
+        <div class="ganttHead">
+          <div>Sprint</div><div>Jun 9–15</div><div>Jun 16–22</div><div>Jun 23–29</div><div>Jun 30–Jul 6</div><div>Jul 7–13</div><div>Jul 14–20</div><div>Jul 21–27</div><div>Jul 28–Aug 1</div>
+        </div>
+        <div class="ganttRow">
+          <div class="task"><i class="dot done"></i><div><b>Sprint 0</b><br><span>Foundation · complete</span></div></div>
+          <div class="bar done" style="grid-column:2 / 3"></div>
+        </div>
+        <div class="ganttRow">
+          <div class="task"><i class="dot next"></i><div><b>Sprint 1</b><br><span>Backend persistence · two-week build</span></div></div>
+          <div class="bar next" style="grid-column:3 / 5"></div>
+        </div>
+        <div class="ganttRow">
+          <div class="task"><i class="dot"></i><div><b>Sprint 2</b><br><span>Review hardening · frontend preparation</span></div></div>
+          <div class="bar plan" style="grid-column:5 / 7"></div>
+        </div>
+        <div class="ganttRow">
+          <div class="task"><i class="dot"></i><div><b>Sprint 3</b><br><span>Frontend review prototype</span></div></div>
+          <div class="bar plan" style="grid-column:7 / 8"></div>
+        </div>
+        <div class="ganttRow">
+          <div class="task"><i class="dot"></i><div><b>Sprint 4</b><br><span>Evaluation + polish</span></div></div>
+          <div class="bar plan" style="grid-column:8 / 9"></div>
+        </div>
+        <div class="ganttRow">
+          <div class="task"><i class="dot"></i><div><b>Final</b><br><span>Defense package</span></div></div>
+          <div class="bar plan" style="grid-column:9 / 10"></div>
+        </div>
+        <div class="legend"><span><i class="iDone"></i>Complete</span><span><i class="iNext"></i>Next</span><span><i></i>Planned</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-notes="1:55–2:45. Deliverables update: repo, docs, local demo, and supporting setup.">
+  <div class="canvas">
+    <div class="logo">THESEUS</div>
+    <div class="content">
+      <h2>Proposal became a buildable project foundation.</h2>
+      <div class="grid3">
+        <div class="card"><h3>Repository base</h3></div>
+        <div class="card"><h3>Core documentation</h3></div>
+        <div class="card"><h3>Local review demo</h3></div>
+      </div>
+      <div class="statusRows">
+        <div class="row"><span>FastAPI skeleton + health/analyze route</span><span class="green">Exists</span></div>
+        <div class="row"><span>Review quality rubric</span><span class="green">Ready</span></div>
+        <div class="row"><span>GitHub issues / project board</span><span class="green">Organized</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-notes="2:45–3:40. Demo proof: the local script takes sample data through the review engine and outputs a structured review.">
+  <div class="canvas">
+    <div class="logo">THESEUS</div>
+    <div class="content">
+      <h2>Sample data produces a structured weekly review.</h2>
+      <div class="terminalCenter">
+        <div class="terminal">
+          <span class="muted">$</span> python3 scripts/run_sample_review.py<br>
+          <span class="ok">✓</span> loaded data/sample/sample_week.json<br>
+          <span class="ok">✓</span> called review_engine.rules.analyze_week<br>
+          <span class="ok">✓</span> generated weekly review<br><br>
+          <span class="blue">outputs</span>: wins · insights · risk_flags · next_steps · evidence · generated_text<br><br>
+          <span class="no">not yet</span>: SQLite storage · CRUD flows · frontend review page
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-notes="3:40–4:35. State Sprint 1 controls and the AI usage summary.">
+  <div class="canvas">
+    <div class="logo">THESEUS</div>
+    <div class="content">
+      <h2>Evidence first. Then generated wording.</h2>
+      <div class="riskGrid">
+        <div class="risk"><b>AI vagueness</b></div>
+        <div class="risk"><b>Incomplete logs</b></div>
+        <div class="risk"><b>Feedback tone</b></div>
+      </div>
+      <div class="nextStrip">
+        <div class="stripBox">
+          <b>Sprint 1: backend persistence</b>
+          <div class="miniFlow"><span>SQLite schema</span><span>Repository layer</span><span>CRUD APIs</span><span>Sample loader</span><span>Stored review path</span></div>
+        </div>
+        <div class="stripBox">
+          <b>AI usage</b>
+          <div class="miniFlow"><span>planning</span><span>drafting</span><span>review</span><span>wording</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-notes="4:35–5:00. Close the presentation, invite questions, and point to the next sprint target.">
+  <div class="canvas">
+    <div class="logo">THESEUS</div>
+    <div class="content thanks">
+      <div class="thanksInner">
+        <h1>Thank you.</h1>
+        <p>Questions?</p>
+      </div>
+      <div class="nextGoal">
+        <div class="tag">Next</div>
+        <h3>Sprint 1: backend persistence</h3>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="controls" aria-label="slide controls">
+  <button onclick="prevSlide()" aria-label="Previous slide">‹</button>
+  <button onclick="nextSlide()" aria-label="Next slide">›</button>
+  <button onclick="toggleFullscreen()" aria-label="Toggle fullscreen">⛶</button>
+</div>
+<div id="notes" class="notesPanel"></div>
+<script>
+  const slides=[...document.querySelectorAll('.slide')];
+  const notes=document.getElementById('notes');
+  let idx=0;
+  function show(i){
+    idx=Math.max(0,Math.min(slides.length-1,i));
+    slides.forEach((s,n)=>s.classList.toggle('active',n===idx));
+    history.replaceState(null,'','#s'+(idx+1));
+    updateNotes();
+  }
+  function updateNotes(){notes.textContent=slides[idx].dataset.notes || ''}
+  function nextSlide(){show(idx+1)}
+  function prevSlide(){show(idx-1)}
+  function toggleNotes(){notes.classList.toggle('show');updateNotes()}
+  function toggleFullscreen(){if(!document.fullscreenElement){document.documentElement.requestFullscreen?.()}else{document.exitFullscreen?.()}}
+  window.addEventListener('keydown',e=>{
+    if(['ArrowRight',' ','PageDown'].includes(e.key)){e.preventDefault();nextSlide()}
+    if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();prevSlide()}
+    if(e.key==='Home'){e.preventDefault();show(0)}
+    if(e.key==='End'){e.preventDefault();show(slides.length-1)}
+    if(e.key.toLowerCase()==='f'){toggleFullscreen()}
+    if(e.key.toLowerCase()==='n'){toggleNotes()}
+  });
+  let startX=null;
+  window.addEventListener('touchstart',e=>startX=e.touches[0].clientX,{passive:true});
+  window.addEventListener('touchend',e=>{if(startX===null)return;const dx=e.changedTouches[0].clientX-startX;if(Math.abs(dx)>50){dx<0?nextSlide():prevSlide()}startX=null},{passive:true});
+  const match=location.hash.match(/^#s(\d+)$/); if(match) show(Number(match[1])-1); else updateNotes();
+</script>
+</body>
+</html>
