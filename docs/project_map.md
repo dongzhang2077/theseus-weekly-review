@@ -63,7 +63,7 @@ flowchart LR
 | Review logic design | [05_review_engine_design.md](05_review_engine_design.md) |
 | Sprint plan | [06_agile_delivery_plan.md](06_agile_delivery_plan.md) |
 | Backlog/user stories | [07_product_backlog.md](07_product_backlog.md) |
-| June 13 progress report | [08_progress_report_1.md](08_progress_report_1.md) |
+| June 15 progress report | [08_progress_report_1.md](08_progress_report_1.md) |
 | Decisions and rationale | [09_decision_log.md](09_decision_log.md) |
 | GitHub collaboration workflow | [10_github_workflow.md](10_github_workflow.md) |
 | Sustainable architecture runway | [11_architectural_runway.md](11_architectural_runway.md) |

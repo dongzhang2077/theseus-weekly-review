@@ -1,6 +1,6 @@
 # Progress Report 1 Review Notes
 
-Purpose: final review notes for issue #21, before the 2026-06-13 Progress Report 1 presentation.
+Purpose: final review notes for issue #21, before the 2026-06-15 Progress Report 1 presentation.
 
 ## Review Status
 

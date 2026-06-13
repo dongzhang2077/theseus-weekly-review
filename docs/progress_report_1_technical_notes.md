@@ -1,6 +1,6 @@
 # Progress Report 1 Technical Notes
 
-Date: 2026-06-13
+Date: 2026-06-15
 
 Purpose: technical handoff notes for Progress Report 1 slides and script.
 

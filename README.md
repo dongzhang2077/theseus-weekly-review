@@ -7,7 +7,7 @@ The MVP is intentionally narrow. Theseus is not a full autonomous planner, not a
 ## Current Project Stage
 
 - Proposal submitted: 2026-06-09
-- Progress Report 1: 2026-06-13
+- Progress Report 1: 2026-06-15
 - Midterm implementation checkpoint: 2026-07-18
 - Final defense and report: 2026-08-01
 - GitHub Project board: [Theseus MVP Development](https://github.com/users/dongzhang2077/projects/3)
