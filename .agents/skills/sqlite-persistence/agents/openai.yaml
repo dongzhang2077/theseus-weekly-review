@@ -1,0 +1,4 @@
+interface:
+  display_name: "SQLite Persistence"
+  short_description: "Build and verify the Theseus SQLite persistence path"
+  default_prompt: "Use $sqlite-persistence to implement or review the next SQLite persistence task."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "API Contract Review"
+  short_description: "Check FastAPI behavior against the Theseus API contract"
+  default_prompt: "Use $api-contract-review to review the current API changes against the contract."

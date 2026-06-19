@@ -13,6 +13,7 @@ The backend is responsible for validation, persistence, and review orchestration
 
 - `GET /health`
 - `POST /reviews/weekly/analyze`
+- `POST /reviews/weekly/generate`
 - CRUD endpoints for goals, projects, weekly plans, and time logs
 
 The first implementation can run the review engine directly from a JSON payload before the database layer is finished.
@@ -24,7 +25,17 @@ From the repository root:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r backend/requirements.txt
+pip install -r backend/requirements-dev.txt
 uvicorn backend.app.main:app --reload
 ```
 
+The default local database is `data/local/theseus.db`. Override it with `THESEUS_DB_PATH`.
+
+Generate a review from an initialized and populated database with:
+
+```bash
+python3 scripts/run_persisted_review.py \
+  --database data/local/theseus.db \
+  --week-start 2026-06-08 \
+  --week-end 2026-06-14
+```

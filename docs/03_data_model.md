@@ -85,6 +85,7 @@ DailyReflection
 | weekly_min_minutes | integer | Maintenance or target floor |
 | weekly_target_minutes | integer | Normal weekly target |
 | status | text | `active`, `paused`, `archived` |
+| last_activity_date | date | Optional date used by dormancy checks |
 | created_at | datetime | System timestamp |
 | updated_at | datetime | System timestamp |
 
@@ -170,8 +171,17 @@ DailyReflection
 | generated_text | text | Human-readable review |
 | model_name | text | Optional |
 | created_at | datetime | System timestamp |
+| updated_at | datetime | System timestamp |
 
-## 4. Reference Mapping Notes
+## 4. API Representation Rules
+
+- Create requests do not accept database IDs or system timestamps.
+- Read responses include persisted IDs and timestamps.
+- Dates, times, and datetimes use ISO 8601 JSON strings.
+- A weekly plan and its planned items are created in one transaction.
+- One Sprint 1 weekly review is stored per `(week_start, week_end)` pair; regeneration replaces the stored structured result while preserving its ID.
+
+## 5. Reference Mapping Notes
 
 If importing records from a timer or historical tracking source, fields can map into the Theseus schema as follows:
 
