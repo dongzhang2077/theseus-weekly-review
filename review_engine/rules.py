@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 
@@ -366,13 +366,25 @@ def _label_goal_minutes(goals_by_id: dict[int, dict[str, Any]], minutes_by_goal:
     return labeled
 
 
-def _days_since(start_date: str | None, end_date: str | None) -> int | None:
+def _days_since(
+    start_date: str | date | datetime | None,
+    end_date: str | date | datetime | None,
+) -> int | None:
     if not start_date or not end_date:
         return None
-    try:
-        start = datetime.strptime(start_date, "%Y-%m-%d").date()
-        end = datetime.strptime(end_date, "%Y-%m-%d").date()
-    except ValueError:
+    start = _coerce_date(start_date)
+    end = _coerce_date(end_date)
+    if start is None or end is None:
         return None
     return (end - start).days
 
+
+def _coerce_date(value: str | date | datetime) -> date | None:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None

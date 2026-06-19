@@ -42,9 +42,11 @@ Response:
 }
 ```
 
+Status: `201 Created`.
+
 ### GET /goals
 
-Returns all goals.
+Returns all goals ordered by priority and ID. Persisted responses also include `created_at` and `updated_at`.
 
 ## 3. Projects
 
@@ -63,6 +65,12 @@ Request:
   "status": "active"
 }
 ```
+
+Status: `201 Created`. A missing `goal_id` returns a controlled `4xx` response.
+
+### GET /projects
+
+Returns projects ordered by ID.
 
 ## 4. Weekly Plans
 
@@ -88,6 +96,12 @@ Request:
 }
 ```
 
+Status: `201 Created`. The plan and all items are committed atomically.
+
+### GET /weekly-plans
+
+Returns persisted plans with item IDs and deterministic item ordering.
+
 ## 5. Time Logs
 
 ### POST /time-logs
@@ -107,6 +121,12 @@ Request:
   "note": "Defined core entities."
 }
 ```
+
+Status: `201 Created`.
+
+### GET /time-logs
+
+Returns time logs ordered by date, start time, and ID.
 
 ## 6. Weekly Review
 
@@ -157,7 +177,17 @@ Response:
 }
 ```
 
-## 7. Evaluation
+The persisted response also includes `id`, `created_at`, and `updated_at`. If no matching weekly plan exists, the endpoint returns `404`. The endpoint reads normalized evidence from SQLite, calls the framework-independent review engine, and stores the structured result before responding.
+
+## 7. Validation and Errors
+
+- Invalid request data returns `422`.
+- Missing referenced entities return `404` or `409`, depending on whether the operation is a lookup or a conflicting write.
+- Create requests never accept database-managed IDs or timestamps.
+- Empty optional strings are accepted; required names and titles must not be empty.
+- `start_time` and `end_time` must be supplied together.
+
+## 8. Evaluation
 
 ### POST /evaluation/review-feedback
 
@@ -176,4 +206,3 @@ Request:
   "comments": "The review was clear and realistic."
 }
 ```
-

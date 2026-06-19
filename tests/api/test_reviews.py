@@ -1,0 +1,43 @@
+from fastapi.testclient import TestClient
+
+from backend.app.main import create_app
+from tests.support import load_sample_payload, seed_sample_week
+
+
+def test_generate_endpoint_persists_review(database) -> None:
+    app = create_app(database.path)
+    with TestClient(app) as client:
+        with database.session() as connection:
+            seed_sample_week(connection)
+
+        response = client.post(
+            "/reviews/weekly/generate",
+            json={"week_start": "2026-06-08", "week_end": "2026-06-14"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == 1
+    with database.session() as connection:
+        count = connection.execute("SELECT COUNT(*) FROM weekly_reviews").fetchone()[0]
+    assert count == 1
+
+
+def test_generate_endpoint_returns_404_without_plan(database) -> None:
+    app = create_app(database.path)
+    with TestClient(app) as client:
+        response = client.post(
+            "/reviews/weekly/generate",
+            json={"week_start": "2026-06-08", "week_end": "2026-06-14"},
+        )
+
+    assert response.status_code == 404
+    assert response.json()["detail"].startswith("No weekly plan exists")
+
+
+def test_analyze_endpoint_preserves_in_memory_compatibility(database) -> None:
+    app = create_app(database.path)
+    with TestClient(app) as client:
+        response = client.post("/reviews/weekly/analyze", json=load_sample_payload())
+
+    assert response.status_code == 200
+    assert response.json()["evidence"]["actual_total_minutes"] == 450

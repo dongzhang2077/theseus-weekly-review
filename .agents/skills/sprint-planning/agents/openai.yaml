@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sprint Planning"
+  short_description: "Plan sprint ownership, dependencies, and acceptance criteria"
+  default_prompt: "Use $sprint-planning to turn the current backlog into an executable sprint plan."

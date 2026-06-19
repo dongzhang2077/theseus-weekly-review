@@ -1,19 +1,37 @@
+from __future__ import annotations
+
+import os
+from contextlib import asynccontextmanager
+from pathlib import Path
+
 from fastapi import FastAPI
 
-from review_engine.rules import analyze_week
-
-from .schemas import WeeklyReviewRequest
-
-
-app = FastAPI(title="Theseus API", version="0.1.0")
+from .api.reviews import router as reviews_router
+from .db import Database
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "service": "theseus-backend"}
+DEFAULT_DATABASE_PATH = Path(
+    os.getenv("THESEUS_DB_PATH", "data/local/theseus.db")
+)
 
 
-@app.post("/reviews/weekly/analyze")
-def analyze_weekly_review(request: WeeklyReviewRequest) -> dict:
-    return analyze_week(request.model_dump())
+def create_app(database_path: str | Path | None = None) -> FastAPI:
+    database = Database(database_path or DEFAULT_DATABASE_PATH)
 
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        database.initialize()
+        yield
+
+    application = FastAPI(title="Theseus API", version="0.1.0", lifespan=lifespan)
+    application.state.database = database
+    application.include_router(reviews_router)
+
+    @application.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok", "service": "theseus-backend"}
+
+    return application
+
+
+app = create_app()
