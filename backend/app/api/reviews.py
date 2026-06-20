@@ -20,13 +20,13 @@ router = APIRouter(prefix="/reviews/weekly", tags=["weekly-reviews"])
 
 
 @router.post("/analyze", response_model=WeeklyReviewResult)
-def analyze_weekly_review(request: WeeklyReviewRequest) -> WeeklyReviewResult:
+async def analyze_weekly_review(request: WeeklyReviewRequest) -> WeeklyReviewResult:
     payload = request.model_dump(mode="json")
     return WeeklyReviewResult.model_validate(analyze_week(payload))
 
 
 @router.post("/generate", response_model=WeeklyReviewRead)
-def generate_weekly_review(
+async def generate_weekly_review(
     request: WeeklyReviewGenerateRequest,
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> WeeklyReviewRead:

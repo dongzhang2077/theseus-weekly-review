@@ -17,6 +17,11 @@ def database(tmp_path) -> Database:
 
 
 @pytest.fixture
+def anyio_backend() -> str:
+    return "asyncio"
+
+
+@pytest.fixture
 def connection(database: Database) -> Iterator[sqlite3.Connection]:
     with database.session() as active_connection:
         yield active_connection
