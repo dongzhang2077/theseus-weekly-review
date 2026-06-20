@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from .api.goals import router as goals_router
 from .api.projects import router as projects_router
 from .api.reviews import router as reviews_router
+from .api.time_logs import router as time_logs_router
 from .api.weekly_plans import router as weekly_plans_router
 from .db import Database
 
@@ -31,6 +32,7 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
     application.include_router(goals_router)
     application.include_router(projects_router)
     application.include_router(reviews_router)
+    application.include_router(time_logs_router)
     application.include_router(weekly_plans_router)
 
     @application.get("/health")
