@@ -87,6 +87,13 @@ Signals:
 - Ratio of `restore` to `consuming`
 - Excessive `destroy` time
 
+Default thresholds:
+
+- Always report the activity mix with all four activity types: `consuming`, `neutral`, `restore`, and `destroy`.
+- Treat `restore` time as supportive evidence when it appears in the week.
+- Treat `restore` time as a stronger sustainability signal when it is at least 25% of `consuming` time.
+- Flag a `destroy_pattern` when destroy-labeled activity reaches at least 120 minutes and at least 25% of logged time.
+
 ### Dormancy Risk
 
 Question:
@@ -177,4 +184,3 @@ A generated review is unacceptable if:
 - It frames the user as lazy or failing.
 - It ignores completed work and recovery activities.
 - It gives medical, psychological, or mental health diagnosis.
-

@@ -5,6 +5,12 @@ from datetime import date, datetime
 from typing import Any
 
 
+ACTIVITY_TYPES = ("consuming", "neutral", "restore", "destroy")
+DESTROY_RISK_MINUTES = 120
+DESTROY_RISK_RATIO = 0.25
+RESTORE_SUPPORT_RATIO = 0.25
+
+
 def analyze_week(payload: dict[str, Any]) -> dict[str, Any]:
     goals = payload.get("goals", [])
     projects = payload.get("projects", [])
@@ -60,7 +66,7 @@ def analyze_week(payload: dict[str, Any]) -> dict[str, Any]:
         "week_end": weekly_plan.get("week_end"),
         "wins": wins[:3],
         "insights": insights[:5],
-        "risk_flags": risk_flags[:5],
+        "risk_flags": risk_flags[:8],
         "next_steps": next_steps[:3],
         "evidence": evidence,
         "generated_text": _render_review_text(wins, insights, risk_flags, next_steps),
@@ -97,9 +103,11 @@ def _actual_minutes_by_goal(
 
 
 def _activity_mix(time_logs: list[dict[str, Any]]) -> dict[str, int]:
-    totals: dict[str, int] = defaultdict(int)
+    totals: dict[str, int] = {activity_type: 0 for activity_type in ACTIVITY_TYPES}
     for log in time_logs:
         activity_type = log.get("activity_type", "neutral")
+        if activity_type not in totals:
+            activity_type = "neutral"
         totals[activity_type] += int(log.get("duration_minutes", 0))
     return dict(totals)
 
@@ -205,29 +213,42 @@ def _check_activity_mix(activity_mix: dict[str, int]) -> dict[str, list[dict[str
     insights = []
     risk_flags = []
     consuming = activity_mix.get("consuming", 0)
+    neutral = activity_mix.get("neutral", 0)
     restore = activity_mix.get("restore", 0)
     destroy = activity_mix.get("destroy", 0)
+    total = consuming + neutral + restore + destroy
 
     if consuming > 0:
         insights.append(
             {
                 "title": "Consuming work was measurable",
-                "evidence": f"Consuming activities received {consuming / 60:.1f} hours.",
+                "evidence": (
+                    f"Activity mix: consuming {consuming / 60:.1f}h, "
+                    f"neutral {neutral / 60:.1f}h, restore {restore / 60:.1f}h, "
+                    f"destroy {destroy / 60:.1f}h."
+                ),
             }
         )
     if restore > 0:
+        title = "Recovery can be counted as support work"
+        if consuming > 0 and restore / consuming >= RESTORE_SUPPORT_RATIO:
+            title = "Recovery meaningfully supported the week"
         insights.append(
             {
-                "title": "Recovery can be counted as support work",
+                "title": title,
                 "evidence": f"Restore activities received {restore / 60:.1f} hours.",
             }
         )
-    if destroy >= 180:
+    destroy_ratio = destroy / total if total > 0 else 0
+    if destroy >= DESTROY_RISK_MINUTES and destroy_ratio >= DESTROY_RISK_RATIO:
         risk_flags.append(
             {
                 "type": "destroy_pattern",
-                "severity": "low",
-                "evidence": f"Destroy-labeled activities reached {destroy / 60:.1f} hours.",
+                "severity": "medium",
+                "evidence": (
+                    f"Destroy-labeled activities reached {destroy / 60:.1f}h "
+                    f"of {total / 60:.1f}h logged time."
+                ),
             }
         )
     if consuming > 0 and restore / consuming < 0.2:
