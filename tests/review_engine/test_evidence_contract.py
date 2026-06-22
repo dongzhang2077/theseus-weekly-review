@@ -44,6 +44,23 @@ def test_evidence_contract_tracks_goal_and_project_context(evidence: dict) -> No
             "active_status": True,
             "actual_minutes": 300,
             "project_ids": [1, 2],
+            "active_project_count": 2,
+            "project_breakdown": [
+                {
+                    "id": 1,
+                    "title": "Theseus backend",
+                    "status": "active",
+                    "stage": "startup",
+                    "actual_minutes": 240,
+                },
+                {
+                    "id": 2,
+                    "title": "Theseus frontend",
+                    "status": "active",
+                    "stage": "startup",
+                    "actual_minutes": 60,
+                },
+            ],
         },
         {
             "id": 2,
@@ -52,6 +69,16 @@ def test_evidence_contract_tracks_goal_and_project_context(evidence: dict) -> No
             "active_status": True,
             "actual_minutes": 0,
             "project_ids": [3],
+            "active_project_count": 1,
+            "project_breakdown": [
+                {
+                    "id": 3,
+                    "title": "Resume and applications",
+                    "status": "active",
+                    "stage": "stable",
+                    "actual_minutes": 0,
+                }
+            ],
         },
     ]
 

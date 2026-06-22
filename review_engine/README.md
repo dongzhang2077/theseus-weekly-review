@@ -25,7 +25,7 @@ This makes the first prototype testable without an API key.
 `sprint2.review_evidence.v1`. The stable evidence sections are:
 
 - `summary`: planned minutes, actual minutes, and input record counts.
-- `goals`: goal ID, title, priority, active status, actual minutes, and linked project IDs.
+- `goals`: goal ID, title, priority, active status, actual minutes, linked project IDs, and project-level actual-minute breakdown.
 - `projects`: project ID/title, goal link, stage/status, planned minutes, actual minutes, drift, and inactivity age.
 - `plan`: week dates, planned capacity, slack target, planned total, and planned slack.
 - `activity`: activity-type minutes with all four types plus total and unlinked minutes.

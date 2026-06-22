@@ -46,7 +46,7 @@ The evidence package is versioned with:
 Stable sections:
 
 - `summary`: planned total, actual total, and counts of goals, projects, logs, and reflections.
-- `goals`: each goal with priority, active status, actual minutes, and linked project IDs.
+- `goals`: each goal with priority, active status, actual minutes, linked project IDs, and project-level actual-minute breakdown.
 - `projects`: each project with goal link, stage/status, planned minutes, actual minutes, difference, and inactive days.
 - `plan`: week dates, planned capacity, slack target, planned total, planned slack minutes, and item count.
 - `activity`: all four activity-type totals plus total logged minutes and unlinked minutes.

@@ -43,7 +43,7 @@ def analyze_week(payload: dict[str, Any]) -> dict[str, Any]:
     risk_flags = []
     next_steps = []
 
-    alignment = _check_goal_alignment(goals, actual_by_goal)
+    alignment = _check_goal_alignment(goals, projects, actual_by_goal, actual_by_project)
     insights.extend(alignment["insights"])
     risk_flags.extend(alignment["risk_flags"])
 
@@ -142,7 +142,7 @@ def _build_evidence(
             "time_log_count": len(time_logs),
             "reflection_count": len(reflections),
         },
-        "goals": _goal_evidence(goals, projects, actual_by_goal),
+        "goals": _goal_evidence(goals, projects, actual_by_goal, actual_by_project),
         "projects": _project_evidence(
             projects,
             goals_by_id,
@@ -194,16 +194,20 @@ def _goal_evidence(
     goals: list[dict[str, Any]],
     projects: list[dict[str, Any]],
     actual_by_goal: dict[int, int],
+    actual_by_project: dict[int, int],
 ) -> list[dict[str, Any]]:
-    project_ids_by_goal: dict[int, list[int]] = defaultdict(list)
+    projects_by_goal: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for project in projects:
         goal_id = project.get("goal_id")
         if goal_id is not None:
-            project_ids_by_goal[int(goal_id)].append(int(project["id"]))
+            projects_by_goal[int(goal_id)].append(project)
 
     goal_rows = []
     for goal in sorted(goals, key=lambda item: (item.get("priority", 99), item.get("id", 0))):
         goal_id = int(goal["id"])
+        project_breakdown = _goal_project_breakdown(
+            projects_by_goal.get(goal_id, []), actual_by_project
+        )
         goal_rows.append(
             {
                 "id": goal_id,
@@ -211,10 +215,32 @@ def _goal_evidence(
                 "priority": goal.get("priority", 99),
                 "active_status": bool(goal.get("active_status", True)),
                 "actual_minutes": actual_by_goal.get(goal_id, 0),
-                "project_ids": sorted(project_ids_by_goal.get(goal_id, [])),
+                "project_ids": [project["id"] for project in project_breakdown],
+                "active_project_count": sum(
+                    1 for project in projects_by_goal.get(goal_id, []) if project.get("status") == "active"
+                ),
+                "project_breakdown": project_breakdown,
             }
         )
     return goal_rows
+
+
+def _goal_project_breakdown(
+    projects: list[dict[str, Any]], actual_by_project: dict[int, int]
+) -> list[dict[str, Any]]:
+    breakdown = []
+    for project in sorted(projects, key=lambda item: item.get("id", 0)):
+        project_id = int(project["id"])
+        breakdown.append(
+            {
+                "id": project_id,
+                "title": project["title"],
+                "status": project.get("status"),
+                "stage": project.get("stage"),
+                "actual_minutes": actual_by_project.get(project_id, 0),
+            }
+        )
+    return breakdown
 
 
 def _project_evidence(
@@ -334,17 +360,35 @@ def _detect_wins(
     return wins
 
 
-def _check_goal_alignment(goals: list[dict[str, Any]], actual_by_goal: dict[int, int]) -> dict[str, list[dict[str, str]]]:
+def _check_goal_alignment(
+    goals: list[dict[str, Any]],
+    projects: list[dict[str, Any]],
+    actual_by_goal: dict[int, int],
+    actual_by_project: dict[int, int],
+) -> dict[str, list[dict[str, str]]]:
     insights = []
     risk_flags = []
+    projects_by_goal: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for project in projects:
+        goal_id = project.get("goal_id")
+        if goal_id is not None:
+            projects_by_goal[int(goal_id)].append(project)
+
     active_goals = [goal for goal in goals if goal.get("active_status", True)]
     for goal in sorted(active_goals, key=lambda item: item.get("priority", 99)):
-        minutes = actual_by_goal.get(goal["id"], 0)
+        goal_id = int(goal["id"])
+        minutes = actual_by_goal.get(goal_id, 0)
+        project_breakdown = _goal_project_breakdown(
+            projects_by_goal.get(goal_id, []), actual_by_project
+        )
         if minutes > 0:
             insights.append(
                 {
                     "title": f"{goal['title']} received attention",
-                    "evidence": f"Actual goal-linked time was {minutes / 60:.1f} hours.",
+                    "evidence": (
+                        f"Priority {goal.get('priority', 99)} goal received {minutes / 60:.1f}h "
+                        f"across {_format_project_minutes(project_breakdown)}."
+                    ),
                 }
             )
         else:
@@ -352,10 +396,28 @@ def _check_goal_alignment(goals: list[dict[str, Any]], actual_by_goal: dict[int,
                 {
                     "type": "alignment_gap",
                     "severity": "medium",
-                    "evidence": f"{goal['title']} received 0 goal-linked minutes.",
+                    "evidence": (
+                        f"Priority {goal.get('priority', 99)} goal {goal['title']} received "
+                        f"0 goal-linked minutes across {_format_project_names(project_breakdown)}."
+                    ),
                 }
             )
     return {"insights": insights, "risk_flags": risk_flags}
+
+
+def _format_project_minutes(projects: list[dict[str, Any]]) -> str:
+    if not projects:
+        return "no linked projects"
+    return ", ".join(
+        f"{project['title']} ({int(project['actual_minutes']) / 60:.1f}h)"
+        for project in projects
+    )
+
+
+def _format_project_names(projects: list[dict[str, Any]]) -> str:
+    if not projects:
+        return "no linked projects"
+    return ", ".join(project["title"] for project in projects)
 
 
 def _check_plan_gap(
