@@ -144,6 +144,10 @@ Request:
 
 Response:
 
+The `evidence.goals` and `evidence.projects` arrays are abbreviated in this example
+for readability. Real responses include the populated goal and project evidence rows
+defined by the Sprint 2 evidence contract.
+
 ```json
 {
   "week_start": "2026-06-08",
@@ -173,7 +177,70 @@ Response:
       "reason": "Keeps progress realistic without overfilling the week."
     }
   ],
-  "generated_text": "Win: ... Insight: ... Next step: ..."
+  "evidence": {
+    "schema_version": "sprint2.review_evidence.v1",
+    "summary": {
+      "planned_total_minutes": 660,
+      "actual_total_minutes": 450,
+      "goal_count": 2,
+      "project_count": 3,
+      "time_log_count": 5,
+      "reflection_count": 1
+    },
+    "goals": [],
+    "projects": [],
+    "plan": {
+      "planned_capacity_minutes": 1800,
+      "planned_total_minutes": 660,
+      "planned_slack_minutes": 1140,
+      "required_slack_minutes": 360,
+      "slack_status": "healthy",
+      "project_drift": [
+        {
+          "project_id": 2,
+          "project_title": "Theseus frontend",
+          "planned_minutes": 240,
+          "actual_minutes": 60,
+          "difference_minutes": -180,
+          "difference_ratio": 0.75,
+          "status": "under_plan"
+        }
+      ],
+      "unplanned_project_minutes": 0,
+      "unplanned_projects": []
+    },
+    "activity": {
+      "mix": {
+        "consuming": 300,
+        "neutral": 0,
+        "restore": 60,
+        "destroy": 90
+      },
+      "total_minutes": 450,
+      "unlinked_minutes": 150
+    },
+    "reflections": {
+      "count": 1,
+      "small_win_count": 1,
+      "mood_note_count": 0,
+      "free_note_count": 1
+    },
+    "dormancy": {
+      "projects": [
+        {
+          "project_id": 3,
+          "project_title": "Resume and applications",
+          "weekly_min_minutes": 60,
+          "actual_minutes": 0,
+          "last_activity_date": "2026-05-15",
+          "inactive_days": 30,
+          "risk_level": "high",
+          "missed_weekly_minimum": true
+        }
+      ]
+    }
+  },
+  "generated_text": "Win: ... Insight: ... Risk: ... Next step: ..."
 }
 ```
 
