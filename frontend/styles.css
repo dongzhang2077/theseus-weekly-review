@@ -114,6 +114,11 @@ button {
   color: #3f6541;
 }
 
+.icon-button:disabled {
+  cursor: progress;
+  opacity: 0.62;
+}
+
 .icon-button:focus-visible {
   outline: 2px solid rgba(119, 155, 192, 0.74);
   outline-offset: 3px;
@@ -397,6 +402,17 @@ button {
   gap: 10px;
 }
 
+.status-note {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.status-note.warning {
+  color: #8a6220;
+}
+
 .metric {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius);
@@ -540,6 +556,50 @@ th.numeric {
   margin: 0;
   color: var(--muted);
   line-height: 1.55;
+}
+
+.settings-panel {
+  max-width: 760px;
+}
+
+.settings-form {
+  display: grid;
+  gap: 14px;
+}
+
+.form-field {
+  display: grid;
+  gap: 8px;
+}
+
+.field-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px 42px;
+  gap: 8px;
+  align-items: center;
+}
+
+.input-row input {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  color: var(--ink);
+  background: rgba(255, 253, 248, 0.82);
+  outline: none;
+}
+
+.input-row input:focus {
+  border-color: rgba(119, 155, 192, 0.9);
+  box-shadow: 0 0 0 3px rgba(119, 155, 192, 0.16);
 }
 
 .mobile-nav {

@@ -26,7 +26,7 @@ UI priorities:
 
 - Current shell: static HTML, CSS, and JavaScript with no build dependency.
 - Later implementation may move to React or another component framework if the app needs more state complexity.
-- Fetch API can be added behind a small API client layer when wiring the backend demo flow.
+- Fetch API is isolated in `api.js` so the UI can use backend data with a fixture fallback.
 
 ## Local Run
 
@@ -43,6 +43,14 @@ http://127.0.0.1:5173
 ```
 
 The static shell can also be opened directly from `frontend/index.html`.
+
+By default the app calls the backend at:
+
+```text
+http://127.0.0.1:8000
+```
+
+Change the API base URL in Settings when the backend runs elsewhere.
 
 ## First Prototype Flow
 

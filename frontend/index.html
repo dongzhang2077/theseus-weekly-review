@@ -48,12 +48,12 @@
           </div>
 
           <div class="utility-actions" aria-label="Workspace actions">
-            <button class="icon-button" type="button" aria-label="Refresh sample data" title="Refresh">
+            <button class="icon-button" type="button" data-action="refresh-fixture" aria-label="Refresh sample data" title="Refresh">
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="M20 11a8 8 0 0 0-14.7-4.4L4 8M4 4v4h4M4 13a8 8 0 0 0 14.7 4.4L20 16M20 20v-4h-4" />
               </svg>
             </button>
-            <button class="icon-button accent-action" type="button" aria-label="Generate review" title="Generate">
+            <button class="icon-button accent-action" type="button" data-action="generate-review" aria-label="Generate review" title="Generate">
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="M7 5v14l11-7Z" />
               </svg>
@@ -72,6 +72,7 @@
       <nav class="mobile-nav" id="mobileNav" aria-label="Primary navigation"></nav>
     </div>
 
+    <script src="./api.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

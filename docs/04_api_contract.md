@@ -2,6 +2,10 @@
 
 The API uses JSON over HTTP. Authentication is optional for the local MVP and can be added later.
 
+For the local browser demo, the backend allows `http://127.0.0.1:5173` and
+`http://localhost:5173` as CORS origins by default. Override this with the
+comma-separated `THESEUS_CORS_ORIGINS` environment variable.
+
 ## 1. Health
 
 ### GET /health
