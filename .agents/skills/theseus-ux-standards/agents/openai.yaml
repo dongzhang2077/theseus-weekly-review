@@ -1,0 +1,4 @@
+interface:
+  display_name: "Theseus UX Standards"
+  short_description: "Keep Theseus UI clear, usable, and low-noise"
+  default_prompt: "Use $theseus-ux-standards to design or review a Theseus frontend UI for clear task flow, concise copy, and accessible controls."

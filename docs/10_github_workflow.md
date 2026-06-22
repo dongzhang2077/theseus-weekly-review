@@ -49,9 +49,36 @@ Before merging:
 - Acceptance criteria are met.
 - Sample data still works.
 - Documentation is updated if behavior changed.
+- A relevant skill review was run and summarized in the PR.
 - Known limitations are noted.
 
-## 5. Issue Labels
+## 5. Review Gate
+
+Every PR should include one focused review pass before merge. Choose the review
+surface based on what changed, then record findings and verification commands in
+the PR.
+
+Use these default review routes:
+
+- API, schemas, endpoints, or frontend-backend compatibility: `api-contract-review`.
+- Persistence, repositories, SQLite schema, sample loading, or stored reviews: `sqlite-persistence`.
+- Sprint scope, issue split, project board, or delivery plan changes: `sprint-planning`.
+- Frontend UI, UX flow, copy, controls, responsive behavior, or visual polish: `theseus-ux-standards`.
+- Review-engine-only changes with no API behavior change: run focused review-engine tests and summarize evidence contract impact.
+
+Review output should include:
+
+- Blocking findings, or a clear statement that none were found.
+- Non-blocking follow-up notes.
+- Commands run and their results.
+- Any remaining risk or skipped verification.
+
+For frontend PRs, also include desktop and mobile screenshots or a written note
+explaining why screenshots were not applicable. Check that the UI has no emoji,
+uses icon-first controls, avoids visible button text by default, and follows
+`docs/design/style-reference.md` when that file exists.
+
+## 6. Issue Labels
 
 Recommended labels:
 
@@ -67,7 +94,7 @@ Recommended labels:
 - `priority:p1`
 - `priority:p2`
 
-## 6. Board Columns
+## 7. Board Columns
 
 Suggested GitHub Project columns:
 
@@ -93,7 +120,7 @@ Done
 
 GitHub Projects may open in table view by default. In the web UI, create or switch to a Board view and group by `Workflow Status` to see these as workflow columns.
 
-## 7. Initial GitHub Setup Commands
+## 8. Initial GitHub Setup Commands
 
 If Git reports dubious ownership on the Windows-mounted workspace, add this once:
 
