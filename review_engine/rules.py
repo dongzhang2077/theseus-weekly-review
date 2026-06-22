@@ -5,6 +5,10 @@ from datetime import date, datetime
 from typing import Any
 
 
+ACTIVITY_TYPES = ("consuming", "neutral", "restore", "destroy")
+EVIDENCE_SCHEMA_VERSION = "sprint2.review_evidence.v1"
+
+
 def analyze_week(payload: dict[str, Any]) -> dict[str, Any]:
     goals = payload.get("goals", [])
     projects = payload.get("projects", [])
@@ -20,15 +24,19 @@ def analyze_week(payload: dict[str, Any]) -> dict[str, Any]:
     actual_by_goal = _actual_minutes_by_goal(projects_by_id, time_logs)
     activity_mix = _activity_mix(time_logs)
 
-    evidence = {
-        "planned_by_project": _label_project_minutes(projects_by_id, planned_by_project),
-        "actual_by_project": _label_project_minutes(projects_by_id, actual_by_project),
-        "actual_by_goal": _label_goal_minutes(goals_by_id, actual_by_goal),
-        "activity_mix": activity_mix,
-        "planned_total_minutes": sum(planned_by_project.values()),
-        "actual_total_minutes": sum(log.get("duration_minutes", 0) for log in time_logs),
-        "reflection_count": len(reflections),
-    }
+    evidence = _build_evidence(
+        goals=goals,
+        projects=projects,
+        goals_by_id=goals_by_id,
+        projects_by_id=projects_by_id,
+        weekly_plan=weekly_plan,
+        time_logs=time_logs,
+        reflections=reflections,
+        planned_by_project=planned_by_project,
+        actual_by_project=actual_by_project,
+        actual_by_goal=actual_by_goal,
+        activity_mix=activity_mix,
+    )
 
     wins = _detect_wins(projects_by_id, actual_by_project, activity_mix, reflections)
     insights = []
@@ -102,6 +110,192 @@ def _activity_mix(time_logs: list[dict[str, Any]]) -> dict[str, int]:
         activity_type = log.get("activity_type", "neutral")
         totals[activity_type] += int(log.get("duration_minutes", 0))
     return dict(totals)
+
+
+def _build_evidence(
+    *,
+    goals: list[dict[str, Any]],
+    projects: list[dict[str, Any]],
+    goals_by_id: dict[int, dict[str, Any]],
+    projects_by_id: dict[int, dict[str, Any]],
+    weekly_plan: dict[str, Any],
+    time_logs: list[dict[str, Any]],
+    reflections: list[dict[str, Any]],
+    planned_by_project: dict[int, int],
+    actual_by_project: dict[int, int],
+    actual_by_goal: dict[int, int],
+    activity_mix: dict[str, int],
+) -> dict[str, Any]:
+    planned_total = sum(planned_by_project.values())
+    actual_total = sum(int(log.get("duration_minutes", 0)) for log in time_logs)
+    capacity = int(weekly_plan.get("planned_capacity_minutes", 0))
+    slack_minutes = capacity - planned_total if capacity > 0 else None
+    slack_percent = (slack_minutes / capacity) if capacity > 0 and slack_minutes is not None else None
+
+    evidence = {
+        "schema_version": EVIDENCE_SCHEMA_VERSION,
+        "summary": {
+            "planned_total_minutes": planned_total,
+            "actual_total_minutes": actual_total,
+            "goal_count": len(goals),
+            "project_count": len(projects),
+            "time_log_count": len(time_logs),
+            "reflection_count": len(reflections),
+        },
+        "goals": _goal_evidence(goals, projects, actual_by_goal),
+        "projects": _project_evidence(
+            projects,
+            goals_by_id,
+            planned_by_project,
+            actual_by_project,
+            _last_log_dates_by_project(time_logs),
+            weekly_plan.get("week_end"),
+        ),
+        "plan": {
+            "week_start": weekly_plan.get("week_start"),
+            "week_end": weekly_plan.get("week_end"),
+            "planned_capacity_minutes": capacity,
+            "slack_target_percent": int(weekly_plan.get("slack_target_percent", 20)),
+            "planned_total_minutes": planned_total,
+            "planned_slack_minutes": slack_minutes,
+            "planned_slack_percent": slack_percent,
+            "item_count": len(weekly_plan.get("items", [])),
+        },
+        "activity": {
+            "mix": _complete_activity_mix(activity_mix),
+            "total_minutes": actual_total,
+            "unlinked_minutes": _unlinked_minutes(time_logs),
+        },
+        "reflections": {
+            "count": len(reflections),
+            "small_win_count": sum(1 for item in reflections if item.get("small_win")),
+            "mood_note_count": sum(1 for item in reflections if item.get("mood_note")),
+            "free_note_count": sum(1 for item in reflections if item.get("free_note")),
+        },
+    }
+
+    # Sprint 1 compatibility keys remain available while Sprint 2 consumers move to
+    # the structured sections above.
+    evidence.update(
+        {
+            "planned_by_project": _label_project_minutes(projects_by_id, planned_by_project),
+            "actual_by_project": _label_project_minutes(projects_by_id, actual_by_project),
+            "actual_by_goal": _label_goal_minutes(goals_by_id, actual_by_goal),
+            "activity_mix": activity_mix,
+            "planned_total_minutes": planned_total,
+            "actual_total_minutes": actual_total,
+            "reflection_count": len(reflections),
+        }
+    )
+    return evidence
+
+
+def _goal_evidence(
+    goals: list[dict[str, Any]],
+    projects: list[dict[str, Any]],
+    actual_by_goal: dict[int, int],
+) -> list[dict[str, Any]]:
+    project_ids_by_goal: dict[int, list[int]] = defaultdict(list)
+    for project in projects:
+        goal_id = project.get("goal_id")
+        if goal_id is not None:
+            project_ids_by_goal[int(goal_id)].append(int(project["id"]))
+
+    goal_rows = []
+    for goal in sorted(goals, key=lambda item: (item.get("priority", 99), item.get("id", 0))):
+        goal_id = int(goal["id"])
+        goal_rows.append(
+            {
+                "id": goal_id,
+                "title": goal["title"],
+                "priority": goal.get("priority", 99),
+                "active_status": bool(goal.get("active_status", True)),
+                "actual_minutes": actual_by_goal.get(goal_id, 0),
+                "project_ids": sorted(project_ids_by_goal.get(goal_id, [])),
+            }
+        )
+    return goal_rows
+
+
+def _project_evidence(
+    projects: list[dict[str, Any]],
+    goals_by_id: dict[int, dict[str, Any]],
+    planned_by_project: dict[int, int],
+    actual_by_project: dict[int, int],
+    last_log_dates_by_project: dict[int, date],
+    week_end: str | date | datetime | None,
+) -> list[dict[str, Any]]:
+    project_rows = []
+    for project in sorted(projects, key=lambda item: item.get("id", 0)):
+        project_id = int(project["id"])
+        goal_id = project.get("goal_id")
+        goal = goals_by_id.get(goal_id) if goal_id is not None else None
+        planned_minutes = planned_by_project.get(project_id, 0)
+        actual_minutes = actual_by_project.get(project_id, 0)
+        difference_minutes = actual_minutes - planned_minutes
+        last_activity_date = _effective_last_activity_date(
+            project.get("last_activity_date"),
+            last_log_dates_by_project.get(project_id),
+        )
+        project_rows.append(
+            {
+                "id": project_id,
+                "title": project["title"],
+                "goal_id": goal_id,
+                "goal_title": goal["title"] if goal else None,
+                "stage": project.get("stage"),
+                "status": project.get("status"),
+                "weekly_min_minutes": int(project.get("weekly_min_minutes", 0)),
+                "weekly_target_minutes": int(project.get("weekly_target_minutes", 0)),
+                "planned_minutes": planned_minutes,
+                "actual_minutes": actual_minutes,
+                "difference_minutes": difference_minutes,
+                "difference_ratio": (
+                    abs(difference_minutes) / planned_minutes if planned_minutes > 0 else None
+                ),
+                "last_activity_date": last_activity_date,
+                "inactive_days": _days_since(last_activity_date, week_end),
+            }
+        )
+    return project_rows
+
+
+def _complete_activity_mix(activity_mix: dict[str, int]) -> dict[str, int]:
+    return {activity_type: int(activity_mix.get(activity_type, 0)) for activity_type in ACTIVITY_TYPES}
+
+
+def _unlinked_minutes(time_logs: list[dict[str, Any]]) -> int:
+    return sum(
+        int(log.get("duration_minutes", 0))
+        for log in time_logs
+        if log.get("project_id") is None
+    )
+
+
+def _last_log_dates_by_project(time_logs: list[dict[str, Any]]) -> dict[int, date]:
+    dates: dict[int, date] = {}
+    for log in time_logs:
+        project_id = log.get("project_id")
+        if project_id is None:
+            continue
+        log_date = _coerce_date(log.get("date"))
+        if log_date is None:
+            continue
+        project_key = int(project_id)
+        if project_key not in dates or log_date > dates[project_key]:
+            dates[project_key] = log_date
+    return dates
+
+
+def _effective_last_activity_date(
+    project_last_activity_date: str | date | datetime | None,
+    last_log_date: date | None,
+) -> str | None:
+    project_date = _coerce_date(project_last_activity_date) if project_last_activity_date else None
+    candidates = [item for item in (project_date, last_log_date) if item is not None]
+    if not candidates:
+        return None
+    return max(candidates).isoformat()
 
 
 def _detect_wins(

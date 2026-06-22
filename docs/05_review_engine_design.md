@@ -33,6 +33,29 @@ The review engine returns:
 
 Each major claim should have evidence.
 
+### Sprint 2 Evidence Contract
+
+The evidence package is versioned with:
+
+```json
+{
+  "schema_version": "sprint2.review_evidence.v1"
+}
+```
+
+Stable sections:
+
+- `summary`: planned total, actual total, and counts of goals, projects, logs, and reflections.
+- `goals`: each goal with priority, active status, actual minutes, and linked project IDs.
+- `projects`: each project with goal link, stage/status, planned minutes, actual minutes, difference, and inactive days.
+- `plan`: week dates, planned capacity, slack target, planned total, planned slack minutes, and item count.
+- `activity`: all four activity-type totals plus total logged minutes and unlinked minutes.
+- `reflections`: reflection count and counts for small wins, mood notes, and free notes.
+
+Sprint 1 compatibility keys such as `actual_total_minutes`, `planned_by_project`,
+`actual_by_project`, `actual_by_goal`, and `activity_mix` remain present while
+front-end and demo code move to the structured sections.
+
 ## 4. Deterministic Checks
 
 ### Goal-Time Alignment
@@ -177,4 +200,3 @@ A generated review is unacceptable if:
 - It frames the user as lazy or failing.
 - It ignores completed work and recovery activities.
 - It gives medical, psychological, or mental health diagnosis.
-

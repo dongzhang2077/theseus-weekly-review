@@ -17,16 +17,15 @@ def test_sample_to_sqlite_to_stored_review(seeded_connection) -> None:
     )
 
     assert stored == generated
-    assert generated.evidence == {
-        "actual_by_goal": {"Build Theseus MVP": 300},
-        "actual_by_project": {"Theseus backend": 240, "Theseus frontend": 60},
-        "actual_total_minutes": 450,
-        "activity_mix": {"consuming": 300, "destroy": 90, "restore": 60},
-        "planned_by_project": {
-            "Resume and applications": 120,
-            "Theseus backend": 300,
-            "Theseus frontend": 240,
-        },
-        "planned_total_minutes": 660,
-        "reflection_count": 1,
+    assert generated.evidence["schema_version"] == "sprint2.review_evidence.v1"
+    assert generated.evidence["summary"]["actual_total_minutes"] == 450
+    assert generated.evidence["activity"]["mix"] == {
+        "consuming": 300,
+        "neutral": 0,
+        "restore": 60,
+        "destroy": 90,
     }
+    assert generated.evidence["projects"][0]["title"] == "Theseus backend"
+    assert generated.evidence["projects"][0]["planned_minutes"] == 300
+    assert generated.evidence["projects"][0]["actual_minutes"] == 240
+    assert generated.evidence["actual_total_minutes"] == 450

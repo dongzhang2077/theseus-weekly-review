@@ -173,6 +173,36 @@ Response:
       "reason": "Keeps progress realistic without overfilling the week."
     }
   ],
+  "evidence": {
+    "schema_version": "sprint2.review_evidence.v1",
+    "summary": {
+      "planned_total_minutes": 660,
+      "actual_total_minutes": 450,
+      "goal_count": 2,
+      "project_count": 3,
+      "time_log_count": 5,
+      "reflection_count": 1
+    },
+    "goals": [],
+    "projects": [],
+    "plan": {},
+    "activity": {
+      "mix": {
+        "consuming": 300,
+        "neutral": 0,
+        "restore": 60,
+        "destroy": 90
+      },
+      "total_minutes": 450,
+      "unlinked_minutes": 150
+    },
+    "reflections": {
+      "count": 1,
+      "small_win_count": 1,
+      "mood_note_count": 0,
+      "free_note_count": 1
+    }
+  },
   "generated_text": "Win: ... Insight: ... Next step: ..."
 }
 ```
