@@ -185,7 +185,24 @@ Response:
     },
     "goals": [],
     "projects": [],
-    "plan": {},
+    "plan": {
+      "planned_capacity_minutes": 1800,
+      "planned_total_minutes": 660,
+      "planned_slack_minutes": 1140,
+      "project_drift": [
+        {
+          "project_id": 2,
+          "project_title": "Theseus frontend",
+          "planned_minutes": 240,
+          "actual_minutes": 60,
+          "difference_minutes": -180,
+          "difference_ratio": 0.75,
+          "status": "under_plan"
+        }
+      ],
+      "unplanned_project_minutes": 0,
+      "unplanned_projects": []
+    },
     "activity": {
       "mix": {
         "consuming": 300,

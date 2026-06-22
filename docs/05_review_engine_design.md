@@ -48,7 +48,7 @@ Stable sections:
 - `summary`: planned total, actual total, and counts of goals, projects, logs, and reflections.
 - `goals`: each goal with priority, active status, actual minutes, linked project IDs, and project-level actual-minute breakdown.
 - `projects`: each project with goal link, stage/status, planned minutes, actual minutes, difference, and inactive days.
-- `plan`: week dates, planned capacity, slack target, planned total, planned slack minutes, and item count.
+- `plan`: week dates, planned capacity, slack target, planned total, planned slack minutes, item count, project drift rows, and unplanned project-linked time.
 - `activity`: all four activity-type totals plus total logged minutes and unlinked minutes.
 - `reflections`: reflection count and counts for small wins, mood notes, and free notes.
 

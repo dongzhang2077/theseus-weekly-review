@@ -90,6 +90,7 @@ def test_evidence_contract_tracks_goal_and_project_context(evidence: dict) -> No
     assert resume_project["actual_minutes"] == 0
     assert resume_project["difference_minutes"] == -120
     assert resume_project["difference_ratio"] == 1
+    assert resume_project["plan_status"] == "under_plan"
     assert resume_project["inactive_days"] == 30
 
 

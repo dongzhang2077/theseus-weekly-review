@@ -7,6 +7,9 @@ from typing import Any
 
 ACTIVITY_TYPES = ("consuming", "neutral", "restore", "destroy")
 EVIDENCE_SCHEMA_VERSION = "sprint2.review_evidence.v1"
+PLAN_DRIFT_MIN_RATIO = 0.5
+PLAN_DRIFT_MIN_MINUTES = 60
+PLAN_MIN_REVIEW_MINUTES = 60
 
 
 def analyze_week(payload: dict[str, Any]) -> dict[str, Any]:
@@ -160,6 +163,13 @@ def _build_evidence(
             "planned_slack_minutes": slack_minutes,
             "planned_slack_percent": slack_percent,
             "item_count": len(weekly_plan.get("items", [])),
+            "project_drift": _plan_project_drift(projects_by_id, planned_by_project, actual_by_project),
+            "unplanned_project_minutes": _unplanned_project_minutes(
+                planned_by_project, actual_by_project
+            ),
+            "unplanned_projects": _unplanned_projects(
+                projects_by_id, planned_by_project, actual_by_project
+            ),
         },
         "activity": {
             "mix": _complete_activity_mix(activity_mix),
@@ -263,6 +273,7 @@ def _project_evidence(
             project.get("last_activity_date"),
             last_log_dates_by_project.get(project_id),
         )
+        plan_status = _plan_status(planned_minutes, actual_minutes)
         project_rows.append(
             {
                 "id": project_id,
@@ -279,11 +290,92 @@ def _project_evidence(
                 "difference_ratio": (
                     abs(difference_minutes) / planned_minutes if planned_minutes > 0 else None
                 ),
+                "plan_status": plan_status,
                 "last_activity_date": last_activity_date,
                 "inactive_days": _days_since(last_activity_date, week_end),
             }
         )
     return project_rows
+
+
+def _plan_project_drift(
+    projects_by_id: dict[int, dict[str, Any]],
+    planned_by_project: dict[int, int],
+    actual_by_project: dict[int, int],
+) -> list[dict[str, Any]]:
+    rows = []
+    for project_id in sorted(set(planned_by_project) | set(actual_by_project)):
+        planned_minutes = planned_by_project.get(project_id, 0)
+        actual_minutes = actual_by_project.get(project_id, 0)
+        difference_minutes = actual_minutes - planned_minutes
+        project = projects_by_id.get(project_id, {"title": f"Project {project_id}"})
+        rows.append(
+            {
+                "project_id": project_id,
+                "project_title": project["title"],
+                "planned_minutes": planned_minutes,
+                "actual_minutes": actual_minutes,
+                "difference_minutes": difference_minutes,
+                "difference_ratio": (
+                    abs(difference_minutes) / planned_minutes if planned_minutes > 0 else None
+                ),
+                "status": _plan_status(planned_minutes, actual_minutes),
+            }
+        )
+    return rows
+
+
+def _unplanned_project_minutes(
+    planned_by_project: dict[int, int],
+    actual_by_project: dict[int, int],
+) -> int:
+    return sum(
+        minutes
+        for project_id, minutes in actual_by_project.items()
+        if minutes > 0 and planned_by_project.get(project_id, 0) == 0
+    )
+
+
+def _unplanned_projects(
+    projects_by_id: dict[int, dict[str, Any]],
+    planned_by_project: dict[int, int],
+    actual_by_project: dict[int, int],
+) -> list[dict[str, Any]]:
+    rows = []
+    for project_id, actual_minutes in sorted(actual_by_project.items()):
+        if actual_minutes <= 0 or planned_by_project.get(project_id, 0) > 0:
+            continue
+        project = projects_by_id.get(project_id, {"title": f"Project {project_id}"})
+        rows.append(
+            {
+                "project_id": project_id,
+                "project_title": project["title"],
+                "actual_minutes": actual_minutes,
+            }
+        )
+    return rows
+
+
+def _plan_status(planned_minutes: int, actual_minutes: int) -> str:
+    if planned_minutes <= 0 and actual_minutes > 0:
+        return "unplanned"
+    if planned_minutes <= 0:
+        return "not_planned"
+    difference_minutes = actual_minutes - planned_minutes
+    if _is_major_plan_drift(planned_minutes, actual_minutes):
+        return "over_plan" if difference_minutes > 0 else "under_plan"
+    return "on_track"
+
+
+def _is_major_plan_drift(planned_minutes: int, actual_minutes: int) -> bool:
+    if planned_minutes <= 0:
+        return actual_minutes >= PLAN_DRIFT_MIN_MINUTES
+    difference_minutes = abs(actual_minutes - planned_minutes)
+    return (
+        planned_minutes >= PLAN_MIN_REVIEW_MINUTES
+        and difference_minutes >= PLAN_DRIFT_MIN_MINUTES
+        and difference_minutes / planned_minutes >= PLAN_DRIFT_MIN_RATIO
+    )
 
 
 def _complete_activity_mix(activity_mix: dict[str, int]) -> dict[str, int]:
@@ -427,30 +519,46 @@ def _check_plan_gap(
 ) -> dict[str, list[dict[str, str]]]:
     insights = []
     risk_flags = []
-    for project_id, planned_minutes in planned_by_project.items():
+    for project_id in sorted(set(planned_by_project) | set(actual_by_project)):
+        planned_minutes = planned_by_project.get(project_id, 0)
         actual_minutes = actual_by_project.get(project_id, 0)
-        if planned_minutes < 60:
+        if planned_minutes < PLAN_MIN_REVIEW_MINUTES and actual_minutes < PLAN_DRIFT_MIN_MINUTES:
             continue
         project = projects_by_id.get(project_id, {"title": f"Project {project_id}"})
         diff = actual_minutes - planned_minutes
-        diff_ratio = abs(diff) / planned_minutes
-        if diff_ratio >= 0.5:
+        diff_ratio = abs(diff) / planned_minutes if planned_minutes > 0 else None
+        plan_status = _plan_status(planned_minutes, actual_minutes)
+        if plan_status == "unplanned":
             risk_flags.append(
                 {
                     "type": "plan_drift",
                     "severity": "medium",
                     "evidence": (
-                        f"{project['title']} planned {planned_minutes / 60:.1f}h "
-                        f"and logged {actual_minutes / 60:.1f}h."
+                        f"{project['title']} logged {actual_minutes / 60:.1f}h without planned time."
                     ),
                 }
             )
-        else:
+        elif _is_major_plan_drift(planned_minutes, actual_minutes):
+            direction = "over plan" if diff > 0 else "under plan"
+            risk_flags.append(
+                {
+                    "type": "plan_drift",
+                    "severity": "medium",
+                    "evidence": (
+                        f"{project['title']} planned {planned_minutes / 60:.1f}h, "
+                        f"logged {actual_minutes / 60:.1f}h, and finished "
+                        f"{abs(diff) / 60:.1f}h {direction} "
+                        f"({diff_ratio:.0%} difference)."
+                    ),
+                }
+            )
+        elif planned_minutes > 0:
             insights.append(
                 {
                     "title": f"{project['title']} roughly matched the plan",
                     "evidence": (
-                        f"Planned {planned_minutes / 60:.1f}h and logged {actual_minutes / 60:.1f}h."
+                        f"Planned {planned_minutes / 60:.1f}h, logged {actual_minutes / 60:.1f}h, "
+                        f"difference {diff / 60:.1f}h."
                     ),
                 }
             )
