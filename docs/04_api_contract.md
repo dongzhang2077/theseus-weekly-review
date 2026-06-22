@@ -189,6 +189,8 @@ Response:
       "planned_capacity_minutes": 1800,
       "planned_total_minutes": 660,
       "planned_slack_minutes": 1140,
+      "required_slack_minutes": 360,
+      "slack_status": "healthy",
       "project_drift": [
         {
           "project_id": 2,
@@ -218,6 +220,20 @@ Response:
       "small_win_count": 1,
       "mood_note_count": 0,
       "free_note_count": 1
+    },
+    "dormancy": {
+      "projects": [
+        {
+          "project_id": 3,
+          "project_title": "Resume and applications",
+          "weekly_min_minutes": 60,
+          "actual_minutes": 0,
+          "last_activity_date": "2026-05-15",
+          "inactive_days": 30,
+          "risk_level": "high",
+          "missed_weekly_minimum": true
+        }
+      ]
     }
   },
   "generated_text": "Win: ... Insight: ... Next step: ..."

@@ -10,6 +10,8 @@ EVIDENCE_SCHEMA_VERSION = "sprint2.review_evidence.v1"
 PLAN_DRIFT_MIN_RATIO = 0.5
 PLAN_DRIFT_MIN_MINUTES = 60
 PLAN_MIN_REVIEW_MINUTES = 60
+DORMANCY_MEDIUM_DAYS = 14
+DORMANCY_HIGH_DAYS = 21
 
 
 def analyze_week(payload: dict[str, Any]) -> dict[str, Any]:
@@ -58,7 +60,12 @@ def analyze_week(payload: dict[str, Any]) -> dict[str, Any]:
     insights.extend(energy["insights"])
     risk_flags.extend(energy["risk_flags"])
 
-    dormancy = _check_dormancy(projects, actual_by_project, weekly_plan.get("week_end"))
+    dormancy = _check_dormancy(
+        projects,
+        actual_by_project,
+        _last_log_dates_by_project(time_logs),
+        weekly_plan.get("week_end"),
+    )
     risk_flags.extend(dormancy["risk_flags"])
 
     slack = _check_slack(weekly_plan)
@@ -134,6 +141,8 @@ def _build_evidence(
     capacity = int(weekly_plan.get("planned_capacity_minutes", 0))
     slack_minutes = capacity - planned_total if capacity > 0 else None
     slack_percent = (slack_minutes / capacity) if capacity > 0 and slack_minutes is not None else None
+    slack_target_percent = int(weekly_plan.get("slack_target_percent", 20))
+    required_slack_minutes = round(capacity * (slack_target_percent / 100)) if capacity > 0 else None
 
     evidence = {
         "schema_version": EVIDENCE_SCHEMA_VERSION,
@@ -158,10 +167,12 @@ def _build_evidence(
             "week_start": weekly_plan.get("week_start"),
             "week_end": weekly_plan.get("week_end"),
             "planned_capacity_minutes": capacity,
-            "slack_target_percent": int(weekly_plan.get("slack_target_percent", 20)),
+            "slack_target_percent": slack_target_percent,
             "planned_total_minutes": planned_total,
             "planned_slack_minutes": slack_minutes,
             "planned_slack_percent": slack_percent,
+            "required_slack_minutes": required_slack_minutes,
+            "slack_status": _slack_status(capacity, planned_total, slack_target_percent),
             "item_count": len(weekly_plan.get("items", [])),
             "project_drift": _plan_project_drift(projects_by_id, planned_by_project, actual_by_project),
             "unplanned_project_minutes": _unplanned_project_minutes(
@@ -181,6 +192,14 @@ def _build_evidence(
             "small_win_count": sum(1 for item in reflections if item.get("small_win")),
             "mood_note_count": sum(1 for item in reflections if item.get("mood_note")),
             "free_note_count": sum(1 for item in reflections if item.get("free_note")),
+        },
+        "dormancy": {
+            "projects": _dormancy_evidence(
+                projects,
+                actual_by_project,
+                _last_log_dates_by_project(time_logs),
+                weekly_plan.get("week_end"),
+            )
         },
     }
 
@@ -376,6 +395,63 @@ def _is_major_plan_drift(planned_minutes: int, actual_minutes: int) -> bool:
         and difference_minutes >= PLAN_DRIFT_MIN_MINUTES
         and difference_minutes / planned_minutes >= PLAN_DRIFT_MIN_RATIO
     )
+
+
+def _slack_status(
+    capacity_minutes: int,
+    planned_total_minutes: int,
+    slack_target_percent: int,
+) -> str:
+    if capacity_minutes <= 0:
+        return "unknown"
+    required_slack = capacity_minutes * (slack_target_percent / 100)
+    planned_slack = capacity_minutes - planned_total_minutes
+    return "tight" if planned_slack < required_slack else "healthy"
+
+
+def _dormancy_evidence(
+    projects: list[dict[str, Any]],
+    actual_by_project: dict[int, int],
+    last_log_dates_by_project: dict[int, date],
+    week_end: str | date | datetime | None,
+) -> list[dict[str, Any]]:
+    rows = []
+    for project in sorted(projects, key=lambda item: item.get("id", 0)):
+        project_id = int(project["id"])
+        if project.get("status") != "active" or project.get("stage") == "dormant":
+            continue
+        last_activity_date = _effective_last_activity_date(
+            project.get("last_activity_date"),
+            last_log_dates_by_project.get(project_id),
+        )
+        actual_minutes = actual_by_project.get(project_id, 0)
+        inactive_days = _days_since(last_activity_date, week_end)
+        rows.append(
+            {
+                "project_id": project_id,
+                "project_title": project["title"],
+                "stage": project.get("stage"),
+                "weekly_min_minutes": int(project.get("weekly_min_minutes", 0)),
+                "actual_minutes": actual_minutes,
+                "last_activity_date": last_activity_date,
+                "inactive_days": inactive_days,
+                "risk_level": _dormancy_risk_level(inactive_days),
+                "missed_weekly_minimum": (
+                    int(project.get("weekly_min_minutes", 0)) > 0 and actual_minutes == 0
+                ),
+            }
+        )
+    return rows
+
+
+def _dormancy_risk_level(inactive_days: int | None) -> str:
+    if inactive_days is None:
+        return "unknown"
+    if inactive_days >= DORMANCY_HIGH_DAYS:
+        return "high"
+    if inactive_days >= DORMANCY_MEDIUM_DAYS:
+        return "medium"
+    return "none"
 
 
 def _complete_activity_mix(activity_mix: dict[str, int]) -> dict[str, int]:
@@ -606,28 +682,53 @@ def _check_activity_mix(activity_mix: dict[str, int]) -> dict[str, list[dict[str
 
 
 def _check_dormancy(
-    projects: list[dict[str, Any]], actual_by_project: dict[int, int], week_end: str | None
+    projects: list[dict[str, Any]],
+    actual_by_project: dict[int, int],
+    last_log_dates_by_project: dict[int, date],
+    week_end: str | date | datetime | None,
 ) -> dict[str, list[dict[str, str]]]:
     risk_flags = []
     for project in projects:
         if project.get("status") != "active" or project.get("stage") == "dormant":
             continue
-        actual_minutes = actual_by_project.get(project["id"], 0)
+        project_id = int(project["id"])
+        actual_minutes = actual_by_project.get(project_id, 0)
         if project.get("weekly_min_minutes", 0) > 0 and actual_minutes == 0:
             risk_flags.append(
                 {
                     "type": "dormancy_risk",
                     "severity": "medium",
-                    "evidence": f"{project['title']} had a weekly minimum but logged 0 minutes.",
+                    "evidence": (
+                        f"{project['title']} had a {int(project.get('weekly_min_minutes', 0)) / 60:.1f}h "
+                        "weekly minimum but logged 0 minutes."
+                    ),
                 }
             )
-        inactive_days = _days_since(project.get("last_activity_date"), week_end)
-        if inactive_days is not None and inactive_days >= 21:
+        last_activity_date = _effective_last_activity_date(
+            project.get("last_activity_date"),
+            last_log_dates_by_project.get(project_id),
+        )
+        inactive_days = _days_since(last_activity_date, week_end)
+        if inactive_days is not None and inactive_days >= DORMANCY_HIGH_DAYS:
             risk_flags.append(
                 {
                     "type": "dormancy_risk",
                     "severity": "high",
-                    "evidence": f"{project['title']} has been inactive for {inactive_days} days.",
+                    "evidence": (
+                        f"{project['title']} has been inactive for {inactive_days} days, "
+                        f"crossing the {DORMANCY_HIGH_DAYS}-day wake-up threshold."
+                    ),
+                }
+            )
+        elif inactive_days is not None and inactive_days >= DORMANCY_MEDIUM_DAYS:
+            risk_flags.append(
+                {
+                    "type": "dormancy_risk",
+                    "severity": "medium",
+                    "evidence": (
+                        f"{project['title']} has been inactive for {inactive_days} days, "
+                        f"crossing the {DORMANCY_MEDIUM_DAYS}-day dormancy threshold."
+                    ),
                 }
             )
     return {"risk_flags": risk_flags}
@@ -638,9 +739,11 @@ def _check_slack(weekly_plan: dict[str, Any]) -> dict[str, list[dict[str, str]]]
     if capacity <= 0:
         return {"risk_flags": []}
     planned_total = sum(int(item.get("planned_minutes", 0)) for item in weekly_plan.get("items", []))
-    slack_target = int(weekly_plan.get("slack_target_percent", 20)) / 100
-    max_planned = capacity * (1 - slack_target)
-    if planned_total > max_planned:
+    slack_target_percent = int(weekly_plan.get("slack_target_percent", 20))
+    slack_target = slack_target_percent / 100
+    required_slack = capacity * slack_target
+    planned_slack = capacity - planned_total
+    if planned_slack < required_slack:
         return {
             "risk_flags": [
                 {
@@ -648,7 +751,8 @@ def _check_slack(weekly_plan: dict[str, Any]) -> dict[str, list[dict[str, str]]]
                     "severity": "medium",
                     "evidence": (
                         f"Planned {planned_total / 60:.1f}h against {capacity / 60:.1f}h capacity, "
-                        f"leaving less than {slack_target:.0%} slack."
+                        f"leaving {planned_slack / 60:.1f}h slack below the "
+                        f"{required_slack / 60:.1f}h target ({slack_target_percent}%)."
                     ),
                 }
             ]

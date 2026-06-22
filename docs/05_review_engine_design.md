@@ -48,9 +48,10 @@ Stable sections:
 - `summary`: planned total, actual total, and counts of goals, projects, logs, and reflections.
 - `goals`: each goal with priority, active status, actual minutes, linked project IDs, and project-level actual-minute breakdown.
 - `projects`: each project with goal link, stage/status, planned minutes, actual minutes, difference, and inactive days.
-- `plan`: week dates, planned capacity, slack target, planned total, planned slack minutes, item count, project drift rows, and unplanned project-linked time.
+- `plan`: week dates, planned capacity, slack target, planned total, planned slack minutes, required slack minutes, slack status, item count, project drift rows, and unplanned project-linked time.
 - `activity`: all four activity-type totals plus total logged minutes and unlinked minutes.
 - `reflections`: reflection count and counts for small wins, mood notes, and free notes.
+- `dormancy`: active non-dormant projects with weekly minimums, actual minutes, last activity date, inactive days, and risk level.
 
 Sprint 1 compatibility keys such as `actual_total_minutes`, `planned_by_project`,
 `actual_by_project`, `actual_by_goal`, and `activity_mix` remain present while
