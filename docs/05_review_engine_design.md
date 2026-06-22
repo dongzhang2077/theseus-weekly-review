@@ -111,6 +111,13 @@ Signals:
 - Ratio of `restore` to `consuming`
 - Excessive `destroy` time
 
+Default thresholds:
+
+- Always report all four activity types: `consuming`, `neutral`, `restore`, and `destroy`.
+- Treat `restore` time as supportive evidence when present.
+- Call out strong recovery support when `restore` is at least 25% of `consuming` time.
+- Raise `destroy_pattern` when `destroy` is at least 120 minutes and at least 25% of logged time.
+
 ### Dormancy Risk
 
 Question:

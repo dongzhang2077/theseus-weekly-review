@@ -1,0 +1,105 @@
+{
+  "goals": [
+    {
+      "id": 1,
+      "title": "Build Theseus MVP",
+      "description": "Finish core deterministic review behavior.",
+      "priority": 1,
+      "active_status": true
+    },
+    {
+      "id": 2,
+      "title": "Internship preparation",
+      "description": "Keep applications and interview practice moving.",
+      "priority": 2,
+      "active_status": true
+    }
+  ],
+  "projects": [
+    {
+      "id": 1,
+      "goal_id": 1,
+      "title": "Rule engine polish",
+      "stage": "sprint",
+      "deadline": "2026-06-27",
+      "weekly_min_minutes": 180,
+      "weekly_target_minutes": 360,
+      "status": "active",
+      "last_activity_date": "2026-06-16"
+    },
+    {
+      "id": 2,
+      "goal_id": 2,
+      "title": "Applications",
+      "stage": "stable",
+      "deadline": null,
+      "weekly_min_minutes": 120,
+      "weekly_target_minutes": 240,
+      "status": "active",
+      "last_activity_date": "2026-05-20"
+    }
+  ],
+  "weekly_plan": {
+    "week_start": "2026-06-15",
+    "week_end": "2026-06-21",
+    "planned_capacity_minutes": 960,
+    "slack_target_percent": 20,
+    "items": [
+      {
+        "project_id": 1,
+        "title": "Finish review engine behavior",
+        "planned_minutes": 420,
+        "priority": 1
+      },
+      {
+        "project_id": 2,
+        "title": "Submit applications",
+        "planned_minutes": 300,
+        "priority": 2
+      },
+      {
+        "project_id": null,
+        "title": "Course paperwork",
+        "planned_minutes": 240,
+        "priority": 3
+      }
+    ],
+    "note": "Overloaded week with little buffer."
+  },
+  "time_logs": [
+    {
+      "project_id": 1,
+      "date": "2026-06-16",
+      "start_time": "10:00",
+      "end_time": "11:00",
+      "duration_minutes": 60,
+      "activity_name": "Small rule fix",
+      "activity_type": "consuming",
+      "type_source": "user_selected",
+      "note": "Less project work than planned."
+    },
+    {
+      "project_id": null,
+      "date": "2026-06-17",
+      "start_time": "21:00",
+      "end_time": "23:00",
+      "duration_minutes": 120,
+      "activity_name": "Late scrolling",
+      "activity_type": "destroy",
+      "type_source": "user_selected",
+      "note": "Attention leak after a long day."
+    },
+    {
+      "project_id": null,
+      "date": "2026-06-18",
+      "start_time": "22:00",
+      "end_time": "00:00",
+      "duration_minutes": 120,
+      "activity_name": "Unplanned video browsing",
+      "activity_type": "destroy",
+      "type_source": "user_selected",
+      "note": "Another draining block."
+    }
+  ],
+  "daily_reflections": []
+}

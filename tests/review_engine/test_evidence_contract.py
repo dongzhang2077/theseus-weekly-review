@@ -114,5 +114,10 @@ def test_evidence_contract_keeps_activity_and_legacy_fields(evidence: dict) -> N
 
     assert evidence["actual_total_minutes"] == 450
     assert evidence["planned_total_minutes"] == 660
-    assert evidence["activity_mix"] == {"consuming": 300, "restore": 60, "destroy": 90}
+    assert evidence["activity_mix"] == {
+        "consuming": 300,
+        "neutral": 0,
+        "restore": 60,
+        "destroy": 90,
+    }
     assert evidence["actual_by_goal"] == {"Build Theseus MVP": 300}

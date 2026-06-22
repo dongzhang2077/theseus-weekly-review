@@ -19,6 +19,12 @@ This makes the first prototype testable without an API key.
 - Slack risk
 - Positive progress detection
 
+Activity mix uses the four stable types: `consuming`, `neutral`, `restore`,
+and `destroy`. The deterministic checks call out meaningful recovery support
+when restore time reaches at least 25% of consuming time, and raise a
+`destroy_pattern` risk when destroy time is at least 120 minutes and 25% of
+logged time.
+
 ## Sprint 2 Evidence Contract
 
 `analyze_week` returns `evidence.schema_version` with the value

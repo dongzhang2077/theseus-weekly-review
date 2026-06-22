@@ -1,0 +1,99 @@
+{
+  "goals": [
+    {
+      "id": 1,
+      "title": "Build Theseus MVP",
+      "description": "Keep the review loop moving.",
+      "priority": 1,
+      "active_status": true
+    }
+  ],
+  "projects": [
+    {
+      "id": 1,
+      "goal_id": 1,
+      "title": "Review engine",
+      "stage": "stable",
+      "deadline": "2026-07-18",
+      "weekly_min_minutes": 240,
+      "weekly_target_minutes": 360,
+      "status": "active",
+      "last_activity_date": "2026-06-18"
+    },
+    {
+      "id": 2,
+      "goal_id": null,
+      "title": "Recovery routine",
+      "stage": "stable",
+      "deadline": null,
+      "weekly_min_minutes": 0,
+      "weekly_target_minutes": 180,
+      "status": "active",
+      "last_activity_date": "2026-06-19"
+    }
+  ],
+  "weekly_plan": {
+    "week_start": "2026-06-15",
+    "week_end": "2026-06-21",
+    "planned_capacity_minutes": 1200,
+    "slack_target_percent": 20,
+    "items": [
+      {
+        "project_id": 1,
+        "title": "Add deterministic review rules",
+        "planned_minutes": 300,
+        "priority": 1
+      },
+      {
+        "project_id": 2,
+        "title": "Protect recovery blocks",
+        "planned_minutes": 180,
+        "priority": 2
+      }
+    ],
+    "note": "Aligned week with visible recovery."
+  },
+  "time_logs": [
+    {
+      "project_id": 1,
+      "date": "2026-06-16",
+      "start_time": "09:00",
+      "end_time": "11:30",
+      "duration_minutes": 150,
+      "activity_name": "Review rule implementation",
+      "activity_type": "consuming",
+      "type_source": "user_selected",
+      "note": "Implemented deterministic checks."
+    },
+    {
+      "project_id": 1,
+      "date": "2026-06-18",
+      "start_time": "13:00",
+      "end_time": "15:30",
+      "duration_minutes": 150,
+      "activity_name": "Review rule tests",
+      "activity_type": "consuming",
+      "type_source": "user_selected",
+      "note": "Covered expected review output."
+    },
+    {
+      "project_id": 2,
+      "date": "2026-06-19",
+      "start_time": "18:00",
+      "end_time": "21:00",
+      "duration_minutes": 180,
+      "activity_name": "Dinner, walk, and decompression",
+      "activity_type": "restore",
+      "type_source": "user_selected",
+      "note": "Recovery protected after focused work."
+    }
+  ],
+  "daily_reflections": [
+    {
+      "date": "2026-06-19",
+      "small_win": "The review output became easier to explain.",
+      "mood_note": "",
+      "free_note": "Recovery made the focused blocks sustainable."
+    }
+  ]
+}
