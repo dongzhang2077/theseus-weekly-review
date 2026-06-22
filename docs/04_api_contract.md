@@ -144,6 +144,10 @@ Request:
 
 Response:
 
+The `evidence.goals` and `evidence.projects` arrays are abbreviated in this example
+for readability. Real responses include the populated goal and project evidence rows
+defined by the Sprint 2 evidence contract.
+
 ```json
 {
   "week_start": "2026-06-08",
@@ -236,7 +240,7 @@ Response:
       ]
     }
   },
-  "generated_text": "Win: ... Insight: ... Next step: ..."
+  "generated_text": "Win: ... Insight: ... Risk: ... Next step: ..."
 }
 ```
 
