@@ -106,8 +106,51 @@ const fallbackReview = {
 };
 
 const fallbackCollections = {
-  goals: [],
-  projects: [],
+  goals: [
+    {
+      id: 1,
+      title: "Build Theseus MVP",
+      description: "Create a working weekly review prototype for CSIS 4495.",
+      priority: 1,
+      active_status: true,
+    },
+    {
+      id: 2,
+      title: "Internship preparation",
+      description: "Maintain job search and interview preparation.",
+      priority: 2,
+      active_status: true,
+    },
+  ],
+  projects: [
+    {
+      id: 1,
+      goal_id: 1,
+      title: "Theseus backend",
+      stage: "startup",
+      weekly_min_minutes: 180,
+      weekly_target_minutes: 480,
+      status: "active",
+    },
+    {
+      id: 2,
+      goal_id: 1,
+      title: "Theseus frontend",
+      stage: "startup",
+      weekly_min_minutes: 120,
+      weekly_target_minutes: 360,
+      status: "active",
+    },
+    {
+      id: 3,
+      goal_id: 2,
+      title: "Resume and applications",
+      stage: "stable",
+      weekly_min_minutes: 60,
+      weekly_target_minutes: 180,
+      status: "active",
+    },
+  ],
   weeklyPlans: [],
   timeLogs: [],
   planRows: [
@@ -208,6 +251,10 @@ function activityTypeLabel(type) {
 
 function projectById(projects, projectId) {
   return projects.find((project) => project.id === projectId);
+}
+
+function goalById(goals, goalId) {
+  return goals.find((goal) => goal.id === goalId);
 }
 
 function navButton(item) {
@@ -820,63 +867,238 @@ function renderPlan() {
   `;
 }
 
-function goalRowsFromApi() {
-  if (!state.collections.goals.length && !state.collections.projects.length) {
-    return fallbackCollections.goalRows;
-  }
-
+function goalRows() {
   return state.collections.goals.map((goal) => {
     const projects = state.collections.projects
       .filter((project) => project.goal_id === goal.id)
       .map((project) => project.title)
       .join(", ");
-    return [
-      goal.title,
-      projects || "No linked projects",
-      `P${goal.priority || 1}`,
-      goal.active_status ? "Active" : "Paused",
-    ];
+    return {
+      title: goal.title,
+      description: goal.description || "",
+      projects: projects || "No linked projects",
+      priority: `P${goal.priority || 1}`,
+      status: goal.active_status ? "Active" : "Paused",
+    };
   });
 }
 
-function renderGoals() {
-  const rows = goalRowsFromApi()
+function projectRows() {
+  return state.collections.projects.map((project) => {
+    const goal = goalById(state.collections.goals, project.goal_id);
+    return {
+      title: project.title,
+      goal: goal?.title || "Unlinked",
+      stage: labelFromKey(project.stage),
+      target: formatMinutes(project.weekly_target_minutes || 0),
+      status: labelFromKey(project.status),
+    };
+  });
+}
+
+function goalOptions() {
+  if (!state.collections.goals.length) {
+    return '<option value="">No goals available</option>';
+  }
+  return state.collections.goals
     .map(
-      ([goal, projects, priority, status], index) => `
+      (goal) => `<option value="${goal.id}">${escapeHtml(goal.title)}</option>`
+    )
+    .join("");
+}
+
+function renderGoalForm() {
+  return `
+    <section class="paper-panel">
+      <div class="panel-header">
+        <div class="header-title">
+          <span class="status-dot"></span>
+          <h1>Goal setup</h1>
+        </div>
+      </div>
+      <div class="panel-body">
+        <form class="settings-form setup-form" id="goalCreateForm">
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="field-label" for="goalTitle">Title</label>
+              <input id="goalTitle" name="title" type="text" required autocomplete="off" />
+            </div>
+            <div class="form-field compact-field">
+              <label class="field-label" for="goalPriority">Priority</label>
+              <input id="goalPriority" name="priority" type="number" min="1" max="5" value="1" />
+            </div>
+          </div>
+          <div class="form-field">
+            <label class="field-label" for="goalDescription">Description</label>
+            <textarea id="goalDescription" name="description" rows="3"></textarea>
+          </div>
+          <div class="form-actions">
+            <label class="checkbox-row" for="goalActiveStatus">
+              <input id="goalActiveStatus" name="active_status" type="checkbox" checked />
+              <span>Active</span>
+            </label>
+            <button class="icon-button accent-action" type="submit" aria-label="Create goal" title="Create goal">
+              ${icon("save")}
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+  `;
+}
+
+function renderProjectForm() {
+  return `
+    <section class="paper-panel">
+      <div class="panel-header">
+        <div class="header-title">
+          <span class="status-dot blue"></span>
+          <h1>Project setup</h1>
+        </div>
+      </div>
+      <div class="panel-body">
+        <form class="settings-form setup-form" id="projectCreateForm">
+          <div class="form-field">
+            <label class="field-label" for="projectTitle">Title</label>
+            <input id="projectTitle" name="title" type="text" required autocomplete="off" />
+          </div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="field-label" for="projectGoalId">Goal</label>
+              <select id="projectGoalId" name="goal_id" required>
+                ${goalOptions()}
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="field-label" for="projectStage">Stage</label>
+              <select id="projectStage" name="stage">
+                <option value="startup">Startup</option>
+                <option value="stable">Stable</option>
+                <option value="sprint">Sprint</option>
+                <option value="dormant">Dormant</option>
+                <option value="wake_up">Wake up</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="field-label" for="projectStatus">Status</label>
+              <select id="projectStatus" name="status">
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+            <div class="form-field compact-field">
+              <label class="field-label" for="projectTarget">Target minutes</label>
+              <input id="projectTarget" name="weekly_target_minutes" type="number" min="0" step="15" value="120" />
+            </div>
+          </div>
+          <div class="form-actions">
+            <span class="status-note inline-note">Linked to selected goal</span>
+            <button class="icon-button accent-action" type="submit" aria-label="Create project" title="Create project">
+              ${icon("save")}
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+  `;
+}
+
+function renderGoalTable() {
+  const rows = goalRows()
+    .map(
+      (goal, index) => `
         <tr>
-          <td class="numeric">${index + 1}</td>
-          <td>${escapeHtml(goal)}</td>
-          <td>${escapeHtml(projects)}</td>
-          <td><span class="chip ${priority === "P1" ? "pink" : ""}">${escapeHtml(priority)}</span></td>
-          <td><span class="chip ${status === "Paused" ? "amber" : ""}">${escapeHtml(status)}</span></td>
+          <td class="numeric" data-label="No.">${index + 1}</td>
+          <td data-label="Goal">
+            <span class="table-title">${escapeHtml(goal.title)}</span>
+            ${goal.description ? `<span class="table-subtitle">${escapeHtml(goal.description)}</span>` : ""}
+          </td>
+          <td data-label="Projects">${escapeHtml(goal.projects)}</td>
+          <td data-label="Priority"><span class="chip ${goal.priority === "P1" ? "pink" : ""}">${escapeHtml(goal.priority)}</span></td>
+          <td data-label="Status"><span class="chip ${goal.status === "Paused" ? "amber" : ""}">${escapeHtml(goal.status)}</span></td>
         </tr>
       `
     )
     .join("");
   return `
+    <section class="paper-panel">
+      <div class="panel-header">
+        <div class="header-title">
+          <span class="status-dot"></span>
+          <h1>Goals</h1>
+        </div>
+      </div>
+      <div class="panel-body table-wrap">
+        <table class="compact-table">
+          <thead>
+            <tr>
+              <th class="numeric">No.</th>
+              <th>Goal</th>
+              <th>Projects</th>
+              <th>Priority</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderProjectTable() {
+  const rows = projectRows()
+    .map(
+      (project) => `
+        <tr>
+          <td data-label="Project">${escapeHtml(project.title)}</td>
+          <td data-label="Goal">${escapeHtml(project.goal)}</td>
+          <td data-label="Stage"><span class="chip blue">${escapeHtml(project.stage)}</span></td>
+          <td class="numeric" data-label="Target">${escapeHtml(project.target)}</td>
+          <td data-label="Status"><span class="chip ${project.status === "Paused" ? "amber" : ""}">${escapeHtml(project.status)}</span></td>
+        </tr>
+      `
+    )
+    .join("");
+  return `
+    <section class="paper-panel">
+      <div class="panel-header">
+        <div class="header-title">
+          <span class="status-dot blue"></span>
+          <h1>Projects</h1>
+        </div>
+      </div>
+      <div class="panel-body table-wrap">
+        <table class="compact-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Goal</th>
+              <th>Stage</th>
+              <th class="numeric">Target</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderGoals() {
+  return `
     <div class="view-shell">
-      <section class="paper-panel">
-        <div class="panel-header">
-          <div class="header-title">
-            <span class="status-dot"></span>
-            <h1>Goals and projects</h1>
-          </div>
-        </div>
-        <div class="panel-body table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th class="numeric">No.</th>
-                <th>Goal</th>
-                <th>Projects</th>
-                <th>Priority</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      </section>
+      <div class="view-shell setup-grid">
+        ${renderGoalForm()}
+        ${renderProjectForm()}
+      </div>
+      ${renderGoalTable()}
+      ${renderProjectTable()}
+      <p class="status-note ${state.statusTone}">${escapeHtml(state.statusMessage)}</p>
     </div>
   `;
 }
@@ -933,6 +1155,117 @@ function updateChrome() {
   }
 }
 
+function nextLocalId(items) {
+  return items.reduce((maxId, item) => Math.max(maxId, numberValue(item.id)), 0) + 1;
+}
+
+function createLocalGoal(payload) {
+  const goal = {
+    id: nextLocalId(state.collections.goals),
+    ...payload,
+  };
+  state.collections = {
+    ...state.collections,
+    goals: [...state.collections.goals, goal],
+  };
+  return goal;
+}
+
+function createLocalProject(payload) {
+  const project = {
+    id: nextLocalId(state.collections.projects),
+    weekly_min_minutes: 0,
+    weekly_target_minutes: 0,
+    ...payload,
+  };
+  state.collections = {
+    ...state.collections,
+    projects: [...state.collections.projects, project],
+  };
+  return project;
+}
+
+async function handleGoalCreate(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const title = form.elements.title.value.trim();
+  if (!title) {
+    state.statusMessage = "Goal title is required";
+    state.statusTone = "warning";
+    render();
+    return;
+  }
+
+  const payload = {
+    title,
+    description: form.elements.description.value.trim(),
+    priority: numberValue(form.elements.priority.value, 1),
+    active_status: form.elements.active_status.checked,
+  };
+
+  state.isBusy = true;
+  state.statusMessage = "Saving goal";
+  state.statusTone = "";
+  render();
+
+  try {
+    if (!api) throw new Error("API unavailable");
+    await api.createGoal(payload);
+    await loadApiCollections();
+    state.statusMessage = "Goal saved";
+    state.statusTone = "";
+  } catch {
+    createLocalGoal(payload);
+    state.statusMessage = "Backend unavailable; goal saved locally";
+    state.statusTone = "warning";
+  } finally {
+    state.isBusy = false;
+    render();
+  }
+}
+
+async function handleProjectCreate(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const goalId = numberValue(form.elements.goal_id.value, 0);
+  const title = form.elements.title.value.trim();
+  if (!title || goalId <= 0) {
+    state.statusMessage = "Project title and goal are required";
+    state.statusTone = "warning";
+    render();
+    return;
+  }
+
+  const payload = {
+    goal_id: goalId,
+    title,
+    stage: form.elements.stage.value,
+    status: form.elements.status.value,
+    weekly_target_minutes: numberValue(form.elements.weekly_target_minutes.value, 0),
+    weekly_min_minutes: 0,
+  };
+
+  state.isBusy = true;
+  state.statusMessage = "Saving project";
+  state.statusTone = "";
+  render();
+
+  try {
+    if (!api) throw new Error("API unavailable");
+    await api.createProject(payload);
+    await loadApiCollections();
+    state.statusMessage = "Project saved";
+    state.statusTone = "";
+  } catch {
+    createLocalProject(payload);
+    state.statusMessage = "Backend unavailable; project saved locally";
+    state.statusTone = "warning";
+  } finally {
+    state.isBusy = false;
+    render();
+  }
+}
+
 function bindWorkspaceActions() {
   const form = document.getElementById("apiSettingsForm");
   if (form && api) {
@@ -954,6 +1287,16 @@ function bindWorkspaceActions() {
       state.statusTone = "";
       render();
     });
+  }
+
+  const goalForm = document.getElementById("goalCreateForm");
+  if (goalForm) {
+    goalForm.addEventListener("submit", handleGoalCreate);
+  }
+
+  const projectForm = document.getElementById("projectCreateForm");
+  if (projectForm) {
+    projectForm.addEventListener("submit", handleProjectCreate);
   }
 }
 

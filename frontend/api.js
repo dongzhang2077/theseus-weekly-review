@@ -79,7 +79,17 @@
     resetApiBaseUrl,
     health: () => request("/health"),
     listGoals: () => request("/goals"),
+    createGoal: (payload) =>
+      request("/goals", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
     listProjects: () => request("/projects"),
+    createProject: (payload) =>
+      request("/projects", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
     listWeeklyPlans: () => request("/weekly-plans"),
     listTimeLogs: () => request("/time-logs"),
     generateWeeklyReview: (payload) =>

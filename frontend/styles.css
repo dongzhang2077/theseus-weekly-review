@@ -254,6 +254,10 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.setup-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
 .summary-stack {
   display: grid;
   gap: 14px;
@@ -735,15 +739,86 @@ th.numeric {
   gap: 14px;
 }
 
+.setup-form {
+  gap: 12px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 0.45fr);
+  gap: 12px;
+}
+
 .form-field {
   display: grid;
   gap: 8px;
+}
+
+.compact-field {
+  min-width: 0;
 }
 
 .field-label {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: rgba(255, 253, 248, 0.82);
+  outline: none;
+}
+
+.form-field input,
+.form-field select {
+  height: 42px;
+  padding: 0 12px;
+}
+
+.form-field textarea {
+  min-height: 86px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  border-color: rgba(119, 155, 192, 0.9);
+  box-shadow: 0 0 0 3px rgba(119, 155, 192, 0.16);
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #34362f;
+  font-size: 0.86rem;
+  font-weight: 680;
+}
+
+.checkbox-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--green);
+}
+
+.inline-note {
+  margin: 0;
 }
 
 .input-row {
@@ -768,6 +843,21 @@ th.numeric {
 .input-row input:focus {
   border-color: rgba(119, 155, 192, 0.9);
   box-shadow: 0 0 0 3px rgba(119, 155, 192, 0.16);
+}
+
+.table-title,
+.table-subtitle {
+  display: block;
+}
+
+.table-title {
+  font-weight: 720;
+}
+
+.table-subtitle {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.76rem;
 }
 
 .mobile-nav {
@@ -841,7 +931,8 @@ th.numeric {
   }
 
   .review-grid,
-  .plan-grid {
+  .plan-grid,
+  .setup-grid {
     grid-template-columns: 1fr;
   }
 
@@ -897,6 +988,10 @@ th.numeric {
 
   .week-label {
     min-width: 116px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
   }
 
   .metric-strip,
