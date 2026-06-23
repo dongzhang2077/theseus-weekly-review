@@ -30,6 +30,8 @@ uvicorn backend.app.main:app --reload
 ```
 
 The default local database is `data/local/theseus.db`. Override it with `THESEUS_DB_PATH`.
+The local frontend demo origin is allowed by default. Override browser origins with
+`THESEUS_CORS_ORIGINS`, using a comma-separated list.
 
 Generate a review from an initialized and populated database with:
 

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Theseus</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-frame">
+      <aside class="side-nav" aria-label="Primary navigation">
+        <button class="icon-button menu-button" type="button" aria-label="Open menu">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+        </button>
+        <nav class="nav-stack" id="desktopNav"></nav>
+        <div class="stationery-mark" aria-hidden="true">
+          <span class="leaf leaf-a"></span>
+          <span class="leaf leaf-b"></span>
+          <span class="leaf leaf-c"></span>
+          <span class="tape"></span>
+        </div>
+      </aside>
+
+      <div class="workspace-shell">
+        <header class="top-bar">
+          <div class="week-controls" aria-label="Week controls">
+            <button class="icon-button" type="button" aria-label="Previous week" title="Previous week">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="m15 6-6 6 6 6" />
+              </svg>
+            </button>
+            <div class="week-label">
+              <span class="week-range">Jun 8 - Jun 14, 2026</span>
+              <span class="week-state">Sample week</span>
+            </div>
+            <button class="icon-button" type="button" aria-label="Next week" title="Next week">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </button>
+            <button class="icon-button" type="button" aria-label="Choose week" title="Choose week">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M8 3v3M16 3v3M4 9h16M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="utility-actions" aria-label="Workspace actions">
+            <button class="icon-button" type="button" data-action="refresh-fixture" aria-label="Refresh sample data" title="Refresh">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M20 11a8 8 0 0 0-14.7-4.4L4 8M4 4v4h4M4 13a8 8 0 0 0 14.7 4.4L20 16M20 20v-4h-4" />
+              </svg>
+            </button>
+            <button class="icon-button accent-action" type="button" data-action="generate-review" aria-label="Generate review" title="Generate">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M7 5v14l11-7Z" />
+              </svg>
+            </button>
+            <button class="icon-button" type="button" aria-label="More actions" title="More">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M6 12h.01M12 12h.01M18 12h.01" />
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <main class="workspace" id="workspace" tabindex="-1"></main>
+      </div>
+
+      <nav class="mobile-nav" id="mobileNav" aria-label="Primary navigation"></nav>
+    </div>
+
+    <script src="./api.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
