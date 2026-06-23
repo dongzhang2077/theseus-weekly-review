@@ -111,20 +111,20 @@ const fallbackCollections = {
   weeklyPlans: [],
   timeLogs: [],
   planRows: [
-    ["MON", "Backend API", "2h", "MVP"],
-    ["MON", "Research reading", "1h", "Research"],
-    ["TUE", "API integration", "2h", "MVP"],
-    ["WED", "Research report", "2h", "Research"],
-    ["THU", "Exercise and walk", "1h", "Health"],
-    ["FRI", "Review and plan", "1h", "Review"],
+    { day: "MON", task: "Backend API", project: "Theseus backend", minutes: 120, type: "P1" },
+    { day: "MON", task: "Research reading", project: "Research report", minutes: 60, type: "P2" },
+    { day: "TUE", task: "API integration", project: "Theseus backend", minutes: 120, type: "P1" },
+    { day: "WED", task: "Research report", project: "Research report", minutes: 120, type: "P2" },
+    { day: "THU", task: "Exercise and walk", project: "Health", minutes: 60, type: "P3" },
+    { day: "FRI", task: "Review and plan", project: "Weekly review", minutes: 60, type: "P2" },
   ],
   logRows: [
-    ["MON", "Backend API", "2h 15m", "MVP"],
-    ["MON", "Research reading", "45m", "Research"],
-    ["TUE", "API integration", "1h 45m", "MVP"],
-    ["WED", "Research report", "2h 05m", "Research"],
-    ["THU", "Exercise and walk", "1h", "Health"],
-    ["FRI", "Review and plan", "1h 05m", "Review"],
+    { day: "MON", task: "Backend API", project: "Theseus backend", minutes: 135, type: "consuming" },
+    { day: "MON", task: "Research reading", project: "Research report", minutes: 45, type: "neutral" },
+    { day: "TUE", task: "API integration", project: "Theseus backend", minutes: 105, type: "consuming" },
+    { day: "WED", task: "Research report", project: "Research report", minutes: 125, type: "consuming" },
+    { day: "THU", task: "Exercise and walk", project: "Health", minutes: 60, type: "restore" },
+    { day: "FRI", task: "Late scrolling", project: "Unlinked", minutes: 65, type: "destroy" },
   ],
   goalRows: [
     ["Ship backend MVP", "Backend, API, Docs", "P1", "Active"],
@@ -201,13 +201,9 @@ function weekdayLabel(dateString) {
 }
 
 function activityTypeLabel(type) {
-  const labels = {
-    consuming: "MVP",
-    neutral: "Neutral",
-    restore: "Health",
-    destroy: "Risk",
-  };
-  return labels[type] || labelFromKey(type || "Log");
+  return ["consuming", "neutral", "restore", "destroy"].includes(type)
+    ? type
+    : labelFromKey(type || "log");
 }
 
 function projectById(projects, projectId) {
@@ -605,12 +601,13 @@ function planRowsFromApi() {
 
   return plan.items.map((item) => {
     const project = projectById(state.collections.projects, item.project_id);
-    return [
-      "PLAN",
-      item.title,
-      formatMinutes(item.planned_minutes),
-      project?.title || "Plan",
-    ];
+    return {
+      day: "PLAN",
+      task: item.title,
+      project: project?.title || "Unlinked",
+      minutes: numberValue(item.planned_minutes),
+      type: `P${item.priority || 1}`,
+    };
   });
 }
 
@@ -619,23 +616,86 @@ function logRowsFromApi() {
     (log) => log.date >= demoWeek.week_start && log.date <= demoWeek.week_end
   );
   if (!weeklyLogs.length) return fallbackCollections.logRows;
-  return weeklyLogs.map((log) => [
-    weekdayLabel(log.date),
-    log.activity_name,
-    formatMinutes(log.duration_minutes),
-    activityTypeLabel(log.activity_type),
-  ]);
+  return weeklyLogs.map((log) => {
+    const project = projectById(state.collections.projects, log.project_id);
+    return {
+      day: weekdayLabel(log.date),
+      task: log.activity_name,
+      project: project?.title || "Unlinked",
+      minutes: numberValue(log.duration_minutes),
+      type: activityTypeLabel(log.activity_type),
+    };
+  });
 }
 
-function planTable(title, rows) {
+function totalRowMinutes(rows) {
+  return rows.reduce((total, row) => total + numberValue(row.minutes), 0);
+}
+
+function deltaClass(minutes) {
+  const value = numberValue(minutes);
+  if (value > 0) return "delta-positive";
+  if (value < 0) return "delta-negative";
+  return "";
+}
+
+function planLogMetrics(planRows, logRows) {
+  const planned = totalRowMinutes(planRows);
+  const logged = totalRowMinutes(logRows);
+  return {
+    planned,
+    logged,
+    delta: logged - planned,
+  };
+}
+
+function planOverview(planRows, logRows) {
+  const metrics = planLogMetrics(planRows, logRows);
+  const activityTypes = new Set(logRows.map((row) => row.type));
+  const cards = [
+    ["Planned", formatMinutes(metrics.planned), ""],
+    ["Logged", formatMinutes(metrics.logged), ""],
+    ["Delta", formatSignedMinutes(metrics.delta), deltaClass(metrics.delta)],
+    ["Log types", activityTypes.size, ""],
+  ];
+  return `
+    <section class="paper-panel">
+      <div class="panel-header">
+        <div class="header-title">
+          <span class="status-dot blue"></span>
+          <h1>Plan vs log</h1>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="plan-overview">
+          ${cards
+            .map(
+              ([label, value, valueClass]) => `
+                <div class="metric">
+                  <span class="metric-label">${escapeHtml(label)}</span>
+                  <span class="metric-value ${valueClass}">${escapeHtml(value)}</span>
+                </div>
+              `
+            )
+            .join("")}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function planTable(title, rows, mode) {
   const body = rows
     .map(
-      ([day, task, hours, type]) => `
+      (row) => `
         <tr>
-          <td>${escapeHtml(day)}</td>
-          <td>${escapeHtml(task)}</td>
-          <td class="numeric">${escapeHtml(hours)}</td>
-          <td><span class="chip ${chipTone(type)}">${escapeHtml(type)}</span></td>
+          <td data-label="Day">${escapeHtml(row.day)}</td>
+          <td data-label="Task">${escapeHtml(row.task)}</td>
+          <td data-label="Project">${escapeHtml(row.project)}</td>
+          <td class="numeric" data-label="Hours">${escapeHtml(formatMinutes(row.minutes))}</td>
+          <td data-label="${mode === "log" ? "Activity" : "Priority"}">
+            <span class="chip ${chipTone(row.type)}">${escapeHtml(row.type)}</span>
+          </td>
         </tr>
       `
     )
@@ -649,13 +709,14 @@ function planTable(title, rows) {
         </div>
       </div>
       <div class="panel-body table-wrap">
-        <table>
+        <table class="compact-table">
           <thead>
             <tr>
               <th>Day</th>
               <th>Task</th>
+              <th>Project</th>
               <th class="numeric">Hours</th>
-              <th>Type</th>
+              <th>${mode === "log" ? "Activity" : "Priority"}</th>
             </tr>
           </thead>
           <tbody>${body}</tbody>
@@ -666,17 +727,95 @@ function planTable(title, rows) {
 }
 
 function chipTone(type) {
+  if (type === "neutral") return "blue";
+  if (type === "restore") return "pink";
+  if (type === "destroy" || type === "under_plan") return "amber";
+  if (type === "over_plan") return "blue";
   if (type === "Research") return "blue";
-  if (type === "Health" || type === "Review" || type === "Restore") return "pink";
-  if (type === "Career" || type === "Risk") return "amber";
+  if (type === "Health" || type === "Review" || type === "Restore" || type === "P1") return "pink";
+  if (type === "Career" || type === "Risk" || type === "P2") return "amber";
   return "";
 }
 
-function renderPlan() {
+function comparisonRows(planRows, logRows) {
+  const byProject = new Map();
+  const ensureProject = (project) => {
+    if (!byProject.has(project)) {
+      byProject.set(project, { project, planned: 0, logged: 0 });
+    }
+    return byProject.get(project);
+  };
+
+  planRows.forEach((row) => {
+    ensureProject(row.project).planned += numberValue(row.minutes);
+  });
+  logRows.forEach((row) => {
+    ensureProject(row.project).logged += numberValue(row.minutes);
+  });
+
+  return Array.from(byProject.values())
+    .map((row) => {
+      const delta = row.logged - row.planned;
+      return {
+        ...row,
+        delta,
+        status: delta > 0 ? "over_plan" : delta < 0 ? "under_plan" : "on_track",
+      };
+    })
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || a.project.localeCompare(b.project));
+}
+
+function comparisonTable(planRows, logRows) {
+  const rows = comparisonRows(planRows, logRows)
+    .map(
+      (row) => `
+        <tr>
+          <td data-label="Project">${escapeHtml(row.project)}</td>
+          <td class="numeric" data-label="Planned">${escapeHtml(formatMinutes(row.planned))}</td>
+          <td class="numeric" data-label="Logged">${escapeHtml(formatMinutes(row.logged))}</td>
+          <td class="numeric ${deltaClass(row.delta)}" data-label="Delta">${escapeHtml(formatSignedMinutes(row.delta))}</td>
+          <td data-label="Status"><span class="chip ${chipTone(row.status)}">${escapeHtml(labelFromKey(row.status))}</span></td>
+        </tr>
+      `
+    )
+    .join("");
   return `
-    <div class="view-shell plan-grid">
-      ${planTable("Plan", planRowsFromApi())}
-      ${planTable("Log", logRowsFromApi())}
+    <section class="paper-panel">
+      <div class="panel-header">
+        <div class="header-title">
+          <span class="status-dot"></span>
+          <h1>Evidence link</h1>
+        </div>
+      </div>
+      <div class="panel-body table-wrap">
+        <table class="compact-table comparison-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th class="numeric">Planned</th>
+              <th class="numeric">Logged</th>
+              <th class="numeric">Delta</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderPlan() {
+  const planRows = planRowsFromApi();
+  const logRows = logRowsFromApi();
+  return `
+    <div class="view-shell">
+      ${planOverview(planRows, logRows)}
+      <div class="view-shell plan-grid">
+        ${planTable("Plan", planRows, "plan")}
+        ${planTable("Log", logRows, "log")}
+      </div>
+      ${comparisonTable(planRows, logRows)}
     </div>
   `;
 }
