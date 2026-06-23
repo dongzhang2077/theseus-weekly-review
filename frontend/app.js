@@ -101,7 +101,8 @@ const fallbackReview = {
       total_minutes: 450,
     },
   },
-  generated_text: "Fixture review loaded.",
+  generated_text:
+    "Win: Backend MVP work moved forward with clear implementation evidence. Insight: Planned and logged time can now be compared by project. Risk: Debugging and frontend scope can still displace planned work. Next step: Prepare debugger notes before the next implementation block.",
 };
 
 const fallbackCollections = {
@@ -235,16 +236,29 @@ function renderNav() {
 }
 
 function section(title, count, tone, items, marker) {
-  const rows = items
-    .map(
-      (item) => `
+  const rows = items.length
+    ? items
+        .map(
+          (item) => `
         <li>
-          <span class="small-mark ${marker} ${tone === "amber" ? "amber" : ""}" aria-hidden="true"></span>
-          <span>${escapeHtml(item)}</span>
+          <span class="small-mark ${marker} ${tone || ""}" aria-hidden="true"></span>
+          <span class="item-text">
+            <strong>${escapeHtml(item.title || item)}</strong>
+            ${item.detail ? `<span>${escapeHtml(item.detail)}</span>` : ""}
+          </span>
         </li>
       `
-    )
-    .join("");
+        )
+        .join("")
+    : `
+        <li class="empty-row">
+          <span class="small-mark ${marker} ${tone || ""}" aria-hidden="true"></span>
+          <span class="item-text">
+            <strong>No items yet</strong>
+            <span>This section will fill after review data is available.</span>
+          </span>
+        </li>
+      `;
   return `
     <section class="paper-panel">
       <div class="section-header">
@@ -262,21 +276,38 @@ function section(title, count, tone, items, marker) {
 }
 
 function findingTitles(items, fallback) {
-  if (!Array.isArray(items) || !items.length) return fallback;
-  return items.map((item) => item.title || item.evidence || String(item));
+  const source = Array.isArray(items) ? items : fallback;
+  return source.map((item) =>
+    typeof item === "string"
+      ? { title: item, detail: "" }
+      : { title: item.title || item.evidence || String(item), detail: item.evidence || "" }
+  );
 }
 
 function riskTitles(risks, fallback) {
-  if (!Array.isArray(risks) || !risks.length) return fallback;
-  return risks.map((risk) => risk.evidence || labelFromKey(risk.type));
+  const source = Array.isArray(risks) ? risks : fallback;
+  return source.map((risk) =>
+    typeof risk === "string"
+      ? { title: risk, detail: "" }
+      : {
+          title: risk.evidence || labelFromKey(risk.type),
+          detail: risk.severity ? `${labelFromKey(risk.severity)} severity` : "",
+        }
+  );
 }
 
-function nextStepTitle() {
+function nextStepItems() {
   const nextSteps = state.review.next_steps;
-  if (!Array.isArray(nextSteps) || !nextSteps.length) {
-    return fallbackReview.next_steps[0].title;
+  if (!Array.isArray(nextSteps)) {
+    return fallbackReview.next_steps.map((step) => ({
+      title: step.title,
+      detail: step.reason,
+    }));
   }
-  return nextSteps[0].title || nextSteps[0].reason || "Prepare next review block";
+  return nextSteps.map((step) => ({
+    title: step.title || step.reason || "Prepare next review block",
+    detail: step.reason || "",
+  }));
 }
 
 function reviewEvidenceRows() {
@@ -332,21 +363,59 @@ function evidenceTable() {
           <h2>Evidence</h2>
         </div>
       </div>
-      <div class="panel-body table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Project</th>
-              <th class="numeric">Planned</th>
-              <th class="numeric">Actual</th>
-              <th class="numeric">Delta</th>
-              <th>Note</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
+      <div class="panel-body">
+        ${evidenceSummary()}
+        <details class="evidence-details" open>
+          <summary>
+            <span>Project evidence</span>
+            <span>${reviewEvidenceRows().length}</span>
+          </summary>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th class="numeric">Planned</th>
+                  <th class="numeric">Actual</th>
+                  <th class="numeric">Delta</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </details>
       </div>
     </section>
+  `;
+}
+
+function evidenceSummary() {
+  const summary = state.review.evidence?.summary || {};
+  const plan = state.review.evidence?.plan || {};
+  const reflections = state.review.evidence?.reflections || {};
+  const dormancyProjects = state.review.evidence?.dormancy?.projects || [];
+  const cards = [
+    ["Logs", summary.time_log_count ?? 0],
+    ["Projects", summary.project_count ?? reviewEvidenceRows().length],
+    ["Slack", plan.slack_status ? labelFromKey(plan.slack_status) : "Unknown"],
+    ["Dormant", dormancyProjects.filter((project) => project.risk_level !== "none").length],
+    ["Reflections", reflections.count ?? summary.reflection_count ?? 0],
+    ["Unplanned", formatMinutes(plan.unplanned_project_minutes || 0)],
+  ];
+  return `
+    <div class="evidence-summary">
+      ${cards
+        .map(
+          ([label, value]) => `
+            <div class="mini-metric">
+              <span>${escapeHtml(label)}</span>
+              <strong>${escapeHtml(value)}</strong>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
   `;
 }
 
@@ -393,9 +462,17 @@ function activityTiles() {
 
 function summaryMetrics() {
   const summary = state.review.evidence?.summary || {};
-  const planned = numberValue(summary.planned_total_minutes, 840);
-  const actual = numberValue(summary.actual_total_minutes, 805);
+  const planned = numberValue(
+    summary.planned_total_minutes,
+    numberValue(state.review.evidence?.planned_total_minutes, 840)
+  );
+  const actual = numberValue(
+    summary.actual_total_minutes,
+    numberValue(state.review.evidence?.actual_total_minutes, 805)
+  );
   return {
+    plannedRaw: planned,
+    loggedRaw: actual,
     planned: formatMinutes(planned),
     logged: formatMinutes(actual),
     delta: formatSignedMinutes(actual - planned),
@@ -403,37 +480,101 @@ function summaryMetrics() {
   };
 }
 
+function sourceLabel() {
+  if (state.isBusy) return "Loading";
+  if (state.statusTone === "warning") return "Fixture";
+  if (state.statusMessage.includes("Backend")) return "Backend";
+  return "Fixture";
+}
+
+function dashboardMetrics(metrics) {
+  const summary = state.review.evidence?.summary || {};
+  const risks = Array.isArray(state.review.risk_flags) ? state.review.risk_flags.length : 0;
+  const nextSteps = Array.isArray(state.review.next_steps) ? state.review.next_steps.length : 0;
+  const cards = [
+    ["Source", sourceLabel(), state.statusTone === "warning" ? "amber" : "green"],
+    ["Risks", risks, risks > 0 ? "amber" : "green"],
+    ["Next", nextSteps || nextStepItems().length, "green"],
+    ["Logs", summary.time_log_count ?? state.collections.timeLogs.length, "blue"],
+  ];
+
+  return `
+    <div class="dashboard-strip">
+      ${cards
+        .map(
+          ([label, value, tone]) => `
+            <div class="dashboard-card ${tone}">
+              <span>${escapeHtml(label)}</span>
+              <strong>${escapeHtml(value)}</strong>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+    <div class="metric-strip">
+      <div class="metric">
+        <span class="metric-label">Planned</span>
+        <span class="metric-value">${metrics.planned}</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Logged</span>
+        <span class="metric-value">${metrics.logged}</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Delta</span>
+        <span class="metric-value ${metrics.deltaClass}">${metrics.delta}</span>
+      </div>
+    </div>
+  `;
+}
+
+function generatedReviewText() {
+  const text = String(state.review.generated_text || "").trim();
+  if (!text) {
+    return "No generated review text yet.";
+  }
+  return text;
+}
+
+function reviewTextPanel() {
+  return `
+    <section class="paper-panel">
+      <div class="panel-header">
+        <div class="header-title">
+          <span class="status-dot blue"></span>
+          <h2>Review text</h2>
+        </div>
+      </div>
+      <div class="panel-body">
+        <p class="generated-text">${escapeHtml(generatedReviewText())}</p>
+      </div>
+    </section>
+  `;
+}
+
 function renderReview() {
   const wins = findingTitles(
     state.review.wins,
-    fallbackReview.wins.map((win) => win.title)
+    fallbackReview.wins
+  );
+  const insights = findingTitles(
+    state.review.insights,
+    fallbackReview.insights
   );
   const risks = riskTitles(
     state.review.risk_flags,
-    fallbackReview.risk_flags.map((risk) => risk.evidence)
+    fallbackReview.risk_flags
   );
+  const nextSteps = nextStepItems();
   const metrics = summaryMetrics();
   return `
     <div class="view-shell review-grid">
       <div class="summary-stack">
         ${section("Wins", wins.length, "", wins, "check")}
+        ${section("Insights", insights.length, "blue", insights, "dot")}
         ${section("Risks", risks.length, "amber", risks, "dot")}
         ${evidenceTable()}
-        <section class="paper-panel">
-          <div class="section-header">
-            <div class="header-title">
-              <span class="status-dot"></span>
-              <h2>Next</h2>
-            </div>
-            <span class="count-mark">1</span>
-          </div>
-          <div class="section-body">
-            <div class="task-row">
-              <span class="task-checkbox" aria-hidden="true"></span>
-              <span>${escapeHtml(nextStepTitle())}</span>
-            </div>
-          </div>
-        </section>
+        ${section("Next", nextSteps.length, "", nextSteps, "box")}
       </div>
       <div class="summary-stack">
         <section class="paper-panel">
@@ -445,23 +586,12 @@ function renderReview() {
           </div>
           <div class="panel-body">
             <p class="status-note ${state.statusTone}">${escapeHtml(state.statusMessage)}</p>
-            <div class="metric-strip">
-              <div class="metric">
-                <span class="metric-label">Planned</span>
-                <span class="metric-value">${metrics.planned}</span>
-              </div>
-              <div class="metric">
-                <span class="metric-label">Logged</span>
-                <span class="metric-value">${metrics.logged}</span>
-              </div>
-              <div class="metric">
-                <span class="metric-label">Delta</span>
-                <span class="metric-value ${metrics.deltaClass}">${metrics.delta}</span>
-              </div>
-            </div>
+            ${state.isBusy ? '<div class="loading-line" aria-hidden="true"></div>' : ""}
+            ${dashboardMetrics(metrics)}
           </div>
         </section>
         ${activityTiles()}
+        ${reviewTextPanel()}
       </div>
     </div>
   `;
