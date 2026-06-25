@@ -4,6 +4,8 @@ from collections import defaultdict
 from datetime import date, datetime
 from typing import Any
 
+from review_engine.baseline import evaluate_projects_health
+
 
 ACTIVITY_TYPES = ("consuming", "neutral", "restore", "destroy")
 EVIDENCE_SCHEMA_VERSION = "sprint2.review_evidence.v1"
@@ -148,6 +150,12 @@ def _build_evidence(
     slack_percent = (slack_minutes / capacity) if capacity > 0 and slack_minutes is not None else None
     slack_target_percent = int(weekly_plan.get("slack_target_percent", 20))
     required_slack_minutes = round(capacity * (slack_target_percent / 100)) if capacity > 0 else None
+    last_log_dates_by_project = _last_log_dates_by_project(time_logs)
+    inactive_days_by_project = _inactive_days_by_project(
+        projects,
+        last_log_dates_by_project,
+        weekly_plan.get("week_end"),
+    )
 
     evidence = {
         "schema_version": EVIDENCE_SCHEMA_VERSION,
@@ -165,7 +173,7 @@ def _build_evidence(
             goals_by_id,
             planned_by_project,
             actual_by_project,
-            _last_log_dates_by_project(time_logs),
+            last_log_dates_by_project,
             weekly_plan.get("week_end"),
         ),
         "plan": {
@@ -202,8 +210,15 @@ def _build_evidence(
             "projects": _dormancy_evidence(
                 projects,
                 actual_by_project,
-                _last_log_dates_by_project(time_logs),
+                last_log_dates_by_project,
                 weekly_plan.get("week_end"),
+            )
+        },
+        "stage_health": {
+            "projects": evaluate_projects_health(
+                projects,
+                actual_by_project,
+                inactive_days_by_project,
             )
         },
     }
@@ -484,6 +499,22 @@ def _last_log_dates_by_project(time_logs: list[dict[str, Any]]) -> dict[int, dat
         if project_key not in dates or log_date > dates[project_key]:
             dates[project_key] = log_date
     return dates
+
+
+def _inactive_days_by_project(
+    projects: list[dict[str, Any]],
+    last_log_dates_by_project: dict[int, date],
+    week_end: str | date | datetime | None,
+) -> dict[int, int | None]:
+    inactive_days = {}
+    for project in projects:
+        project_id = int(project["id"])
+        last_activity_date = _effective_last_activity_date(
+            project.get("last_activity_date"),
+            last_log_dates_by_project.get(project_id),
+        )
+        inactive_days[project_id] = _days_since(last_activity_date, week_end)
+    return inactive_days
 
 
 def _effective_last_activity_date(
