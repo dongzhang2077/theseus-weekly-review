@@ -150,6 +150,36 @@ class TimeLogRead(TimeLogCreate):
     updated_at: datetime
 
 
+class MobileTimeLogImportRecord(APIModel):
+    source_record_id: str | None = None
+    activity_id: int | None = None
+    project_id: int | None = None
+    date: date
+    start_time: time | None = None
+    end_time: time | None = None
+    duration_minutes: int = Field(gt=0)
+    activity_name: str = Field(min_length=1)
+    activity_type: str = Field(min_length=1)
+    type_source: ActivityTypeSource = "user_selected"
+    note: str = ""
+
+    @model_validator(mode="after")
+    def validate_time_pair(self) -> MobileTimeLogImportRecord:
+        if (self.start_time is None) != (self.end_time is None):
+            raise ValueError("start_time and end_time must be provided together")
+        return self
+
+
+class MobileTimeLogImportRequest(APIModel):
+    time_logs: list[MobileTimeLogImportRecord] = Field(min_length=1)
+
+
+class MobileTimeLogImportSummary(APIModel):
+    imported: int
+    skipped: int
+    needs_mapping: int
+
+
 class DailyReflectionCreate(APIModel):
     date: date
     small_win: str = ""

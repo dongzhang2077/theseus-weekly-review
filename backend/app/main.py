@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api.goals import router as goals_router
+from .api.imports import router as imports_router
 from .api.projects import router as projects_router
 from .api.reviews import router as reviews_router
 from .api.time_logs import router as time_logs_router
@@ -50,6 +51,7 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
         )
     application.state.database = database
     application.include_router(goals_router)
+    application.include_router(imports_router)
     application.include_router(projects_router)
     application.include_router(reviews_router)
     application.include_router(time_logs_router)
