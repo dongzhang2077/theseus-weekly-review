@@ -132,7 +132,60 @@ Status: `201 Created`.
 
 Returns time logs ordered by date, start time, and ID.
 
-## 6. Weekly Review
+## 6. Mobile Imports
+
+### POST /imports/mobile-time-logs
+
+Imports normalized mobile capture records into backend `time_logs`.
+
+Request:
+
+```json
+{
+  "time_logs": [
+    {
+      "source_record_id": "local-20260610-001",
+      "project_id": 1,
+      "date": "2026-06-10",
+      "start_time": "09:00",
+      "end_time": "10:30",
+      "duration_minutes": 90,
+      "activity_name": "Backend schema design",
+      "activity_type": "consume",
+      "type_source": "user_selected",
+      "note": "Captured offline."
+    }
+  ]
+}
+```
+
+Required record fields are `date`, `duration_minutes`, `activity_name`, and
+`activity_type`. Optional fields are `source_record_id`, `activity_id`,
+`project_id`, `start_time`, `end_time`, `type_source`, and `note`. `start_time`
+and `end_time` must be supplied together.
+
+Accepted activity types are `restore`, `consuming`, `neutral`, and `destroy`.
+The import endpoint also normalizes legacy `consume` to `consuming`.
+
+Response:
+
+```json
+{
+  "imported": 12,
+  "skipped": 0,
+  "needs_mapping": 3
+}
+```
+
+Status: `201 Created`.
+
+Records with unknown activity types are skipped and counted as
+`needs_mapping`. Valid records without `project_id` are imported as ad hoc time
+logs and counted as `needs_mapping` so the UI can later ask the user to map
+them. Duplicate `source_record_id` values inside one batch are skipped. Invalid
+payload shape returns `422`.
+
+## 7. Weekly Review
 
 ### POST /reviews/weekly/generate
 
@@ -250,15 +303,16 @@ defined by the Sprint 2 evidence contract.
 
 The persisted response also includes `id`, `created_at`, and `updated_at`. If no matching weekly plan exists, the endpoint returns `404`. The endpoint reads normalized evidence from SQLite, calls the framework-independent review engine, and stores the structured result before responding.
 
-## 7. Validation and Errors
+## 8. Validation and Errors
 
 - Invalid request data returns `422`.
 - Missing referenced entities return `404` or `409`, depending on whether the operation is a lookup or a conflicting write.
 - Create requests never accept database-managed IDs or timestamps.
 - Empty optional strings are accepted; required names and titles must not be empty.
 - `start_time` and `end_time` must be supplied together.
+- Batch mobile imports report unresolved `activity_id` or `project_id` as record-level `skipped` and `needs_mapping` counts instead of failing the whole request.
 
-## 8. Evaluation
+## 9. Evaluation
 
 ### POST /evaluation/review-feedback
 

@@ -54,6 +54,8 @@ The capture module should export normalized records that match Theseus backend c
 {
   "time_logs": [
     {
+      "source_record_id": "local-20260610-001",
+      "project_id": 1,
       "date": "2026-06-10",
       "start_time": "09:00",
       "end_time": "10:30",
@@ -67,6 +69,22 @@ The capture module should export normalized records that match Theseus backend c
 }
 ```
 
+Required record fields:
+
+- `date`
+- `duration_minutes`
+- `activity_name`
+- `activity_type`
+
+Optional record fields:
+
+- `source_record_id`: mobile-local ID for identifying records inside an export batch.
+- `activity_id`: backend activity ID when the mobile record is already mapped.
+- `project_id`: backend project ID when the mobile record is already mapped.
+- `start_time` and `end_time`: must be supplied together.
+- `type_source`: defaults to `user_selected`.
+- `note`: defaults to an empty string.
+
 Activity type values should match the proposal:
 
 ```text
@@ -75,6 +93,10 @@ consuming
 neutral
 destroy
 ```
+
+Legacy mobile exports may send `consume`; the backend import normalizes it to
+`consuming`. Other unknown activity types are skipped and counted as
+`needs_mapping`.
 
 ## 4. Mobile Data Model
 
@@ -129,6 +151,14 @@ Responsibilities:
 - link to project only when user mapping exists
 - return import summary
 
+Import behavior:
+
+- Valid mapped records are inserted into backend `time_logs`.
+- Valid records without `project_id` are inserted as ad hoc time logs and counted as `needs_mapping`.
+- Unknown activity types are not inserted and are counted as both `skipped` and `needs_mapping`.
+- Duplicate `source_record_id` values inside the same batch are skipped.
+- Invalid payload shape, invalid dates, invalid duration, or partial start/end time returns `422`.
+
 Example response:
 
 ```json
@@ -159,4 +189,3 @@ Do not make early mobile work depend on:
 - full weekly review UI inside the mobile app
 
 These can come later after the core review loop is useful.
-
