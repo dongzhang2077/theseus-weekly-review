@@ -16,6 +16,7 @@ This makes the first prototype testable without an API key.
 - Plan-vs-actual gap
 - Activity energy-impact mix
 - Dormancy risk
+- Stage-health baseline
 - Slack risk
 - Positive progress detection
 
@@ -37,6 +38,7 @@ logged time.
 - `activity`: activity-type minutes with all four types plus total and unlinked minutes.
 - `reflections`: reflection count and counts for small wins, mood notes, and free notes.
 - `dormancy`: active non-dormant projects with weekly minimums, actual minutes, last activity date, inactive days, and risk level.
+- `stage_health`: each project's stage baseline, actual minutes, inactive days, health status, and reason.
 
 The Sprint 1 flat keys such as `actual_total_minutes`, `planned_by_project`,
 `actual_by_project`, `actual_by_goal`, and `activity_mix` remain available for

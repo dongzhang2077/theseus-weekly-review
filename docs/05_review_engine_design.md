@@ -52,6 +52,7 @@ Stable sections:
 - `activity`: all four activity-type totals plus total logged minutes and unlinked minutes.
 - `reflections`: reflection count and counts for small wins, mood notes, and free notes.
 - `dormancy`: active non-dormant projects with weekly minimums, actual minutes, last activity date, inactive days, and risk level.
+- `stage_health`: each project with stage baseline thresholds, actual minutes, inactive days, status, and reason.
 
 Sprint 1 compatibility keys such as `actual_total_minutes`, `planned_by_project`,
 `actual_by_project`, `actual_by_goal`, and `activity_mix` remain present while
@@ -98,6 +99,29 @@ Signals:
 - Actual minutes by project
 - Difference and percentage difference
 - Unplanned time categories that displaced planned work
+
+### Stage-Health Baseline
+
+Question:
+
+Did each project receive time that matches its current lifecycle stage?
+
+Signals:
+
+- Project stage: `startup`, `stable`, `sprint`, `dormant`, or `wake_up`
+- Stage min, target, and max minutes
+- Project weekly min and target overrides
+- Actual minutes
+- Inactive days
+
+Statuses:
+
+- `healthy`: actual time reached the stage target range.
+- `maintenance`: actual time covered the minimum but stayed below target.
+- `drift`: actual time fell below the stage minimum.
+- `overheated`: actual time exceeded the stage maximum.
+- `dormant`: the project is not expected to receive active weekly time.
+- `wake_up_risk`: a wake-up or long-inactive project needs a visible restart block.
 
 ### Activity Energy-Impact Mix
 

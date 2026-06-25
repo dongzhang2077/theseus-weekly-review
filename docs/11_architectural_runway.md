@@ -142,7 +142,9 @@ The stage-baseline model gives Theseus a useful project lifecycle lane:
 - `dormant`
 - `wake_up`
 
-The first Sprint can store simple `weekly_min_minutes` and `weekly_target_minutes`. Later, `baseline.py` can support stage-specific min/max thresholds.
+`review_engine/baseline.py` owns the stage-specific min, target, and max thresholds. Project-level `weekly_min_minutes` and `weekly_target_minutes` override the defaults when set, while the engine still preserves a stage maximum for overheat detection.
+
+The weekly evidence package exposes this as `evidence.stage_health.projects`, with one row per project and a deterministic status such as `healthy`, `maintenance`, `drift`, `overheated`, `dormant`, or `wake_up_risk`.
 
 Do not hard-code all thresholds inside route handlers.
 
