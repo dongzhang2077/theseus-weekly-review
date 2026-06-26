@@ -3,26 +3,26 @@ import { DetailPanel } from "../../shared/components/DetailPanel";
 import { Icon } from "../../shared/icons/Icon";
 import { IconButton } from "../../shared/components/IconButton";
 import { Sheet } from "../../shared/components/Sheet";
-import { demoWeek, type DemoReviewItem } from "../../shared/demo/demoWeek";
+import type { AppReviewItem, AppWeekViewModel } from "../../shared/api/weeklyReview";
 
 const characterAttentionUrl = new URL("../../assets/character-attention.png", import.meta.url).href;
 
 type ReviewSheet = "wins" | "risks" | "full";
-type ReviewDetail = "win-backend" | "win-deep-work" | "risk-resume" | "risk-frontend" | null;
-const review = demoWeek.review;
-const reviewDetails = [...review.wins, ...review.risks].reduce<Record<string, DemoReviewItem>>((byId, item) => {
-  byId[item.id] = item;
-  return byId;
-}, {});
+type ReviewDetail = string | null;
 
 interface ReviewScreenProps {
+  review: AppWeekViewModel["review"];
   onPlan: () => void;
 }
 
-export function ReviewScreen({ onPlan }: ReviewScreenProps) {
+export function ReviewScreen({ review, onPlan }: ReviewScreenProps) {
   const [bubbleOpen, setBubbleOpen] = useState(false);
   const [sheet, setSheet] = useState<ReviewSheet | null>(null);
   const [detail, setDetail] = useState<ReviewDetail>(null);
+  const reviewDetails = [...review.wins, ...review.risks].reduce<Record<string, AppReviewItem>>((byId, item) => {
+    byId[item.id] = item;
+    return byId;
+  }, {});
 
   return (
     <section className="screen review-screen">
@@ -63,7 +63,7 @@ export function ReviewScreen({ onPlan }: ReviewScreenProps) {
         {sheet === "wins" ? (
           <div className="sheet-list">
             {review.wins.map((win) => (
-              <button key={win.id} className="list-row" onClick={() => setDetail(win.id as ReviewDetail)}>
+              <button key={win.id} className="list-row" onClick={() => setDetail(win.id)}>
                 <span>
                   <strong>{win.title}</strong>
                 </span>
@@ -75,7 +75,7 @@ export function ReviewScreen({ onPlan }: ReviewScreenProps) {
         {sheet === "risks" ? (
           <div className="sheet-list">
             {review.risks.map((risk) => (
-              <button key={risk.id} className="list-row" onClick={() => setDetail(risk.id as ReviewDetail)}>
+              <button key={risk.id} className="list-row" onClick={() => setDetail(risk.id)}>
                 <span>
                   <strong>{risk.title}</strong>
                   <small>{risk.severity}</small>
@@ -96,7 +96,7 @@ export function ReviewScreen({ onPlan }: ReviewScreenProps) {
       </Sheet>
 
       <DetailPanel title={detailTitle(detail)} open={detail !== null} onBack={() => setDetail(null)}>
-        {detail ? (
+        {detail && reviewDetails[detail] ? (
           <div className="detail-stack">
             {reviewDetails[detail].severity ? (
               <span className={`status-chip severity-${reviewDetails[detail].severity}`}>{reviewDetails[detail].severity}</span>
@@ -127,7 +127,7 @@ function sheetTitle(sheet: ReviewSheet | null): string {
 }
 
 function detailTitle(detail: ReviewDetail): string {
-  if (detail === "risk-resume" || detail === "risk-frontend") return "Risk";
-  if (detail === "win-backend" || detail === "win-deep-work") return "Win";
+  if (detail?.startsWith("risk-")) return "Risk";
+  if (detail?.startsWith("win-")) return "Win";
   return "Review";
 }

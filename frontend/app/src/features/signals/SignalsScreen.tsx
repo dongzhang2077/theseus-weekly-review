@@ -3,21 +3,7 @@ import { DetailPanel } from "../../shared/components/DetailPanel";
 import { Icon } from "../../shared/icons/Icon";
 import { Sheet } from "../../shared/components/Sheet";
 import { choosePrioritySignal, sortSignalEvidence, type SignalEvidence, type SignalId, type SignalSummary } from "./signalModel";
-import { demoWeek } from "../../shared/demo/demoWeek";
-
-const signals: SignalSummary[] = demoWeek.signals.summaries;
-
-const evidenceBySignal: Record<SignalId, SignalEvidence[]> = {
-  stage: [],
-  plan: [],
-  goal: [],
-  energy: []
-};
-
-for (const evidence of demoWeek.signals.evidence) {
-  const { signalId, ...signalEvidence } = evidence;
-  evidenceBySignal[signalId].push(signalEvidence);
-}
+import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
 
 const iconBySignal: Record<SignalId, "calendar" | "target" | "layers" | "leaf"> = {
   plan: "calendar",
@@ -26,10 +12,29 @@ const iconBySignal: Record<SignalId, "calendar" | "target" | "layers" | "leaf"> 
   energy: "leaf"
 };
 
-export function SignalsScreen() {
-  const priority = useMemo(() => choosePrioritySignal(signals), []);
+interface SignalsScreenProps {
+  signals: AppWeekViewModel["signals"];
+}
+
+export function SignalsScreen({ signals }: SignalsScreenProps) {
+  const priority = useMemo(() => choosePrioritySignal(signals.summaries), [signals.summaries]);
   const [activeSignal, setActiveSignal] = useState<SignalId | null>(null);
   const [activeDetail, setActiveDetail] = useState<SignalEvidence | null>(null);
+  const evidenceBySignal = useMemo(() => {
+    const grouped: Record<SignalId, SignalEvidence[]> = {
+      stage: [],
+      plan: [],
+      goal: [],
+      energy: []
+    };
+
+    for (const evidence of signals.evidence) {
+      const { signalId, ...signalEvidence } = evidence;
+      grouped[signalId].push(signalEvidence);
+    }
+
+    return grouped;
+  }, [signals.evidence]);
   const rows = activeSignal ? sortSignalEvidence(evidenceBySignal[activeSignal]) : [];
 
   return (
@@ -53,7 +58,7 @@ export function SignalsScreen() {
       </div>
 
       <div className="signal-grid" aria-label="Signal types">
-        {signals.map((signal) => (
+        {signals.summaries.map((signal) => (
           <button
             key={signal.id}
             className={`signal-entry severity-${signal.severity} ${priority.id === signal.id ? "priority" : ""}`}
@@ -66,7 +71,7 @@ export function SignalsScreen() {
         ))}
       </div>
 
-      <Sheet title={activeSignal ? signals.find((signal) => signal.id === activeSignal)?.label ?? "Signals" : "Signals"} open={activeSignal !== null} onClose={() => setActiveSignal(null)}>
+      <Sheet title={activeSignal ? signals.summaries.find((signal) => signal.id === activeSignal)?.label ?? "Signals" : "Signals"} open={activeSignal !== null} onClose={() => setActiveSignal(null)}>
         <div className="sheet-list">
           {rows.map((row) => (
             <button key={row.id} className={`list-row severity-${row.severity}`} onClick={() => setActiveDetail(row)}>

@@ -3,22 +3,25 @@ import { DetailPanel } from "../../shared/components/DetailPanel";
 import { Icon } from "../../shared/icons/Icon";
 import { IconButton } from "../../shared/components/IconButton";
 import { applySuggestion, dismissSuggestion, savePlanDetail, type PlanState } from "./planModel";
-import { demoWeek } from "../../shared/demo/demoWeek";
-
-const initialPlan: PlanState = demoWeek.plan.initialState;
+import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
 
 export type PlanDetail = "suggestion" | "focus" | "slack" | "projects";
 
 interface PlanScreenProps {
+  planData: AppWeekViewModel["plan"];
   entryRequest: {
     id: number;
     detail: PlanDetail;
   } | null;
 }
 
-export function PlanScreen({ entryRequest }: PlanScreenProps) {
-  const [plan, setPlan] = useState(initialPlan);
+export function PlanScreen({ planData, entryRequest }: PlanScreenProps) {
+  const [plan, setPlan] = useState<PlanState>(planData.initialState);
   const [detail, setDetail] = useState<PlanDetail | null>(null);
+
+  useEffect(() => {
+    setPlan(planData.initialState);
+  }, [planData.initialState]);
 
   useEffect(() => {
     if (entryRequest) {

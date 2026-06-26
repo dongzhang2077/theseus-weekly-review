@@ -6,15 +6,17 @@ import type { IconName } from "../../shared/icons/Icon";
 import { IconButton } from "../../shared/components/IconButton";
 import { Sheet } from "../../shared/components/Sheet";
 import { chooseFocusActivity, formatClock, formatDuration, tickActivities, toggleActivity, type ActivityTimer } from "./timerModel";
-import { demoWeek } from "../../shared/demo/demoWeek";
-
-const initialActivities: ActivityTimer[] = demoWeek.track.activities;
+import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
 
 const categories = ["Project", "Study", "Health"];
 type TrackSheet = "logs" | "create";
 
-export function TrackScreen() {
-  const [activities, setActivities] = useState(initialActivities);
+interface TrackScreenProps {
+  track: AppWeekViewModel["track"];
+}
+
+export function TrackScreen({ track }: TrackScreenProps) {
+  const [activities, setActivities] = useState(track.activities);
   const [activeSheet, setActiveSheet] = useState<TrackSheet | null>(null);
   const [detail, setDetail] = useState<ActivityTimer | null>(null);
   const focus = useMemo(() => chooseFocusActivity(activities), [activities]);
@@ -29,6 +31,10 @@ export function TrackScreen() {
 
     return () => window.clearInterval(interval);
   }, [hasRunningActivity]);
+
+  useEffect(() => {
+    setActivities(track.activities);
+  }, [track.activities]);
 
   function onToggle(activityId: string) {
     setActivities((current) => toggleActivity(current, activityId));
