@@ -16,6 +16,8 @@ interface ReviewScreenProps {
 }
 
 export function ReviewScreen({ review, onPlan }: ReviewScreenProps) {
+  const weekLabels = ["Jun 1 - Jun 7", review.weekLabel, "Jun 15 - Jun 21"];
+  const [weekIndex, setWeekIndex] = useState(1);
   const [bubbleOpen, setBubbleOpen] = useState(false);
   const [sheet, setSheet] = useState<ReviewSheet | null>(null);
   const [detail, setDetail] = useState<ReviewDetail>(null);
@@ -27,9 +29,9 @@ export function ReviewScreen({ review, onPlan }: ReviewScreenProps) {
   return (
     <section className="screen review-screen">
       <header className="screen-header">
-        <IconButton label="Previous" icon="chevronLeft" />
-        <div className="screen-title">{review.weekLabel}</div>
-        <IconButton label="Next" icon="chevronRight" />
+        <IconButton label="Previous" icon="chevronLeft" onClick={() => setWeekIndex((index) => Math.max(0, index - 1))} />
+        <div className="screen-title">{weekLabels[weekIndex]}</div>
+        <IconButton label="Next" icon="chevronRight" onClick={() => setWeekIndex((index) => Math.min(weekLabels.length - 1, index + 1))} />
       </header>
 
       <div className="review-cover">

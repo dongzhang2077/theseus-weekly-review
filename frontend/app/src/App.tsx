@@ -43,7 +43,7 @@ export function App() {
   return (
     <AppShell activeTab={activeTab} onTabChange={setActiveTab}>
       {activeTab === "review" ? <ReviewScreen review={appWeek.review} onPlan={openPlanSuggestion} /> : null}
-      {activeTab === "signals" ? <SignalsScreen signals={appWeek.signals} /> : null}
+      {activeTab === "signals" ? <SignalsScreen signals={appWeek.signals} onPlan={openPlanSuggestion} /> : null}
       {activeTab === "track" ? <TrackScreen track={appWeek.track} /> : null}
       {activeTab === "plan" ? <PlanScreen planData={appWeek.plan} entryRequest={planEntryRequest} /> : null}
     </AppShell>
