@@ -14,9 +14,10 @@ const iconBySignal: Record<SignalId, "calendar" | "target" | "layers" | "leaf"> 
 
 interface SignalsScreenProps {
   signals: AppWeekViewModel["signals"];
+  onPlan: () => void;
 }
 
-export function SignalsScreen({ signals }: SignalsScreenProps) {
+export function SignalsScreen({ signals, onPlan }: SignalsScreenProps) {
   const priority = useMemo(() => choosePrioritySignal(signals.summaries), [signals.summaries]);
   const [activeSignal, setActiveSignal] = useState<SignalId | null>(null);
   const [activeDetail, setActiveDetail] = useState<SignalEvidence | null>(null);
@@ -98,7 +99,7 @@ export function SignalsScreen({ signals }: SignalsScreenProps) {
                 </div>
               ))}
             </dl>
-            {activeDetail.action ? <button className="paper-action">{activeDetail.action}</button> : null}
+            {activeDetail.action ? <button className="paper-action" onClick={onPlan}>{activeDetail.action}</button> : null}
           </div>
         ) : null}
       </DetailPanel>

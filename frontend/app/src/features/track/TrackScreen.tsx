@@ -10,6 +10,13 @@ import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
 import { saveActivitySession } from "../../shared/api/timeLogs";
 
 const categories = ["Project", "Study", "Health"];
+const energyOptions = ["consume", "restore", "neutral"] as const;
+const colorOptions = [
+  { name: "Green", value: "#6f8f6b", className: "green" },
+  { name: "Blue", value: "#8aa9c0", className: "blue" },
+  { name: "Amber", value: "#c8a25f", className: "amber" },
+  { name: "Pink", value: "#d69a9a", className: "pink" }
+];
 type TrackSheet = "logs" | "create";
 
 interface TrackScreenProps {
@@ -21,6 +28,11 @@ export function TrackScreen({ apiBaseUrl, track }: TrackScreenProps) {
   const [activities, setActivities] = useState(track.activities);
   const [activeSheet, setActiveSheet] = useState<TrackSheet | null>(null);
   const [detail, setDetail] = useState<ActivityTimer | null>(null);
+  const [newName, setNewName] = useState("Design polish block");
+  const [newCategory, setNewCategory] = useState("Project");
+  const [newEnergy, setNewEnergy] = useState<ActivityTimer["energy"]>("consume");
+  const [newColor, setNewColor] = useState(colorOptions[0].value);
+  const [savedActivityId, setSavedActivityId] = useState<string | null>(null);
   const focus = useMemo(() => chooseFocusActivity(activities), [activities]);
   const hasRunningActivity = activities.some((activity) => activity.running);
   const todayTotal = activities.reduce((total, activity) => total + activity.todaySeconds + activity.sessionSeconds, 0);
@@ -47,6 +59,33 @@ export function TrackScreen({ apiBaseUrl, track }: TrackScreenProps) {
 
       return toggleActivity(current, activityId);
     });
+  }
+
+  function onCreateActivity() {
+    const name = newName.trim();
+    if (!name) return;
+
+    const activity: ActivityTimer = {
+      id: `activity-${Date.now()}`,
+      name,
+      category: newCategory,
+      energy: newEnergy,
+      color: newColor,
+      todaySeconds: 0,
+      sessionSeconds: 0,
+      running: false
+    };
+
+    setActivities((current) => [...current, activity]);
+    setDetail(activity);
+    setNewName("");
+    setActiveSheet(null);
+  }
+
+  function onSaveDetail() {
+    if (!detail) return;
+    setSavedActivityId(detail.id);
+    window.setTimeout(() => setSavedActivityId(null), 1200);
   }
 
   return (
@@ -121,25 +160,44 @@ export function TrackScreen({ apiBaseUrl, track }: TrackScreenProps) {
         <div className="create-body">
           <label className="paper-field">
             <span>Name</span>
-            <input type="text" defaultValue="Design polish block" aria-label="Activity name" />
+            <input type="text" value={newName} aria-label="Activity name" onChange={(event) => setNewName(event.currentTarget.value)} />
           </label>
           <div className="chip-section" aria-label="Category">
-            <button className="choice-chip selected" aria-pressed="true">Project</button>
-            <button className="choice-chip" aria-pressed="false">Study</button>
-            <button className="choice-chip" aria-pressed="false">Health</button>
+            {categories.map((category) => (
+              <button
+                key={category}
+                className={`choice-chip ${newCategory === category ? "selected" : ""}`}
+                aria-pressed={newCategory === category}
+                onClick={() => setNewCategory(category)}
+              >
+                {category}
+              </button>
+            ))}
           </div>
           <div className="chip-section" aria-label="Energy">
-            <button className="choice-chip selected" aria-pressed="true">Consume</button>
-            <button className="choice-chip" aria-pressed="false">Restore</button>
-            <button className="choice-chip" aria-pressed="false">Neutral</button>
+            {energyOptions.map((energy) => (
+              <button
+                key={energy}
+                className={`choice-chip ${newEnergy === energy ? "selected" : ""}`}
+                aria-pressed={newEnergy === energy}
+                onClick={() => setNewEnergy(energy)}
+              >
+                {energyLabel(energy)}
+              </button>
+            ))}
           </div>
           <div className="swatch-row" aria-label="Color">
-            <button className="color-swatch green selected" aria-label="Green" />
-            <button className="color-swatch blue" aria-label="Blue" />
-            <button className="color-swatch amber" aria-label="Amber" />
-            <button className="color-swatch pink" aria-label="Pink" />
+            {colorOptions.map((color) => (
+              <button
+                key={color.name}
+                className={`color-swatch ${color.className} ${newColor === color.value ? "selected" : ""}`}
+                aria-label={color.name}
+                aria-pressed={newColor === color.value}
+                onClick={() => setNewColor(color.value)}
+              />
+            ))}
           </div>
-          <button className="create-action" aria-label="Create activity" onClick={() => setActiveSheet("logs")}>
+          <button className="create-action" aria-label="Create activity" onClick={onCreateActivity}>
             <Icon name="plus" />
           </button>
         </div>
@@ -167,12 +225,20 @@ export function TrackScreen({ apiBaseUrl, track }: TrackScreenProps) {
               <span>Note</span>
               <textarea rows={3} defaultValue="Built the app-first tracker prototype and checked the tab timing flow." />
             </label>
-            <button className="paper-action">Save</button>
+            <button className="paper-action" onClick={onSaveDetail}>
+              {savedActivityId === detail.id ? "Saved" : "Save"}
+            </button>
           </div>
         ) : null}
       </DetailPanel>
     </section>
   );
+}
+
+function energyLabel(energy: ActivityTimer["energy"]): string {
+  if (energy === "consume") return "Consume";
+  if (energy === "restore") return "Restore";
+  return "Neutral";
 }
 
 function activityIcon(activityId: string): IconName {
