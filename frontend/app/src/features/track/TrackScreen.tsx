@@ -93,7 +93,6 @@ export function TrackScreen() {
         </button>
 
         <button className="timer-core" aria-label={focus.running ? "Pause" : "Start"} onClick={() => onToggle(focus.id)}>
-          <span className={`timer-state-mark ${focus.running ? "running" : ""}`} />
           <span className="timer-clock">{formatClock(focus.sessionSeconds)}</span>
         </button>
 

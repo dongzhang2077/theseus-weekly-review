@@ -49,6 +49,8 @@ export function ReviewScreen() {
         <span />
         <span className="soft" />
         <span />
+        <span />
+        <span />
       </button>
 
       <Sheet title={sheetTitle(sheet)} open={sheet !== null} onClose={() => setSheet(null)}>
