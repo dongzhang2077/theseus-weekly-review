@@ -5,10 +5,11 @@ interface SheetProps {
   title: string;
   open: boolean;
   onClose: () => void;
+  actions?: ReactNode;
   children: ReactNode;
 }
 
-export function Sheet({ title, open, onClose, children }: SheetProps) {
+export function Sheet({ title, open, onClose, actions, children }: SheetProps) {
   if (!open) return null;
 
   return (
@@ -18,7 +19,10 @@ export function Sheet({ title, open, onClose, children }: SheetProps) {
         <div className="sheet-handle" aria-hidden="true" />
         <header className="sheet-header">
           <div className="sheet-title">{title}</div>
-          <IconButton label="Close" icon="chevronDown" onClick={onClose} />
+          <div className="sheet-actions">
+            {actions}
+            <IconButton label="Close" icon="chevronDown" onClick={onClose} />
+          </div>
         </header>
         <div className="sheet-body">{children}</div>
       </section>

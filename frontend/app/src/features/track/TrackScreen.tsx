@@ -52,10 +52,11 @@ const initialActivities: ActivityTimer[] = [
 ];
 
 const categories = ["Project", "Study", "Health"];
+type TrackSheet = "logs" | "create";
 
 export function TrackScreen() {
   const [activities, setActivities] = useState(initialActivities);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [activeSheet, setActiveSheet] = useState<TrackSheet | null>(null);
   const [detail, setDetail] = useState<ActivityTimer | null>(null);
   const focus = useMemo(() => chooseFocusActivity(activities), [activities]);
   const hasRunningActivity = activities.some((activity) => activity.running);
@@ -100,13 +101,18 @@ export function TrackScreen() {
           <Icon name={focus.running ? "pause" : "play"} />
         </button>
 
-        <button className="total-pill" aria-label="Today total" onClick={() => setSheetOpen(true)}>
+        <button className="total-pill" aria-label="Today total" onClick={() => setActiveSheet("logs")}>
           <span />
           {formatDuration(todayTotal)}
         </button>
       </div>
 
-      <Sheet title="Today" open={sheetOpen} onClose={() => setSheetOpen(false)}>
+      <Sheet
+        title="Today"
+        open={activeSheet === "logs"}
+        onClose={() => setActiveSheet(null)}
+        actions={<IconButton label="New" icon="plus" onClick={() => setActiveSheet("create")} />}
+      >
         <div className="activity-list">
           {categories.map((category) => (
             <div key={category} className="tracker-category">
@@ -125,13 +131,43 @@ export function TrackScreen() {
                       <span>
                         <strong>{activity.name}</strong>
                       </span>
-                      <strong>{formatDuration(activity.todaySeconds + activity.sessionSeconds)}</strong>
+                      <strong className={activity.running ? "running-time" : ""}>
+                        {activity.running ? `• ${formatClock(activity.sessionSeconds).slice(3)}` : formatDuration(activity.todaySeconds)}
+                      </strong>
                     </button>
                     <IconButton label="Detail" icon="info" onClick={() => setDetail(activity)} />
                   </div>
                 ))}
             </div>
           ))}
+        </div>
+      </Sheet>
+
+      <Sheet title="New" open={activeSheet === "create"} onClose={() => setActiveSheet("logs")}>
+        <div className="create-body">
+          <label className="paper-field">
+            <span>Name</span>
+            <input type="text" defaultValue="Design polish block" aria-label="Activity name" />
+          </label>
+          <div className="chip-section" aria-label="Category">
+            <button className="choice-chip selected" aria-pressed="true">Project</button>
+            <button className="choice-chip" aria-pressed="false">Study</button>
+            <button className="choice-chip" aria-pressed="false">Health</button>
+          </div>
+          <div className="chip-section" aria-label="Energy">
+            <button className="choice-chip selected" aria-pressed="true">Consume</button>
+            <button className="choice-chip" aria-pressed="false">Restore</button>
+            <button className="choice-chip" aria-pressed="false">Neutral</button>
+          </div>
+          <div className="swatch-row" aria-label="Color">
+            <button className="color-swatch green selected" aria-label="Green" />
+            <button className="color-swatch blue" aria-label="Blue" />
+            <button className="color-swatch amber" aria-label="Amber" />
+            <button className="color-swatch pink" aria-label="Pink" />
+          </div>
+          <button className="create-action" aria-label="Create activity" onClick={() => setActiveSheet("logs")}>
+            <Icon name="plus" />
+          </button>
         </div>
       </Sheet>
 
