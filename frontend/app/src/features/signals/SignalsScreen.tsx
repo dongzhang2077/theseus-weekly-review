@@ -3,105 +3,21 @@ import { DetailPanel } from "../../shared/components/DetailPanel";
 import { Icon } from "../../shared/icons/Icon";
 import { Sheet } from "../../shared/components/Sheet";
 import { choosePrioritySignal, sortSignalEvidence, type SignalEvidence, type SignalId, type SignalSummary } from "./signalModel";
+import { demoWeek } from "../../shared/demo/demoWeek";
 
-const signals: SignalSummary[] = [
-  {
-    id: "plan",
-    label: "Plan",
-    severity: "attention",
-    status: "Drift",
-    reason: "Planned work shifted away from resume restart."
-  },
-  {
-    id: "stage",
-    label: "Stage",
-    severity: "severe",
-    status: "Dormant",
-    reason: "A restart project stayed inactive this week."
-  },
-  {
-    id: "goal",
-    label: "Goal",
-    severity: "normal",
-    status: "Aligned",
-    reason: "Backend work still supports the MVP goal."
-  },
-  {
-    id: "energy",
-    label: "Energy",
-    severity: "attention",
-    status: "Thin",
-    reason: "Recovery time is lower than planned focus time."
-  }
-];
+const signals: SignalSummary[] = demoWeek.signals.summaries;
 
 const evidenceBySignal: Record<SignalId, SignalEvidence[]> = {
-  stage: [
-    {
-      id: "resume-dormant",
-      title: "Resume dormant",
-      severity: "severe",
-      reason: "The project was planned, then received no active block.",
-      rows: [
-        { label: "Planned", value: "2h" },
-        { label: "Logged", value: "0m" },
-        { label: "Inactive", value: "6d" }
-      ],
-      action: "Plan"
-    },
-    {
-      id: "backend-healthy",
-      title: "Backend healthy",
-      severity: "normal",
-      reason: "Core API work continued with usable evidence.",
-      rows: [
-        { label: "Logged", value: "7h" },
-        { label: "Stage", value: "Build" },
-        { label: "Evidence", value: "4" }
-      ]
-    }
-  ],
-  plan: [
-    {
-      id: "plan-drift",
-      title: "Plan drift",
-      severity: "attention",
-      reason: "Backend moved forward, but restart work fell out of the week.",
-      rows: [
-        { label: "Backend", value: "+1h" },
-        { label: "Resume", value: "-2h" },
-        { label: "Review", value: "Done" }
-      ],
-      action: "Plan"
-    }
-  ],
-  goal: [
-    {
-      id: "goal-aligned",
-      title: "Goal aligned",
-      severity: "normal",
-      reason: "The strongest work still supports the demo path.",
-      rows: [
-        { label: "MVP", value: "On" },
-        { label: "Docs", value: "Light" },
-        { label: "Scope", value: "Clear" }
-      ]
-    }
-  ],
-  energy: [
-    {
-      id: "energy-thin",
-      title: "Energy thin",
-      severity: "attention",
-      reason: "Recovery blocks are present, but not enough to offset build work.",
-      rows: [
-        { label: "Focus", value: "8h" },
-        { label: "Restore", value: "1h" },
-        { label: "Load", value: "High" }
-      ]
-    }
-  ]
+  stage: [],
+  plan: [],
+  goal: [],
+  energy: []
 };
+
+for (const evidence of demoWeek.signals.evidence) {
+  const { signalId, ...signalEvidence } = evidence;
+  evidenceBySignal[signalId].push(signalEvidence);
+}
 
 const iconBySignal: Record<SignalId, "calendar" | "target" | "layers" | "leaf"> = {
   plan: "calendar",

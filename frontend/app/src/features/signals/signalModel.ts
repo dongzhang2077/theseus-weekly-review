@@ -1,6 +1,5 @@
-export type SignalId = "stage" | "plan" | "goal" | "energy";
-
-export type SignalSeverity = "severe" | "attention" | "normal" | "nodata";
+import type { SignalId, SignalSeverity } from "../../shared/domain/signals";
+export type { SignalId, SignalSeverity } from "../../shared/domain/signals";
 
 export interface SignalSummary {
   id: SignalId;

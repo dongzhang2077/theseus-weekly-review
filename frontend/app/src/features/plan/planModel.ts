@@ -1,11 +1,5 @@
-export type SuggestionStatus = "available" | "applied" | "dismissed";
-
-export interface PlanState {
-  suggestionStatus: SuggestionStatus;
-  focusProject: string | null;
-  slackHours: number;
-  savedAt: string | null;
-}
+import type { PlanState, SuggestionStatus } from "../../shared/domain/plan";
+export type { PlanState, SuggestionStatus } from "../../shared/domain/plan";
 
 export function applySuggestion(state: PlanState): PlanState {
   return {

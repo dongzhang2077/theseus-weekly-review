@@ -3,13 +3,9 @@ import { DetailPanel } from "../../shared/components/DetailPanel";
 import { Icon } from "../../shared/icons/Icon";
 import { IconButton } from "../../shared/components/IconButton";
 import { applySuggestion, dismissSuggestion, savePlanDetail, type PlanState } from "./planModel";
+import { demoWeek } from "../../shared/demo/demoWeek";
 
-const initialPlan: PlanState = {
-  suggestionStatus: "available",
-  focusProject: "Backend MVP",
-  slackHours: 4,
-  savedAt: null
-};
+const initialPlan: PlanState = demoWeek.plan.initialState;
 
 export type PlanDetail = "suggestion" | "focus" | "slack" | "projects";
 

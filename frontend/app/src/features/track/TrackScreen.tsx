@@ -6,50 +6,9 @@ import type { IconName } from "../../shared/icons/Icon";
 import { IconButton } from "../../shared/components/IconButton";
 import { Sheet } from "../../shared/components/Sheet";
 import { chooseFocusActivity, formatClock, formatDuration, tickActivities, toggleActivity, type ActivityTimer } from "./timerModel";
+import { demoWeek } from "../../shared/demo/demoWeek";
 
-const initialActivities: ActivityTimer[] = [
-  {
-    id: "frontend",
-    name: "Frontend build block",
-    category: "Project",
-    energy: "consume",
-    color: "#6f8f6b",
-    todaySeconds: 42 * 60,
-    sessionSeconds: 0,
-    running: false,
-    recommended: true
-  },
-  {
-    id: "backend",
-    name: "Backend polish",
-    category: "Project",
-    energy: "consume",
-    color: "#8aa9c0",
-    todaySeconds: 24 * 60,
-    sessionSeconds: 0,
-    running: false
-  },
-  {
-    id: "research",
-    name: "Research notes",
-    category: "Study",
-    energy: "neutral",
-    color: "#c8a25f",
-    todaySeconds: 55 * 60,
-    sessionSeconds: 0,
-    running: false
-  },
-  {
-    id: "walk",
-    name: "Health walk",
-    category: "Health",
-    energy: "restore",
-    color: "#7f9f85",
-    todaySeconds: 45 * 60,
-    sessionSeconds: 0,
-    running: false
-  }
-];
+const initialActivities: ActivityTimer[] = demoWeek.track.activities;
 
 const categories = ["Project", "Study", "Health"];
 type TrackSheet = "logs" | "create";

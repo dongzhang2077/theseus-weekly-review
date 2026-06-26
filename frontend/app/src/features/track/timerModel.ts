@@ -1,16 +1,5 @@
-export type EnergyKind = "destroy" | "consume" | "neutral" | "restore";
-
-export interface ActivityTimer {
-  id: string;
-  name: string;
-  category: string;
-  energy: EnergyKind;
-  color: string;
-  todaySeconds: number;
-  sessionSeconds: number;
-  running: boolean;
-  recommended?: boolean;
-}
+import type { ActivityTimer, EnergyKind } from "../../shared/domain/track";
+export type { ActivityTimer, EnergyKind } from "../../shared/domain/track";
 
 const energyRank: Record<EnergyKind, number> = {
   destroy: 4,
