@@ -9,7 +9,11 @@ const characterAttentionUrl = new URL("../../assets/character-attention.png", im
 type ReviewSheet = "wins" | "risks" | "full";
 type ReviewDetail = "win-backend" | "win-deep-work" | "risk-resume" | "risk-frontend" | null;
 
-export function ReviewScreen() {
+interface ReviewScreenProps {
+  onPlan: () => void;
+}
+
+export function ReviewScreen({ onPlan }: ReviewScreenProps) {
   const [bubbleOpen, setBubbleOpen] = useState(false);
   const [sheet, setSheet] = useState<ReviewSheet | null>(null);
   const [detail, setDetail] = useState<ReviewDetail>(null);
@@ -92,7 +96,7 @@ export function ReviewScreen() {
           <div className="review-narrative">
             <p>Theseus backend moved forward with consistent deep-work blocks.</p>
             <p>Resume work needs a small restart before the week gets crowded.</p>
-            <button className="paper-action">Plan</button>
+            <button className="paper-action" onClick={onPlan}>Plan</button>
           </div>
         ) : null}
       </Sheet>
@@ -157,7 +161,7 @@ export function ReviewScreen() {
                 <dd>3h</dd>
               </div>
             </dl>
-            <button className="paper-action">Plan</button>
+            <button className="paper-action" onClick={onPlan}>Plan</button>
           </div>
         ) : null}
         {detail === "risk-frontend" ? (
@@ -179,6 +183,7 @@ export function ReviewScreen() {
                 <dd>-6h</dd>
               </div>
             </dl>
+            <button className="paper-action" onClick={onPlan}>Plan</button>
           </div>
         ) : null}
       </DetailPanel>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DetailPanel } from "../../shared/components/DetailPanel";
 import { Icon } from "../../shared/icons/Icon";
 import { IconButton } from "../../shared/components/IconButton";
@@ -11,11 +11,24 @@ const initialPlan: PlanState = {
   savedAt: null
 };
 
-type PlanDetail = "suggestion" | "focus" | "slack" | "projects";
+export type PlanDetail = "suggestion" | "focus" | "slack" | "projects";
 
-export function PlanScreen() {
+interface PlanScreenProps {
+  entryRequest: {
+    id: number;
+    detail: PlanDetail;
+  } | null;
+}
+
+export function PlanScreen({ entryRequest }: PlanScreenProps) {
   const [plan, setPlan] = useState(initialPlan);
   const [detail, setDetail] = useState<PlanDetail | null>(null);
+
+  useEffect(() => {
+    if (entryRequest) {
+      setDetail(entryRequest.detail);
+    }
+  }, [entryRequest]);
 
   return (
     <section className="screen plan-screen">
