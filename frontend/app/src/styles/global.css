@@ -1134,3 +1134,249 @@ textarea:focus-visible {
   font-size: 20px;
   line-height: 28px;
 }
+
+/* Signals and Plan visual parity refinements */
+.signals-screen {
+  gap: 0;
+}
+
+.signals-screen .signal-orbit {
+  min-height: 338px;
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  gap: 18px;
+  padding-bottom: 10px;
+}
+
+.orbit-visual {
+  position: relative;
+  width: 178px;
+  height: 178px;
+  display: grid;
+  place-items: center;
+}
+
+.orbit-line {
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgba(118, 146, 170, 0.2);
+  border-radius: 47% 53% 44% 56%;
+}
+
+.orbit-line.one {
+  transform: rotate(18deg);
+}
+
+.orbit-line.two {
+  border-color: rgba(189, 143, 69, 0.18);
+  transform: rotate(-23deg);
+}
+
+.orbit-core {
+  position: relative;
+  z-index: 1;
+  width: 84px;
+  height: 84px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-line-soft);
+  border-radius: 999px;
+  background: rgba(255, 253, 248, 0.72);
+  color: currentColor;
+  box-shadow: 0 8px 20px rgba(76, 62, 38, 0.045);
+}
+
+.orbit-core svg {
+  width: 30px;
+  height: 30px;
+}
+
+.orbit-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(255, 253, 248, 0.84);
+}
+
+.orbit-dot.red {
+  top: 34px;
+  right: 40px;
+  background: var(--color-red);
+}
+
+.orbit-dot.amber {
+  left: 28px;
+  bottom: 56px;
+  background: var(--color-amber);
+}
+
+.orbit-dot.green {
+  right: 54px;
+  bottom: 24px;
+  background: var(--color-green);
+}
+
+.signals-screen .signal-status {
+  color: var(--color-red);
+}
+
+.signals-screen .signal-grid {
+  width: 230px;
+  height: 206px;
+  position: relative;
+  justify-self: center;
+  display: block;
+  margin-top: 6px;
+}
+
+.signals-screen .signal-entry {
+  position: absolute;
+  width: 72px;
+  height: 76px;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  border-radius: 26px 22px 28px 24px;
+  background: rgba(255, 253, 248, 0.72);
+  box-shadow: 0 6px 18px rgba(76, 62, 38, 0.055);
+}
+
+.signals-screen .signal-entry svg {
+  width: 24px;
+  height: 24px;
+}
+
+.signals-screen .signal-entry span {
+  font-size: 12px;
+  line-height: 15px;
+}
+
+.signals-screen .signal-entry:nth-child(1) {
+  left: 2px;
+  top: 2px;
+  transform: rotate(-5deg);
+}
+
+.signals-screen .signal-entry:nth-child(2) {
+  right: 4px;
+  top: 0;
+  transform: rotate(5deg);
+}
+
+.signals-screen .signal-entry:nth-child(3) {
+  left: 8px;
+  bottom: 6px;
+  transform: rotate(-3deg);
+}
+
+.signals-screen .signal-entry:nth-child(4) {
+  right: 6px;
+  bottom: 0;
+  transform: rotate(4deg);
+}
+
+.signals-screen .signal-entry.priority {
+  width: 82px;
+  height: 82px;
+  border-color: rgba(180, 107, 95, 0.38);
+  background: rgba(242, 225, 220, 0.58);
+  color: var(--color-red);
+}
+
+.signals-screen .signal-entry::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 2px rgba(255, 253, 248, 0.86);
+}
+
+.plan-cover {
+  align-content: center;
+  padding-bottom: 52px;
+}
+
+.plan-screen .balance-orb {
+  width: 178px;
+  height: 178px;
+  box-shadow: none;
+  background: rgba(255, 253, 248, 0.34);
+}
+
+.plan-screen .balance-ring {
+  position: relative;
+  width: 162px;
+  height: 162px;
+  background: transparent;
+}
+
+.plan-screen .balance-ring::before,
+.plan-screen .balance-ring::after {
+  content: "";
+  position: absolute;
+  inset: 22px;
+  border: 8px solid transparent;
+  border-radius: 999px;
+}
+
+.plan-screen .balance-ring::before {
+  border-top-color: rgba(111, 143, 107, 0.72);
+  border-left-color: rgba(111, 143, 107, 0.72);
+  border-bottom-color: rgba(111, 143, 107, 0.72);
+  transform: rotate(28deg);
+}
+
+.plan-screen .balance-ring::after {
+  inset: 34px;
+  border-right-color: rgba(189, 143, 69, 0.7);
+  border-bottom-color: rgba(189, 143, 69, 0.7);
+  transform: rotate(-20deg);
+}
+
+.plan-screen .balance-core {
+  position: relative;
+  z-index: 1;
+  width: 70px;
+  height: 70px;
+  border: 1px solid var(--color-line-soft);
+}
+
+.plan-screen .suggestion-card {
+  width: min(100%, 292px);
+}
+
+.plan-screen .plan-entry-grid {
+  width: 226px;
+  height: 142px;
+  position: relative;
+  display: block;
+}
+
+.plan-screen .plan-entry {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+}
+
+.plan-screen .plan-entry.focus {
+  left: 16px;
+  top: 0;
+}
+
+.plan-screen .plan-entry.projects {
+  right: 16px;
+  top: 0;
+}
+
+.plan-screen .plan-entry.slack {
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+}

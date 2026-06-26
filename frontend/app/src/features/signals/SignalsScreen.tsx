@@ -103,9 +103,9 @@ const evidenceBySignal: Record<SignalId, SignalEvidence[]> = {
   ]
 };
 
-const iconBySignal: Record<SignalId, "route" | "target" | "gauge" | "leaf"> = {
-  plan: "route",
-  stage: "gauge",
+const iconBySignal: Record<SignalId, "calendar" | "target" | "layers" | "leaf"> = {
+  plan: "calendar",
+  stage: "layers",
   goal: "target",
   energy: "leaf"
 };
@@ -123,7 +123,16 @@ export function SignalsScreen() {
       </header>
 
       <div className={`signal-orbit severity-${priority.severity}`} aria-label={priority.status}>
-        <Icon name={iconBySignal[priority.id]} />
+        <div className="orbit-visual" aria-hidden="true">
+          <span className="orbit-line one" />
+          <span className="orbit-line two" />
+          <span className="orbit-core">
+            <Icon name={iconBySignal[priority.id]} />
+          </span>
+          <span className="orbit-dot red" />
+          <span className="orbit-dot amber" />
+          <span className="orbit-dot green" />
+        </div>
         <div className="signal-status">{priority.status}</div>
       </div>
 
