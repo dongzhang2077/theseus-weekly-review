@@ -7,7 +7,7 @@ import { Sheet } from "../../shared/components/Sheet";
 const characterAttentionUrl = new URL("../../assets/character-attention.png", import.meta.url).href;
 
 type ReviewSheet = "wins" | "risks" | "full";
-type ReviewDetail = "win-backend" | "risk-resume" | null;
+type ReviewDetail = "win-backend" | "win-deep-work" | "risk-resume" | "risk-frontend" | null;
 
 export function ReviewScreen() {
   const [bubbleOpen, setBubbleOpen] = useState(false);
@@ -62,7 +62,7 @@ export function ReviewScreen() {
               </span>
               <span className="row-dot green" />
             </button>
-            <button className="list-row">
+            <button className="list-row" onClick={() => setDetail("win-deep-work")}>
               <span>
                 <strong>Deep-work blocks protected</strong>
               </span>
@@ -79,7 +79,7 @@ export function ReviewScreen() {
               </span>
               <span className="row-dot red" />
             </button>
-            <button className="list-row">
+            <button className="list-row" onClick={() => setDetail("risk-frontend")}>
               <span>
                 <strong>Frontend drift</strong>
                 <small>Attention</small>
@@ -97,7 +97,7 @@ export function ReviewScreen() {
         ) : null}
       </Sheet>
 
-      <DetailPanel title={detail === "risk-resume" ? "Risk" : "Win"} open={detail !== null} onBack={() => setDetail(null)}>
+      <DetailPanel title={detailTitle(detail)} open={detail !== null} onBack={() => setDetail(null)}>
         {detail === "win-backend" ? (
           <div className="detail-stack">
             <h2>Backend progress on track</h2>
@@ -114,6 +114,26 @@ export function ReviewScreen() {
               <div>
                 <dt>Status</dt>
                 <dd>On track</dd>
+              </div>
+            </dl>
+          </div>
+        ) : null}
+        {detail === "win-deep-work" ? (
+          <div className="detail-stack">
+            <h2>Deep-work blocks protected</h2>
+            <p>Repeated focus blocks kept implementation moving without fragmenting the week.</p>
+            <dl className="evidence-list">
+              <div>
+                <dt>Blocks</dt>
+                <dd>4</dd>
+              </div>
+              <div>
+                <dt>Longest</dt>
+                <dd>2h</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>Consistent</dd>
               </div>
             </dl>
           </div>
@@ -140,6 +160,27 @@ export function ReviewScreen() {
             <button className="paper-action">Plan</button>
           </div>
         ) : null}
+        {detail === "risk-frontend" ? (
+          <div className="detail-stack">
+            <span className="status-chip severity-attention">attention</span>
+            <h2>Frontend drift</h2>
+            <p>Frontend work landed below the planned target while backend took priority.</p>
+            <dl className="evidence-list">
+              <div>
+                <dt>Planned</dt>
+                <dd>8h</dd>
+              </div>
+              <div>
+                <dt>Logged</dt>
+                <dd>2h</dd>
+              </div>
+              <div>
+                <dt>Delta</dt>
+                <dd>-6h</dd>
+              </div>
+            </dl>
+          </div>
+        ) : null}
       </DetailPanel>
     </section>
   );
@@ -148,6 +189,12 @@ export function ReviewScreen() {
 function sheetTitle(sheet: ReviewSheet | null): string {
   if (sheet === "wins") return "Wins";
   if (sheet === "risks") return "Risks";
-  if (sheet === "full") return "Full";
+  if (sheet === "full") return "Review";
+  return "Review";
+}
+
+function detailTitle(detail: ReviewDetail): string {
+  if (detail === "risk-resume" || detail === "risk-frontend") return "Risk";
+  if (detail === "win-backend" || detail === "win-deep-work") return "Win";
   return "Review";
 }
