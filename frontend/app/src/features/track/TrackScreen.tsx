@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { DetailPanel } from "../../shared/components/DetailPanel";
 import { Icon } from "../../shared/icons/Icon";
+import type { IconName } from "../../shared/icons/Icon";
 import { IconButton } from "../../shared/components/IconButton";
 import { Sheet } from "../../shared/components/Sheet";
 import { chooseFocusActivity, formatClock, formatDuration, tickActivities, toggleActivity, type ActivityTimer } from "./timerModel";
@@ -9,7 +10,7 @@ import { chooseFocusActivity, formatClock, formatDuration, tickActivities, toggl
 const initialActivities: ActivityTimer[] = [
   {
     id: "frontend",
-    name: "Frontend build",
+    name: "Frontend build block",
     category: "Project",
     energy: "consume",
     color: "#6f8f6b",
@@ -50,6 +51,8 @@ const initialActivities: ActivityTimer[] = [
   }
 ];
 
+const categories = ["Project", "Study", "Health"];
+
 export function TrackScreen() {
   const [activities, setActivities] = useState(initialActivities);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -75,48 +78,59 @@ export function TrackScreen() {
     <section className="screen track-screen">
       <header className="screen-header">
         <div className="screen-title">Today</div>
-        <IconButton label="Log" icon="book" onClick={() => setSheetOpen(true)} />
+        <IconButton label="Detail" icon="fileText" onClick={() => setDetail(focus)} />
       </header>
 
-      <div className="timer-focus" style={{ "--activity-color": focus.color } as CSSProperties}>
-        <button className="timer-orb" aria-label={focus.running ? "Pause" : "Start"} onClick={() => onToggle(focus.id)}>
-          <Icon name={focus.running ? "pause" : "timer"} />
+      <div className="track-l1" style={{ "--activity-color": focus.color } as CSSProperties}>
+        <button className={`recommended-activity ${focus.running ? "running" : ""}`} aria-label="Start recommended activity" onClick={() => onToggle(focus.id)}>
+          <span className="recommend-mark">
+            <Icon name={activityIcon(focus.id)} />
+          </span>
+          <span className="recommend-copy">
+            <strong>{focus.name}</strong>
+            <small>{focus.running ? "Running" : "Recommended now"}</small>
+          </span>
         </button>
-        <div className="timer-clock">{formatClock(focus.sessionSeconds)}</div>
+
+        <button className="timer-core" aria-label={focus.running ? "Pause" : "Start"} onClick={() => onToggle(focus.id)}>
+          <span className={`timer-state-mark ${focus.running ? "running" : ""}`} />
+          <span className="timer-clock">{formatClock(focus.sessionSeconds)}</span>
+        </button>
+
         <button className="timer-toggle" aria-label={focus.running ? "Pause" : "Start"} onClick={() => onToggle(focus.id)}>
           <Icon name={focus.running ? "pause" : "play"} />
         </button>
+
+        <button className="total-pill" aria-label="Today total" onClick={() => setSheetOpen(true)}>
+          <span />
+          {formatDuration(todayTotal)}
+        </button>
       </div>
-
-      <button className={`activity-card ${focus.running ? "running" : ""}`} onClick={() => onToggle(focus.id)}>
-        <span className="activity-dot" style={{ background: focus.color }} />
-        <span>
-          <strong>{focus.name}</strong>
-          <small>{focus.category}</small>
-        </span>
-        <strong>{formatDuration(focus.todaySeconds + focus.sessionSeconds)}</strong>
-      </button>
-
-      <button className="total-pill" aria-label="Today total" onClick={() => setSheetOpen(true)}>
-        <span />
-        {formatDuration(todayTotal)}
-      </button>
 
       <Sheet title="Today" open={sheetOpen} onClose={() => setSheetOpen(false)}>
         <div className="activity-list">
-          {activities.map((activity) => (
-            <div key={activity.id} className={`activity-row ${activity.running ? "running" : ""}`}>
-              <button className="activity-row-main" onClick={() => onToggle(activity.id)}>
-                <span className="activity-icon" style={{ color: activity.color }}>
-                  <Icon name="activity" />
-                </span>
-                <span>
-                  <strong>{activity.name}</strong>
-                  <small>{activity.category}</small>
-                </span>
-                <strong>{formatDuration(activity.todaySeconds + activity.sessionSeconds)}</strong>
-              </button>
-              <IconButton label="Detail" icon="info" onClick={() => setDetail(activity)} />
+          {categories.map((category) => (
+            <div key={category} className="tracker-category">
+              <div className="category-head">
+                <span className={`cat-dot ${category.toLowerCase()}`} />
+                <span>{category}</span>
+              </div>
+              {activities
+                .filter((activity) => activity.category === category)
+                .map((activity) => (
+                  <div key={activity.id} className={`activity-row ${activity.running ? "running" : ""}`}>
+                    <button className="activity-row-main" onClick={() => onToggle(activity.id)}>
+                      <span className="activity-icon" style={{ color: activity.color }}>
+                        <Icon name={activityIcon(activity.id)} />
+                      </span>
+                      <span>
+                        <strong>{activity.name}</strong>
+                      </span>
+                      <strong>{formatDuration(activity.todaySeconds + activity.sessionSeconds)}</strong>
+                    </button>
+                    <IconButton label="Detail" icon="info" onClick={() => setDetail(activity)} />
+                  </div>
+                ))}
             </div>
           ))}
         </div>
@@ -125,7 +139,7 @@ export function TrackScreen() {
       <DetailPanel title={detail?.name ?? "Activity"} open={detail !== null} onBack={() => setDetail(null)}>
         {detail ? (
           <div className="detail-stack">
-            <span className="status-chip">{detail.energy}</span>
+            <span className={`status-chip energy-${detail.energy}`}>{detail.energy}</span>
             <dl className="evidence-list">
               <div>
                 <dt>Today</dt>
@@ -142,7 +156,7 @@ export function TrackScreen() {
             </dl>
             <label className="note-field">
               <span>Note</span>
-              <textarea rows={3} placeholder="What happened?" />
+              <textarea rows={3} defaultValue="Built the app-first tracker prototype and checked the tab timing flow." />
             </label>
             <button className="paper-action">Save</button>
           </div>
@@ -150,4 +164,11 @@ export function TrackScreen() {
       </DetailPanel>
     </section>
   );
+}
+
+function activityIcon(activityId: string): IconName {
+  if (activityId === "frontend") return "code";
+  if (activityId === "backend") return "briefcase";
+  if (activityId === "walk") return "leaf";
+  return "book";
 }

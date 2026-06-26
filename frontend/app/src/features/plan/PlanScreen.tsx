@@ -2,13 +2,12 @@ import { useState } from "react";
 import { DetailPanel } from "../../shared/components/DetailPanel";
 import { Icon } from "../../shared/icons/Icon";
 import { IconButton } from "../../shared/components/IconButton";
-import { Sheet } from "../../shared/components/Sheet";
 import { applySuggestion, dismissSuggestion, savePlanDetail, type PlanState } from "./planModel";
 
 const initialPlan: PlanState = {
   suggestionStatus: "available",
   focusProject: "Backend MVP",
-  slackHours: 1,
+  slackHours: 4,
   savedAt: null
 };
 
@@ -16,7 +15,6 @@ type PlanDetail = "suggestion" | "focus" | "slack" | "projects";
 
 export function PlanScreen() {
   const [plan, setPlan] = useState(initialPlan);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [detail, setDetail] = useState<PlanDetail | null>(null);
 
   return (
@@ -28,63 +26,56 @@ export function PlanScreen() {
       </header>
 
       <div className="plan-cover">
-        <div className="balance-orb">
-          <Icon name="leaf" />
-        </div>
-        <div className="plan-pill">
-          <span />
-          {plan.slackHours}h slack
-        </div>
-      </div>
+        <button className="balance-orb" aria-label="Week balance" onClick={() => setDetail("slack")}>
+          <span className="balance-ring">
+            <span className="balance-arc green" />
+            <span className="balance-arc amber" />
+            <span className="balance-core">
+              <Icon name="gauge" />
+            </span>
+          </span>
+        </button>
 
-      <div className="plan-entry-list">
         {plan.suggestionStatus === "available" ? (
-          <button className="paper-entry priority" onClick={() => setDetail("suggestion")}>
-            <Icon name="route" />
-            <span>Restart</span>
-            <Icon name="chevronRight" />
+          <button className="suggestion-card" aria-label="Review suggestion" onClick={() => setDetail("suggestion")}>
+            <span className="suggestion-mark">
+              <Icon name="route" />
+            </span>
+            <span className="suggestion-copy">
+              <strong>Resume restart</strong>
+              <small>Tue / Thu mornings</small>
+            </span>
           </button>
-        ) : null}
-        <button className="paper-entry" onClick={() => setDetail("focus")}>
-          <Icon name="target" />
-          <span>Focus</span>
-          <Icon name="chevronRight" />
-        </button>
-        <button className="paper-entry" onClick={() => setDetail("slack")}>
-          <Icon name="leaf" />
-          <span>Slack</span>
-          <Icon name="chevronRight" />
-        </button>
-        <button className="paper-entry" onClick={() => setDetail("projects")}>
-          <Icon name="folder" />
-          <span>Projects</span>
-          <Icon name="chevronRight" />
-        </button>
-      </div>
+        ) : (
+          <button className={`suggestion-card ${plan.suggestionStatus}`} aria-label="Suggestion status" onClick={() => setDetail("suggestion")}>
+            <span className="suggestion-mark">
+              <Icon name={plan.suggestionStatus === "applied" ? "check" : "x"} />
+            </span>
+            <span className="suggestion-copy">
+              <strong>{plan.suggestionStatus === "applied" ? "Applied" : "Dismissed"}</strong>
+              <small>Review suggestion</small>
+            </span>
+          </button>
+        )}
 
-      <Sheet title="Plan" open={sheetOpen} onClose={() => setSheetOpen(false)}>
-        <div className="sheet-list">
-          <button className="list-row" onClick={() => setDetail("focus")}>
-            <span>
-              <strong>{plan.focusProject ?? "Focus"}</strong>
-              <small>Primary block</small>
-            </span>
-            <Icon name="chevronRight" />
+        <div className="plan-entry-grid">
+          <button className="plan-entry focus" aria-label="Focus" onClick={() => setDetail("focus")}>
+            <Icon name="target" />
           </button>
-          <button className="list-row" onClick={() => setDetail("slack")}>
-            <span>
-              <strong>{plan.slackHours}h slack</strong>
-              <small>Capacity</small>
-            </span>
-            <Icon name="chevronRight" />
+          <button className="plan-entry slack" aria-label="Slack" onClick={() => setDetail("slack")}>
+            <Icon name="gauge" />
+          </button>
+          <button className="plan-entry projects" aria-label="Projects" onClick={() => setDetail("projects")}>
+            <Icon name="folder" />
           </button>
         </div>
-      </Sheet>
+      </div>
 
       <DetailPanel title={detailTitle(detail)} open={detail !== null} onBack={() => setDetail(null)}>
         {detail === "suggestion" ? (
           <div className="detail-stack">
             <span className="status-chip severity-attention">attention</span>
+            <h2>Resume restart</h2>
             <p>Protect one small restart block before adding more build work.</p>
             <div className="action-row">
               <button className="paper-action" onClick={() => setPlan((current) => applySuggestion(current))}>
@@ -98,7 +89,17 @@ export function PlanScreen() {
         ) : null}
         {detail === "focus" ? (
           <div className="detail-stack">
-            <p>{plan.focusProject ?? "Choose one focus project."}</p>
+            <h2>{plan.focusProject ?? "Focus"}</h2>
+            <dl className="evidence-list">
+              <div>
+                <dt>Primary</dt>
+                <dd>Frontend</dd>
+              </div>
+              <div>
+                <dt>Support</dt>
+                <dd>Backend</dd>
+              </div>
+            </dl>
             <button className="paper-action" onClick={() => setPlan((current) => savePlanDetail(current, { focusProject: "Frontend polish" }))}>
               Save
             </button>
@@ -106,28 +107,44 @@ export function PlanScreen() {
         ) : null}
         {detail === "slack" ? (
           <div className="detail-stack">
+            <h2>{plan.slackHours}h slack</h2>
+            <dl className="evidence-list">
+              <div>
+                <dt>Planned</dt>
+                <dd>14h</dd>
+              </div>
+              <div>
+                <dt>Capacity</dt>
+                <dd>18h</dd>
+              </div>
+              <div>
+                <dt>Buffer</dt>
+                <dd>{plan.slackHours}h</dd>
+              </div>
+            </dl>
             <div className="chip-row">
-              {[1, 2, 3].map((hours) => (
+              {[2, 4, 6].map((hours) => (
                 <button key={hours} className={plan.slackHours === hours ? "selected" : ""} onClick={() => setPlan((current) => savePlanDetail(current, { slackHours: hours }))}>
                   {hours}h
                 </button>
               ))}
             </div>
-            <button className="paper-action" onClick={() => setPlan((current) => savePlanDetail(current, { slackHours: current.slackHours }))}>
-              Save
-            </button>
           </div>
         ) : null}
         {detail === "projects" ? (
           <div className="detail-stack">
             <dl className="evidence-list">
               <div>
-                <dt>Backend</dt>
-                <dd>Build</dd>
+                <dt>Frontend</dt>
+                <dd>Polish</dd>
               </div>
               <div>
                 <dt>Resume</dt>
                 <dd>Restart</dd>
+              </div>
+              <div>
+                <dt>Backend</dt>
+                <dd>Build</dd>
               </div>
             </dl>
           </div>
@@ -138,7 +155,7 @@ export function PlanScreen() {
 }
 
 function detailTitle(detail: PlanDetail | null): string {
-  if (detail === "suggestion") return "Restart";
+  if (detail === "suggestion") return "Suggestion";
   if (detail === "focus") return "Focus";
   if (detail === "slack") return "Slack";
   if (detail === "projects") return "Projects";
