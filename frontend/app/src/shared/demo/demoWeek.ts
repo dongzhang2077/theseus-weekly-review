@@ -1,39 +1,9 @@
-import type { PlanState } from "../domain/plan";
-import type { SignalId, SignalSeverity } from "../domain/signals";
+import type { AppReviewItem, AppSignalEvidence, AppSignalSummary, AppWeekViewModel } from "../api/weeklyReview";
 import type { ActivityTimer } from "../domain/track";
 
-export interface DemoReviewItem {
-  id: string;
-  title: string;
-  severity?: SignalSeverity;
-  reason: string;
-  evidence: Array<{
-    label: string;
-    value: string;
-  }>;
-  action?: "Plan";
-}
-
-export interface DemoSignalSummary {
-  id: SignalId;
-  label: string;
-  severity: SignalSeverity;
-  status: string;
-  reason: string;
-}
-
-export interface DemoSignalEvidence {
-  id: string;
-  signalId: SignalId;
-  title: string;
-  severity: SignalSeverity;
-  reason: string;
-  rows: Array<{
-    label: string;
-    value: string;
-  }>;
-  action?: string;
-}
+export type DemoReviewItem = AppReviewItem;
+export type DemoSignalSummary = AppSignalSummary;
+export type DemoSignalEvidence = AppSignalEvidence;
 
 export const demoWeek = {
   review: {
@@ -242,6 +212,6 @@ export const demoWeek = {
       focusProject: "Backend MVP",
       slackHours: 4,
       savedAt: null
-    } satisfies PlanState
+    }
   }
-};
+} satisfies AppWeekViewModel;
