@@ -21,6 +21,14 @@ export interface SaveTimeLogOptions {
   fetchImpl?: FetchLike;
 }
 
+export interface SaveActivitySessionOptions {
+  apiBaseUrl?: string;
+  activity: ActivityTimer;
+  date?: string;
+  note?: string;
+  fetchImpl?: FetchLike;
+}
+
 export interface SaveTimeLogResult {
   saved: boolean;
   error: string | null;
@@ -70,6 +78,22 @@ export async function saveTimeLog(options: SaveTimeLogOptions): Promise<SaveTime
       error: error instanceof Error ? error.message : "Time log request failed"
     };
   }
+}
+
+export async function saveActivitySession(options: SaveActivitySessionOptions): Promise<SaveTimeLogResult> {
+  const payload = activitySessionToTimeLog(options.activity, {
+    date: options.date,
+    note: options.note
+  });
+  if (!payload) {
+    return { saved: false, error: "Activity session is empty" };
+  }
+
+  return saveTimeLog({
+    apiBaseUrl: options.apiBaseUrl,
+    payload,
+    fetchImpl: options.fetchImpl
+  });
 }
 
 export function energyToApiActivityType(energy: EnergyKind): ApiActivityType {

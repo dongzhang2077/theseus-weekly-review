@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activitySessionToTimeLog, energyToApiActivityType, saveTimeLog, type TimeLogCreatePayload } from "./timeLogs";
+import { activitySessionToTimeLog, energyToApiActivityType, saveActivitySession, saveTimeLog, type TimeLogCreatePayload } from "./timeLogs";
 import type { ActivityTimer } from "../domain/track";
 import type { FetchLike } from "./loadAppWeek";
 
@@ -67,6 +67,33 @@ describe("timeLogs api helpers", () => {
     await expect(saveTimeLog({ payload })).resolves.toEqual({
       saved: false,
       error: "API base URL is not configured"
+    });
+  });
+
+  it("can save a completed activity session directly", async () => {
+    const calls: Array<{ input: string; init: RequestInit }> = [];
+    const fetchImpl: FetchLike = async (input, init) => {
+      calls.push({ input, init });
+      return {
+        ok: true,
+        status: 201,
+        json: async () => ({})
+      };
+    };
+
+    await expect(
+      saveActivitySession({
+        apiBaseUrl: "http://127.0.0.1:8000",
+        activity,
+        date: "2026-06-26",
+        fetchImpl
+      })
+    ).resolves.toEqual({ saved: true, error: null });
+
+    expect(JSON.parse(String(calls[0].init.body))).toMatchObject({
+      date: "2026-06-26",
+      duration_minutes: 2,
+      activity_name: "Frontend build block"
     });
   });
 });
