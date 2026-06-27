@@ -1,0 +1,16 @@
+import type { IconName } from "../icons/Icon";
+
+export type AppTab = "review" | "signals" | "track" | "plan";
+
+export interface TabItem {
+  id: AppTab;
+  label: string;
+  icon: IconName;
+}
+
+export const tabs: TabItem[] = [
+  { id: "review", label: "Review", icon: "book" },
+  { id: "signals", label: "Signals", icon: "activity" },
+  { id: "track", label: "Track", icon: "timer" },
+  { id: "plan", label: "Plan", icon: "calendar" }
+];
