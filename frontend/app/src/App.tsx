@@ -45,7 +45,9 @@ export function App() {
       {activeTab === "review" ? <ReviewScreen review={appWeek.review} onPlan={openPlanSuggestion} /> : null}
       {activeTab === "signals" ? <SignalsScreen signals={appWeek.signals} onPlan={openPlanSuggestion} /> : null}
       {activeTab === "track" ? <TrackScreen apiBaseUrl={env.VITE_THESEUS_API_BASE_URL} track={appWeek.track} /> : null}
-      {activeTab === "plan" ? <PlanScreen planData={appWeek.plan} entryRequest={planEntryRequest} /> : null}
+      {activeTab === "plan" ? (
+        <PlanScreen apiBaseUrl={env.VITE_THESEUS_API_BASE_URL} planData={appWeek.plan} entryRequest={planEntryRequest} />
+      ) : null}
     </AppShell>
   );
 }
