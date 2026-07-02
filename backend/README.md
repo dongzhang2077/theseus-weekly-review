@@ -44,6 +44,18 @@ export THESEUS_OPENAI_MODEL=gpt-5.5  # Optional.
 
 Do not commit API keys or `.env` files.
 
+OpenCode Go is also supported through its OpenAI-compatible Chat Completions
+endpoint:
+
+```bash
+export THESEUS_REVIEW_WRITER=opencode_go
+export OPENCODE_GO_API_KEY=your_api_key
+export OPENCODE_GO_MODEL=deepseek-v4-pro  # Optional.
+```
+
+Override `OPENCODE_GO_ENDPOINT` only when testing against another compatible
+endpoint.
+
 Generate a review from an initialized and populated database with:
 
 ```bash
@@ -52,3 +64,7 @@ python3 scripts/run_persisted_review.py \
   --week-start 2026-06-08 \
   --week-end 2026-06-14
 ```
+
+After configuring a provider, append `--mode supportive_text` to use it. The
+result should preserve the deterministic evidence fields and store the selected
+provider in `model_name`.
