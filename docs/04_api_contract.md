@@ -206,7 +206,10 @@ local evidence-bound template writer so the demo works without secrets. Set
 `THESEUS_REVIEW_WRITER=openai` and `OPENAI_API_KEY` to use the OpenAI Responses
 API adapter; `THESEUS_OPENAI_MODEL` can override the default model. Provider
 configuration or request failures return `502 Bad Gateway` from the generate
-endpoint.
+endpoint. OpenCode Go is available with `THESEUS_REVIEW_WRITER=opencode_go` and
+`OPENCODE_GO_API_KEY`; it uses `deepseek-v4-pro` by default through the provider's
+OpenAI-compatible Chat Completions endpoint. `OPENCODE_GO_MODEL` and
+`OPENCODE_GO_ENDPOINT` can override those defaults.
 
 Response:
 

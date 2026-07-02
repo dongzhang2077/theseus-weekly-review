@@ -86,6 +86,31 @@ async def test_generate_endpoint_returns_502_for_misconfigured_writer(
     assert "OPENAI_API_KEY" in response.json()["detail"]
 
 
+async def test_generate_endpoint_returns_502_for_missing_opencode_go_key(
+    database,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("THESEUS_REVIEW_WRITER", "opencode_go")
+    monkeypatch.delenv("OPENCODE_GO_API_KEY", raising=False)
+    app = create_app(database.path)
+    with database.session() as connection:
+        seed_sample_week(connection)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/reviews/weekly/generate",
+            json={
+                "week_start": "2026-06-08",
+                "week_end": "2026-06-14",
+                "mode": "supportive_text",
+            },
+        )
+
+    assert response.status_code == 502
+    assert "OPENCODE_GO_API_KEY" in response.json()["detail"]
+
+
 async def test_analyze_endpoint_preserves_in_memory_compatibility(database) -> None:
     app = create_app(database.path)
     transport = httpx.ASGITransport(app=app)

@@ -1,5 +1,6 @@
 from .review_service import ReviewService, WeeklyPlanNotFound
 from .review_writer import (
+    OpenCodeGoReviewWriter,
     OpenAIReviewWriter,
     ReviewWriterError,
     TemplateSupportiveReviewWriter,
@@ -10,6 +11,7 @@ from .sample_import import SampleImportResult, import_sample_week, load_sample_p
 
 __all__ = [
     "ReviewService",
+    "OpenCodeGoReviewWriter",
     "OpenAIReviewWriter",
     "ReviewWriterError",
     "SampleImportResult",

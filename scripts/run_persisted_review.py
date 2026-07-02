@@ -22,6 +22,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--database", required=True, help="Path to the SQLite database")
     parser.add_argument("--week-start", required=True, type=date.fromisoformat)
     parser.add_argument("--week-end", required=True, type=date.fromisoformat)
+    parser.add_argument(
+        "--mode",
+        choices=("deterministic_first", "supportive_text"),
+        default="deterministic_first",
+    )
     return parser.parse_args()
 
 
@@ -32,6 +37,7 @@ def main() -> None:
     request = WeeklyReviewGenerateRequest(
         week_start=args.week_start,
         week_end=args.week_end,
+        mode=args.mode,
     )
     try:
         with database.session() as connection:

@@ -12,6 +12,10 @@ from ..schemas import WeeklyReviewResult
 
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 DEFAULT_OPENAI_MODEL = "gpt-5.5"
+OPENCODE_GO_CHAT_COMPLETIONS_URL = (
+    "https://opencode.ai/zen/go/v1/chat/completions"
+)
+DEFAULT_OPENCODE_GO_MODEL = "deepseek-v4-pro"
 
 
 class ReviewWriter(Protocol):
@@ -29,7 +33,7 @@ class ReviewWriterConfigurationError(ReviewWriterError):
     pass
 
 
-class OpenAITransport(Protocol):
+class JsonTransport(Protocol):
     def post_json(
         self,
         url: str,
@@ -41,7 +45,7 @@ class OpenAITransport(Protocol):
         """Submit a JSON request and return a decoded JSON response."""
 
 
-class UrllibOpenAITransport:
+class UrllibJsonTransport:
     def post_json(
         self,
         url: str,
@@ -61,13 +65,18 @@ class UrllibOpenAITransport:
         )
         try:
             with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-                return json.loads(response.read().decode("utf-8"))
+                decoded = json.loads(response.read().decode("utf-8"))
+                if not isinstance(decoded, Mapping):
+                    raise ReviewWriterError(
+                        "Review writer response was not a JSON object"
+                    )
+                return decoded
         except urllib.error.HTTPError as exc:
             raise ReviewWriterError(
-                f"OpenAI review writer failed with HTTP {exc.code}"
+                f"Review writer request failed with HTTP {exc.code}"
             ) from exc
         except (OSError, json.JSONDecodeError) as exc:
-            raise ReviewWriterError("OpenAI review writer request failed") from exc
+            raise ReviewWriterError("Review writer request failed") from exc
 
 
 class TemplateSupportiveReviewWriter:
@@ -86,7 +95,7 @@ class OpenAIReviewWriter:
         api_key: str,
         model: str = DEFAULT_OPENAI_MODEL,
         endpoint: str = OPENAI_RESPONSES_URL,
-        transport: OpenAITransport | None = None,
+        transport: JsonTransport | None = None,
         timeout_seconds: float = 30.0,
     ) -> None:
         if not api_key.strip():
@@ -94,7 +103,7 @@ class OpenAIReviewWriter:
         self.api_key = api_key
         self.model = model
         self.endpoint = endpoint
-        self.transport = transport or UrllibOpenAITransport()
+        self.transport = transport or UrllibJsonTransport()
         self.timeout_seconds = timeout_seconds
         self.model_name = f"openai:{model}"
 
@@ -111,6 +120,38 @@ class OpenAIReviewWriter:
         return WeeklyReviewResult.model_validate(values)
 
 
+class OpenCodeGoReviewWriter:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model: str = DEFAULT_OPENCODE_GO_MODEL,
+        endpoint: str = OPENCODE_GO_CHAT_COMPLETIONS_URL,
+        transport: JsonTransport | None = None,
+        timeout_seconds: float = 30.0,
+    ) -> None:
+        if not api_key.strip():
+            raise ReviewWriterConfigurationError("OPENCODE_GO_API_KEY is required")
+        self.api_key = api_key
+        self.model = model
+        self.endpoint = endpoint
+        self.transport = transport or UrllibJsonTransport()
+        self.timeout_seconds = timeout_seconds
+        self.model_name = f"opencode-go:{model}"
+
+    def rewrite(self, result: WeeklyReviewResult) -> WeeklyReviewResult:
+        response = self.transport.post_json(
+            self.endpoint,
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            payload=build_chat_completions_payload(result, self.model),
+            timeout_seconds=self.timeout_seconds,
+        )
+        generated_text = parse_chat_completions_generated_text(response)
+        values = result.model_dump(mode="json")
+        values["generated_text"] = generated_text
+        return WeeklyReviewResult.model_validate(values)
+
+
 def review_writer_from_environment() -> ReviewWriter | None:
     provider = os.getenv("THESEUS_REVIEW_WRITER", "").strip().lower()
     if provider in {"", "template", "local"}:
@@ -120,6 +161,20 @@ def review_writer_from_environment() -> ReviewWriter | None:
         return OpenAIReviewWriter(
             api_key=os.getenv("OPENAI_API_KEY", ""),
             model=model,
+        )
+    if provider in {"opencode_go", "opencode-go"}:
+        model = (
+            os.getenv("OPENCODE_GO_MODEL", "").strip()
+            or DEFAULT_OPENCODE_GO_MODEL
+        )
+        endpoint = (
+            os.getenv("OPENCODE_GO_ENDPOINT", "").strip()
+            or OPENCODE_GO_CHAT_COMPLETIONS_URL
+        )
+        return OpenCodeGoReviewWriter(
+            api_key=os.getenv("OPENCODE_GO_API_KEY", ""),
+            model=model,
+            endpoint=endpoint,
         )
     raise ReviewWriterConfigurationError(
         f"Unsupported THESEUS_REVIEW_WRITER provider: {provider}"
@@ -182,6 +237,25 @@ def build_openai_responses_payload(
     }
 
 
+def build_chat_completions_payload(
+    result: WeeklyReviewResult,
+    model: str,
+) -> dict[str, object]:
+    prompt = build_structured_review_prompt(result)
+    system_prompt = (
+        f"{prompt['system']} Return one JSON object with exactly one key named "
+        "generated_text."
+    )
+    return {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt["user"]},
+        ],
+        "response_format": {"type": "json_object"},
+    }
+
+
 def parse_openai_generated_text(response: Mapping[str, Any]) -> str:
     output_text = response.get("output_text")
     if isinstance(output_text, str):
@@ -207,15 +281,33 @@ def parse_openai_generated_text(response: Mapping[str, Any]) -> str:
     raise ReviewWriterError("OpenAI response did not include generated_text")
 
 
+def parse_chat_completions_generated_text(response: Mapping[str, Any]) -> str:
+    choices = response.get("choices")
+    if isinstance(choices, list) and choices:
+        choice = choices[0]
+        if isinstance(choice, Mapping):
+            message = choice.get("message")
+            if isinstance(message, Mapping):
+                content = message.get("content")
+                if isinstance(content, str):
+                    return _parse_generated_text_json(content)
+
+    raise ReviewWriterError(
+        "Chat Completions response did not include generated_text"
+    )
+
+
 def _parse_generated_text_json(text: str) -> str:
     try:
         payload = json.loads(text)
     except json.JSONDecodeError as exc:
-        raise ReviewWriterError("OpenAI response was not valid JSON") from exc
+        raise ReviewWriterError("Review writer response was not valid JSON") from exc
 
+    if not isinstance(payload, Mapping):
+        raise ReviewWriterError("Review writer response was not a JSON object")
     generated_text = payload.get("generated_text")
     if not isinstance(generated_text, str) or not generated_text.strip():
-        raise ReviewWriterError("OpenAI response did not include generated_text")
+        raise ReviewWriterError("Review writer response did not include generated_text")
     return generated_text.strip()
 
 

@@ -7,7 +7,7 @@ import pytest
 from backend.app.db.repositories import WeeklyReviewRepository
 from backend.app.schemas import WeeklyReviewGenerateRequest
 from backend.app.services import ReviewService, WeeklyPlanNotFound
-from backend.app.services.review_writer import OpenAIReviewWriter
+from backend.app.services.review_writer import OpenCodeGoReviewWriter, OpenAIReviewWriter
 
 
 REQUEST = WeeklyReviewGenerateRequest(
@@ -26,6 +26,26 @@ class StaticOpenAITransport:
         timeout_seconds: float,
     ) -> Mapping[str, Any]:
         return {"output_text": '{"generated_text":"You kept the backend moving."}'}
+
+
+class StaticChatCompletionsTransport:
+    def post_json(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str],
+        payload: Mapping[str, Any],
+        timeout_seconds: float,
+    ) -> Mapping[str, Any]:
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": '{"generated_text":"You kept the week evidence-bound."}'
+                    }
+                }
+            ]
+        }
 
 
 def test_service_generates_and_upserts_persisted_review(seeded_connection) -> None:
@@ -78,6 +98,28 @@ def test_service_persists_openai_writer_result(seeded_connection) -> None:
 
     assert review.model_name == "openai:gpt-test"
     assert review.generated_text == "You kept the backend moving."
+    assert review.wins[0].title == "Progress on Theseus backend"
+    assert stored == review
+
+
+def test_service_persists_opencode_go_writer_result(seeded_connection) -> None:
+    request = WeeklyReviewGenerateRequest(
+        week_start=date(2026, 6, 8),
+        week_end=date(2026, 6, 14),
+        mode="supportive_text",
+    )
+    writer = OpenCodeGoReviewWriter(
+        api_key="test-key",
+        transport=StaticChatCompletionsTransport(),
+    )
+
+    review = ReviewService(seeded_connection, writer=writer).generate(request)
+    stored = WeeklyReviewRepository(seeded_connection).get_by_week(
+        "2026-06-08", "2026-06-14"
+    )
+
+    assert review.model_name == "opencode-go:deepseek-v4-pro"
+    assert review.generated_text == "You kept the week evidence-bound."
     assert review.wins[0].title == "Progress on Theseus backend"
     assert stored == review
 
