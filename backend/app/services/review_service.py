@@ -13,6 +13,7 @@ from ..db.repositories import (
     WeeklyReviewRepository,
 )
 from ..schemas import WeeklyReviewGenerateRequest, WeeklyReviewRead, WeeklyReviewResult
+from .review_writer import ReviewWriter, TemplateSupportiveReviewWriter
 
 
 class WeeklyPlanNotFound(LookupError):
@@ -20,8 +21,9 @@ class WeeklyPlanNotFound(LookupError):
 
 
 class ReviewService:
-    def __init__(self, connection: sqlite3.Connection) -> None:
+    def __init__(self, connection: sqlite3.Connection, writer: ReviewWriter | None = None) -> None:
         self.connection = connection
+        self.writer = writer
 
     def generate(self, request: WeeklyReviewGenerateRequest) -> WeeklyReviewRead:
         week_start = request.week_start.isoformat()
@@ -56,4 +58,12 @@ class ReviewService:
             ],
         }
         result = WeeklyReviewResult.model_validate(analyze_week(payload))
-        return WeeklyReviewRepository(self.connection).save(result)
+        writer = self.writer
+        if request.mode == "supportive_text" and writer is None:
+            writer = TemplateSupportiveReviewWriter()
+        if writer is not None:
+            result = writer.rewrite(result)
+        return WeeklyReviewRepository(self.connection).save(
+            result,
+            model_name=writer.model_name if writer is not None else None,
+        )

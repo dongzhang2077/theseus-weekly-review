@@ -40,6 +40,27 @@ async def test_generate_endpoint_returns_404_without_plan(database) -> None:
     assert response.json()["detail"].startswith("No weekly plan exists")
 
 
+async def test_generate_endpoint_supports_supportive_text_mode(database) -> None:
+    app = create_app(database.path)
+    with database.session() as connection:
+        seed_sample_week(connection)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/reviews/weekly/generate",
+            json={
+                "week_start": "2026-06-08",
+                "week_end": "2026-06-14",
+                "mode": "supportive_text",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["model_name"] == "template-supportive-v1"
+    assert response.json()["generated_text"].startswith("You moved this forward:")
+
+
 async def test_analyze_endpoint_preserves_in_memory_compatibility(database) -> None:
     app = create_app(database.path)
     transport = httpx.ASGITransport(app=app)

@@ -30,6 +30,20 @@ def test_service_generates_and_upserts_persisted_review(seeded_connection) -> No
     assert second.wins[0].title == "Progress on Theseus backend"
 
 
+def test_service_can_store_supportive_text_mode(seeded_connection) -> None:
+    request = WeeklyReviewGenerateRequest(
+        week_start=date(2026, 6, 8),
+        week_end=date(2026, 6, 14),
+        mode="supportive_text",
+    )
+
+    review = ReviewService(seeded_connection).generate(request)
+
+    assert review.model_name == "template-supportive-v1"
+    assert review.generated_text.startswith("You moved this forward:")
+    assert review.wins[0].title == "Progress on Theseus backend"
+
+
 def test_service_rejects_week_without_plan(connection) -> None:
     with pytest.raises(WeeklyPlanNotFound):
         ReviewService(connection).generate(REQUEST)

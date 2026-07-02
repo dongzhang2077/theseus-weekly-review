@@ -199,6 +199,12 @@ Request:
 }
 ```
 
+`mode` defaults to `deterministic_first`. Use `supportive_text` to keep the
+same deterministic evidence and structured findings while rewriting
+`generated_text` through the review writing adapter. The MVP adapter is local and
+evidence-bound; external LLM providers can be added behind the same service
+boundary later.
+
 Response:
 
 The `evidence.goals` and `evidence.projects` arrays are abbreviated in this example

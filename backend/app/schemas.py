@@ -10,7 +10,7 @@ ActivityType = Literal["consuming", "neutral", "restore", "destroy"]
 ActivityTypeSource = Literal["user_selected", "ai_suggested", "user_corrected"]
 ProjectStage = Literal["startup", "stable", "sprint", "dormant", "wake_up"]
 ProjectStatus = Literal["active", "paused", "archived"]
-ReviewMode = Literal["deterministic_first"]
+ReviewMode = Literal["deterministic_first", "supportive_text"]
 RiskType = Literal[
     "alignment_gap",
     "plan_drift",
