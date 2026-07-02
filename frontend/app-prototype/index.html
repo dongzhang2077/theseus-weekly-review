@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Theseus Review — App Prototype</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="state-normal">
+
+<!-- =========================================================
+     SVG Icon Sprite (lucide-style, 1.75px stroke, 24x24 viewBox)
+     ========================================================= -->
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></symbol>
+  <symbol id="i-book-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+  <symbol id="i-timer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.16C7.85 18.5 7 20.06 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.16C16.15 18.5 17 20.06 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></symbol>
+  <symbol id="i-alert-triangle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="5" x2="19" y1="12" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></symbol>
+  <symbol id="i-check-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" x2="16" y1="12" y2="12"/></symbol>
+  <symbol id="i-x-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" x2="16" y1="8" y2="16"/><line x1="16" x2="8" y1="8" y2="16"/></symbol>
+  <symbol id="i-leaf" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></symbol>
+  <symbol id="i-tape" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="7" rx="1.5" transform="rotate(-8 12 12.5)"/></symbol>
+  <symbol id="i-sketch-win" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7.2 5.4c.7 5.4 2.4 8.2 4.9 8.2 2.4 0 4.1-2.8 4.8-8.2"/><path d="M6.4 5.6h11.2"/><path d="M8 8.1c-2.7-.2-4.1.7-4 2.4.2 1.9 2.1 3.1 5 3.2"/><path d="M16 8.1c2.7-.2 4.1.7 4 2.4-.2 1.9-2.1 3.1-5 3.2"/><path d="M12 13.9v3.1"/><path d="M9.2 20.1c1.5-1.4 4.2-1.4 5.7 0"/><path d="M8.4 20.2h7.5"/></symbol>
+  <symbol id="i-sketch-risk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M11.2 4.5c.5-.8 1.4-.8 1.9 0l7 12.7c.5.8-.1 1.8-1.1 1.8H5c-1 0-1.6-1-1.1-1.8Z"/><path d="M12 8.7v4.7"/><path d="M12 16.6h.01"/><path d="M8.3 18.9c2.4.5 5.3.5 7.6-.1"/></symbol>
+  <symbol id="i-sketch-review" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 5.2c2.4-.9 5-.7 7.5.8v13c-2.5-1.6-5.1-1.8-7.5-.8Z"/><path d="M19.8 5.2c-2.4-.9-5-.7-7.5.8v13c2.5-1.6 5.1-1.8 7.5-.8Z"/><path d="M7.1 9.2c1-.2 1.8-.1 2.8.3"/><path d="M14.2 9.5c1-.4 1.9-.5 2.9-.3"/><path d="M7.1 12.1c1-.2 1.8-.1 2.8.3"/><path d="M14.2 12.4c1-.4 1.9-.5 2.9-.3"/></symbol>
+</svg>
+
+<!-- =========================================================
+     State Switcher (prototype tool — outside app)
+     ========================================================= -->
+<div class="switcher" role="group" aria-label="Prototype state switcher">
+  <div class="switcher-title">State preview</div>
+  <button class="switcher-btn active" data-state="normal">Normal</button>
+  <button class="switcher-btn" data-state="loading">Loading</button>
+  <button class="switcher-btn" data-state="empty">Empty</button>
+  <button class="switcher-btn" data-state="no-review">None</button>
+  <button class="switcher-btn" data-state="stale">Stale</button>
+  <button class="switcher-btn" data-state="error">Error</button>
+</div>
+
+<!-- =========================================================
+     Phone Frame
+     ========================================================= -->
+<div class="phone" id="phone">
+
+  <!-- Compact Header -->
+  <header class="app-header">
+    <button class="icon-btn" aria-label="Previous week"><svg><use href="#i-chevron-left"/></svg></button>
+    <div class="week-label">Jun 8 - Jun 14</div>
+    <button class="icon-btn" aria-label="Next week"><svg><use href="#i-chevron-right"/></svg></button>
+  </header>
+
+  <!-- App Content -->
+  <main class="app-content">
+    <div class="review-l1">
+      <!-- Review content (character + chapters) — shown in normal/loading/stale -->
+      <div class="review-content">
+        <div class="review-status">Needs attention</div>
+
+        <div class="character-slot">
+          <button class="character-btn" id="characterBtn" aria-label="Week status summary">
+            <img id="characterImg" src="assets/character-attention.png" alt="Week needs attention">
+          </button>
+          <div class="stale-mark" aria-hidden="true"><svg><use href="#i-clock"/></svg></div>
+        </div>
+
+        <div class="chapter-row">
+          <button class="chapter-entry wins" data-sheet="wins" aria-label="Wins">
+            <svg><use href="#i-sketch-win"/></svg>
+          </button>
+          <button class="chapter-entry risks has-risk" data-sheet="risks" aria-label="Risks, severe attention">
+            <svg><use href="#i-sketch-risk"/></svg>
+          </button>
+          <button class="chapter-entry full" data-sheet="full" aria-label="Full review">
+            <svg><use href="#i-sketch-review"/></svg>
+          </button>
+        </div>
+
+      </div>
+
+      <div class="week-rhythm-pill" aria-label="Week rhythm">
+        <span class="rhythm-dot active" aria-hidden="true"></span>
+        <span class="rhythm-dot" aria-hidden="true"></span>
+        <span class="rhythm-dot active" aria-hidden="true"></span>
+        <span class="rhythm-dot soft" aria-hidden="true"></span>
+        <span class="rhythm-dot active" aria-hidden="true"></span>
+      </div>
+
+      <!-- State surfaces -->
+      <div class="state-surface empty">
+        <svg class="ss-icon"><use href="#i-inbox"/></svg>
+        <div class="ss-title">No time logs this week</div>
+        <button class="ss-action primary"><svg><use href="#i-arrow-right"/></svg>Track</button>
+      </div>
+
+      <div class="state-surface no-review">
+        <svg class="ss-icon"><use href="#i-book-open"/></svg>
+        <div class="ss-title">No review yet</div>
+        <button class="ss-action primary"><svg><use href="#i-sparkles"/></svg>Generate</button>
+      </div>
+
+      <div class="state-surface error">
+        <svg class="ss-icon red"><use href="#i-alert-triangle"/></svg>
+        <div class="ss-title">Could not load review</div>
+        <button class="ss-action primary"><svg><use href="#i-refresh"/></svg>Retry</button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav">
+    <button class="nav-item selected" aria-label="Review" aria-current="page"><svg><use href="#i-book-open"/></svg></button>
+    <button class="nav-item" aria-label="Signals" onclick="window.location.href='signals.html'"><svg><use href="#i-activity"/></svg></button>
+    <button class="nav-item" aria-label="Track" onclick="window.location.href='track.html'"><svg><use href="#i-timer"/></svg></button>
+    <button class="nav-item" aria-label="Plan" onclick="window.location.href='plan.html'"><svg><use href="#i-calendar"/></svg></button>
+  </nav>
+
+  <!-- =========================================================
+       Speech Bubble (Level 2 — tap character)
+       ========================================================= -->
+  <div class="bubble-overlay" id="bubbleOverlay">
+    <div class="speech-bubble" id="speechBubble">
+      You moved Theseus forward, but your resume work needs a restart.
+    </div>
+  </div>
+
+  <!-- =========================================================
+       Section Sheets (Level 2)
+       ========================================================= -->
+  <div class="sheet-backdrop" id="sheetBackdrop"></div>
+
+  <!-- Wins Sheet -->
+  <div class="sheet" id="sheet-wins" data-sheet-id="wins">
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-header">
+      <svg class="sh-icon wins"><use href="#i-trophy"/></svg>
+      <div class="sh-title">Wins</div>
+      <button class="icon-btn sh-close" data-close aria-label="Close"><svg><use href="#i-chevron-down"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <button class="list-row" data-detail="win-1">
+        <div class="lr-text">
+          <div class="lr-title">Theseus backend progress on track</div>
+        </div>
+        <div class="lr-dot green" aria-hidden="true"></div>
+      </button>
+      <button class="list-row" data-detail="win-2">
+        <div class="lr-text">
+          <div class="lr-title">Consistent deep-work blocks this week</div>
+        </div>
+        <div class="lr-dot green" aria-hidden="true"></div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Risks Sheet -->
+  <div class="sheet" id="sheet-risks" data-sheet-id="risks">
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-header">
+      <svg class="sh-icon risks"><use href="#i-alert-triangle"/></svg>
+      <div class="sh-title">Risks</div>
+      <button class="icon-btn sh-close" data-close aria-label="Close"><svg><use href="#i-chevron-down"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <button class="list-row" data-detail="risk-1">
+        <div class="lr-text">
+          <div class="lr-title">Resume project dormant 5 days</div>
+          <div class="lr-severity severe">Severe</div>
+        </div>
+        <div class="lr-dot red" aria-hidden="true"></div>
+      </button>
+      <button class="list-row" data-detail="risk-2">
+        <div class="lr-text">
+          <div class="lr-title">Frontend drift: 2h vs 8h planned</div>
+          <div class="lr-severity attention">Attention</div>
+        </div>
+        <div class="lr-dot amber" aria-hidden="true"></div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Full Review Sheet -->
+  <div class="sheet" id="sheet-full" data-sheet-id="full">
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-header">
+      <svg class="sh-icon full"><use href="#i-book-open"/></svg>
+      <div class="sh-title">Full Review</div>
+      <button class="icon-btn sh-close" data-close aria-label="Close"><svg><use href="#i-chevron-down"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <div class="review-narrative">
+        <p>This week you kept Theseus backend moving with consistent deep-work blocks. Logged time exceeded the planned target, which is a strong signal of focus.</p>
+        <p>Two areas need attention. Your Resume project has been dormant for five days and is below its weekly minimum. The frontend work drifted to 2h against an 8h plan.</p>
+        <p>Consider restarting the Resume project with shorter, repeated morning blocks to rebuild momentum without overloading the week.</p>
+      </div>
+      <div class="suggestion">
+        <div class="suggestion-label"><svg><use href="#i-route"/></svg>Suggested next step</div>
+        <div class="suggestion-text">Restart Resume project — add 3h blocks on Tue/Thu mornings</div>
+        <div class="suggestion-actions">
+          <button class="btn">Apply</button>
+          <button class="btn dismiss">Dismiss</button>
+        </div>
+      </div>
+      <div class="regenerate-row">
+        <button class="regenerate-btn hidden" id="regenerateBtn"><svg><use href="#i-refresh"/></svg>Regenerate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       Detail Sheets (Level 3 — full screen)
+       ========================================================= -->
+
+  <!-- Win Detail 1 -->
+  <div class="detail" id="detail-win-1">
+    <div class="detail-header">
+      <button class="icon-btn" data-back aria-label="Back"><svg><use href="#i-chevron-left"/></svg></button>
+      <div class="dh-title">Win</div>
+    </div>
+    <div class="detail-body">
+      <div class="detail-title">Theseus backend progress on track</div>
+      <div class="detail-reason">Consistent progress kept the project healthy and ahead of plan.</div>
+      <div class="detail-section-label">Evidence</div>
+      <div class="evidence-row"><div class="er-label">Project</div><div class="er-value">Theseus Backend</div></div>
+      <div class="evidence-row"><div class="er-label">Planned</div><div class="er-value">8h</div></div>
+      <div class="evidence-row"><div class="er-label">Logged</div><div class="er-value">9.5h</div></div>
+      <div class="evidence-row"><div class="er-label">Status</div><div class="er-value status-ok">On track</div></div>
+    </div>
+  </div>
+
+  <!-- Win Detail 2 -->
+  <div class="detail" id="detail-win-2">
+    <div class="detail-header">
+      <button class="icon-btn" data-back aria-label="Back"><svg><use href="#i-chevron-left"/></svg></button>
+      <div class="dh-title">Win</div>
+    </div>
+    <div class="detail-body">
+      <div class="detail-title">Consistent deep-work blocks this week</div>
+      <div class="detail-reason">Repeated focus blocks protected deep work across the week.</div>
+      <div class="detail-section-label">Evidence</div>
+      <div class="evidence-row"><div class="er-label">Project</div><div class="er-value">Theseus Backend</div></div>
+      <div class="evidence-row"><div class="er-label">Planned</div><div class="er-value">6h</div></div>
+      <div class="evidence-row"><div class="er-label">Logged</div><div class="er-value">7h</div></div>
+      <div class="evidence-row"><div class="er-label">Status</div><div class="er-value status-ok">Consistent</div></div>
+    </div>
+  </div>
+
+  <!-- Risk Detail 1 (severe) -->
+  <div class="detail" id="detail-risk-1">
+    <div class="detail-header">
+      <button class="icon-btn" data-back aria-label="Back"><svg><use href="#i-chevron-left"/></svg></button>
+      <div class="dh-title">Risk</div>
+    </div>
+    <div class="detail-body">
+      <div class="detail-title">Resume project dormant 5 days</div>
+      <div class="detail-severity"><span class="ds-dot red" aria-hidden="true"></span>Severe</div>
+      <div class="detail-reason">No time logged against Resume this week. The project is below its weekly minimum.</div>
+      <div class="detail-section-label">Evidence</div>
+      <div class="evidence-row"><div class="er-label">Project</div><div class="er-value">Resume</div></div>
+      <div class="evidence-row"><div class="er-label">Planned</div><div class="er-value">5h</div></div>
+      <div class="evidence-row"><div class="er-label">Logged</div><div class="er-value status-bad">0h</div></div>
+      <div class="evidence-row"><div class="er-label">Inactive days</div><div class="er-value status-bad">5</div></div>
+      <div class="evidence-row"><div class="er-label">Weekly minimum</div><div class="er-value">3h</div></div>
+      <button class="detail-action"><svg><use href="#i-arrow-right"/></svg>Plan</button>
+    </div>
+  </div>
+
+  <!-- Risk Detail 2 (attention) -->
+  <div class="detail" id="detail-risk-2">
+    <div class="detail-header">
+      <button class="icon-btn" data-back aria-label="Back"><svg><use href="#i-chevron-left"/></svg></button>
+      <div class="dh-title">Risk</div>
+    </div>
+    <div class="detail-body">
+      <div class="detail-title">Frontend drift: 2h vs 8h planned</div>
+      <div class="detail-severity"><span class="ds-dot amber" aria-hidden="true"></span>Attention</div>
+      <div class="detail-reason">Frontend work logged well below plan. Two days missed the minimum.</div>
+      <div class="detail-section-label">Evidence</div>
+      <div class="evidence-row"><div class="er-label">Project</div><div class="er-value">Theseus Frontend</div></div>
+      <div class="evidence-row"><div class="er-label">Planned</div><div class="er-value">8h</div></div>
+      <div class="evidence-row"><div class="er-label">Logged</div><div class="er-value">2h</div></div>
+      <div class="evidence-row"><div class="er-label">Inactive days</div><div class="er-value">2</div></div>
+      <div class="evidence-row"><div class="er-label">Weekly minimum</div><div class="er-value">4h</div></div>
+      <button class="detail-action"><svg><use href="#i-arrow-right"/></svg>Plan</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
