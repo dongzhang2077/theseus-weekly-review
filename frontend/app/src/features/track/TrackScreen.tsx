@@ -7,6 +7,7 @@ import { IconButton } from "../../shared/components/IconButton";
 import { Sheet } from "../../shared/components/Sheet";
 import { chooseFocusActivity, formatClock, formatDuration, tickActivities, toggleActivity, type ActivityTimer } from "./timerModel";
 import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
+import { saveActivitySession } from "../../shared/api/timeLogs";
 
 const categories = ["Project", "Study", "Health"];
 const energyOptions = ["consume", "restore", "neutral"] as const;
@@ -20,9 +21,10 @@ type TrackSheet = "logs" | "create";
 
 interface TrackScreenProps {
   track: AppWeekViewModel["track"];
+  apiBaseUrl?: string;
 }
 
-export function TrackScreen({ track }: TrackScreenProps) {
+export function TrackScreen({ apiBaseUrl, track }: TrackScreenProps) {
   const [activities, setActivities] = useState(track.activities);
   const [activeSheet, setActiveSheet] = useState<TrackSheet | null>(null);
   const [detail, setDetail] = useState<ActivityTimer | null>(null);
@@ -49,7 +51,14 @@ export function TrackScreen({ track }: TrackScreenProps) {
   }, [track.activities]);
 
   function onToggle(activityId: string) {
-    setActivities((current) => toggleActivity(current, activityId));
+    setActivities((current) => {
+      const activity = current.find((item) => item.id === activityId);
+      if (activity?.running && apiBaseUrl) {
+        void saveActivitySession({ apiBaseUrl, activity });
+      }
+
+      return toggleActivity(current, activityId);
+    });
   }
 
   function onCreateActivity() {
