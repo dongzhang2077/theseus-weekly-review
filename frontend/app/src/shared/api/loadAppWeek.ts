@@ -7,6 +7,7 @@ export const demoWeekRange = {
 };
 
 export type AppWeekSource = "api" | "demo";
+export type ReviewMode = "deterministic_first" | "supportive_text";
 
 export interface LoadedAppWeek {
   week: AppWeekViewModel;
@@ -26,6 +27,8 @@ export interface LoadAppWeekOptions {
   apiBaseUrl?: string;
   weekStart?: string;
   weekEnd?: string;
+  mode?: ReviewMode;
+  deterministicFallback?: boolean;
   fallback?: AppWeekViewModel;
   fetchImpl?: FetchLike;
 }
@@ -37,30 +40,55 @@ export async function loadAppWeek(options: LoadAppWeekOptions = {}): Promise<Loa
     return { week: fallback, source: "demo", error: null };
   }
 
-  try {
-    const response = await (options.fetchImpl ?? fetch)(`${apiBaseUrl.replace(/\/$/, "")}/reviews/weekly/generate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        week_start: options.weekStart ?? demoWeekRange.start,
-        week_end: options.weekEnd ?? demoWeekRange.end,
-        mode: "deterministic_first"
-      })
-    });
-
-    if (!response.ok) {
-      return { week: fallback, source: "demo", error: `Backend returned ${response.status}` };
-    }
-
-    const apiReview = (await response.json()) as WeeklyReviewApiResponse;
-    return { week: mapWeeklyReviewToAppWeek(apiReview, fallback), source: "api", error: null };
-  } catch (error) {
-    return {
-      week: fallback,
-      source: "demo",
-      error: error instanceof Error ? error.message : "Backend request failed"
-    };
+  const preferredMode = options.mode ?? "supportive_text";
+  const modes: ReviewMode[] = [preferredMode];
+  if (
+    preferredMode === "supportive_text" &&
+    options.deterministicFallback !== false
+  ) {
+    modes.push("deterministic_first");
   }
+  let lastError = "Backend request failed";
+
+  for (const mode of modes) {
+    try {
+      const response = await (options.fetchImpl ?? fetch)(
+        `${apiBaseUrl.replace(/\/$/, "")}/reviews/weekly/generate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            week_start: options.weekStart ?? demoWeekRange.start,
+            week_end: options.weekEnd ?? demoWeekRange.end,
+            mode
+          })
+        }
+      );
+
+      if (!response.ok) {
+        lastError = `Backend returned ${response.status}`;
+        if (mode === "supportive_text" && response.status === 502) {
+          continue;
+        }
+        break;
+      }
+
+      const apiReview = (await response.json()) as WeeklyReviewApiResponse;
+      return {
+        week: mapWeeklyReviewToAppWeek(apiReview, fallback),
+        source: "api",
+        error:
+          mode === preferredMode
+            ? null
+            : "Supportive review unavailable; deterministic review loaded"
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : "Backend request failed";
+      break;
+    }
+  }
+
+  return { week: fallback, source: "demo", error: lastError };
 }

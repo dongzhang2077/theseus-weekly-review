@@ -1361,7 +1361,7 @@ async function generateReview() {
     state.review = await api.generateWeeklyReview({
       week_start: demoWeek.week_start,
       week_end: demoWeek.week_end,
-      mode: "deterministic_first",
+      mode: "supportive_text",
     });
     state.statusMessage = "Backend review loaded";
     state.statusTone = "";

@@ -62,19 +62,52 @@ describe("loadAppWeek", () => {
     expect(loaded.week.plan.initialState.focusProject).toBe("Protect frontend block");
     expect(calls[0].input).toBe("http://127.0.0.1:8000/reviews/weekly/generate");
     expect(calls[0].init.method).toBe("POST");
+    expect(JSON.parse(String(calls[0].init.body)).mode).toBe("supportive_text");
+  });
+
+  it("retries with deterministic mode when supportive generation fails", async () => {
+    const calls: Array<{ input: string; init: RequestInit }> = [];
+    const fetchImpl: FetchLike = async (input, init) => {
+      calls.push({ input, init });
+      if (calls.length === 1) {
+        return { ok: false, status: 502, json: async () => ({}) };
+      }
+      return { ok: true, status: 200, json: async () => apiReview };
+    };
+
+    const loaded = await loadAppWeek({
+      apiBaseUrl: "http://127.0.0.1:8000",
+      fetchImpl
+    });
+
+    expect(loaded.source).toBe("api");
+    expect(loaded.week.review.wins[0].title).toBe("Backend shipped");
+    expect(loaded.error).toBe(
+      "Supportive review unavailable; deterministic review loaded"
+    );
+    expect(calls).toHaveLength(2);
+    expect(JSON.parse(String(calls[0].init.body)).mode).toBe("supportive_text");
+    expect(JSON.parse(String(calls[1].init.body)).mode).toBe(
+      "deterministic_first"
+    );
   });
 
   it("falls back to demo data when the backend is unavailable", async () => {
-    const fetchImpl: FetchLike = async () => ({
-      ok: false,
-      status: 404,
-      json: async () => ({})
-    });
+    let calls = 0;
+    const fetchImpl: FetchLike = async () => {
+      calls += 1;
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({})
+      };
+    };
 
     const loaded = await loadAppWeek({ apiBaseUrl: "http://127.0.0.1:8000", fetchImpl });
 
     expect(loaded.source).toBe("demo");
     expect(loaded.week).toBe(demoWeek);
     expect(loaded.error).toBe("Backend returned 404");
+    expect(calls).toBe(1);
   });
 });
