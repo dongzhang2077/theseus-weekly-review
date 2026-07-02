@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 import json
-from typing import Protocol
+import os
+import urllib.error
+import urllib.request
+from collections.abc import Mapping
+from typing import Any, Protocol
 
 from ..schemas import WeeklyReviewResult
+
+
+OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
+DEFAULT_OPENAI_MODEL = "gpt-5.5"
 
 
 class ReviewWriter(Protocol):
@@ -13,6 +21,55 @@ class ReviewWriter(Protocol):
         """Return the same evidence-backed review with revised generated text."""
 
 
+class ReviewWriterError(RuntimeError):
+    pass
+
+
+class ReviewWriterConfigurationError(ReviewWriterError):
+    pass
+
+
+class OpenAITransport(Protocol):
+    def post_json(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str],
+        payload: Mapping[str, Any],
+        timeout_seconds: float,
+    ) -> Mapping[str, Any]:
+        """Submit a JSON request and return a decoded JSON response."""
+
+
+class UrllibOpenAITransport:
+    def post_json(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str],
+        payload: Mapping[str, Any],
+        timeout_seconds: float,
+    ) -> Mapping[str, Any]:
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                **headers,
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            raise ReviewWriterError(
+                f"OpenAI review writer failed with HTTP {exc.code}"
+            ) from exc
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ReviewWriterError("OpenAI review writer request failed") from exc
+
+
 class TemplateSupportiveReviewWriter:
     model_name = "template-supportive-v1"
 
@@ -20,6 +77,53 @@ class TemplateSupportiveReviewWriter:
         values = result.model_dump(mode="json")
         values["generated_text"] = render_supportive_text(result)
         return WeeklyReviewResult.model_validate(values)
+
+
+class OpenAIReviewWriter:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model: str = DEFAULT_OPENAI_MODEL,
+        endpoint: str = OPENAI_RESPONSES_URL,
+        transport: OpenAITransport | None = None,
+        timeout_seconds: float = 30.0,
+    ) -> None:
+        if not api_key.strip():
+            raise ReviewWriterConfigurationError("OPENAI_API_KEY is required")
+        self.api_key = api_key
+        self.model = model
+        self.endpoint = endpoint
+        self.transport = transport or UrllibOpenAITransport()
+        self.timeout_seconds = timeout_seconds
+        self.model_name = f"openai:{model}"
+
+    def rewrite(self, result: WeeklyReviewResult) -> WeeklyReviewResult:
+        response = self.transport.post_json(
+            self.endpoint,
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            payload=build_openai_responses_payload(result, self.model),
+            timeout_seconds=self.timeout_seconds,
+        )
+        generated_text = parse_openai_generated_text(response)
+        values = result.model_dump(mode="json")
+        values["generated_text"] = generated_text
+        return WeeklyReviewResult.model_validate(values)
+
+
+def review_writer_from_environment() -> ReviewWriter | None:
+    provider = os.getenv("THESEUS_REVIEW_WRITER", "").strip().lower()
+    if provider in {"", "template", "local"}:
+        return None
+    if provider == "openai":
+        model = os.getenv("THESEUS_OPENAI_MODEL", "").strip() or DEFAULT_OPENAI_MODEL
+        return OpenAIReviewWriter(
+            api_key=os.getenv("OPENAI_API_KEY", ""),
+            model=model,
+        )
+    raise ReviewWriterConfigurationError(
+        f"Unsupported THESEUS_REVIEW_WRITER provider: {provider}"
+    )
 
 
 def build_structured_review_prompt(result: WeeklyReviewResult) -> dict[str, object]:
@@ -40,6 +144,79 @@ def build_structured_review_prompt(result: WeeklyReviewResult) -> dict[str, obje
             "next_steps": "same meaning as input",
         },
     }
+
+
+def build_openai_responses_payload(
+    result: WeeklyReviewResult,
+    model: str,
+) -> dict[str, object]:
+    prompt = build_structured_review_prompt(result)
+    return {
+        "model": model,
+        "input": [
+            {"role": "system", "content": prompt["system"]},
+            {"role": "user", "content": prompt["user"]},
+        ],
+        "store": False,
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": "weekly_review_text",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "generated_text": {
+                            "type": "string",
+                            "description": (
+                                "A concise supportive weekly review using only "
+                                "the provided evidence."
+                            ),
+                        }
+                    },
+                    "required": ["generated_text"],
+                    "additionalProperties": False,
+                },
+            }
+        },
+    }
+
+
+def parse_openai_generated_text(response: Mapping[str, Any]) -> str:
+    output_text = response.get("output_text")
+    if isinstance(output_text, str):
+        return _parse_generated_text_json(output_text)
+
+    output = response.get("output")
+    if isinstance(output, list):
+        for item in output:
+            if not isinstance(item, Mapping):
+                continue
+            content = item.get("content")
+            if not isinstance(content, list):
+                continue
+            for content_item in content:
+                if not isinstance(content_item, Mapping):
+                    continue
+                if content_item.get("type") not in {None, "output_text", "text"}:
+                    continue
+                text = content_item.get("text")
+                if isinstance(text, str):
+                    return _parse_generated_text_json(text)
+
+    raise ReviewWriterError("OpenAI response did not include generated_text")
+
+
+def _parse_generated_text_json(text: str) -> str:
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ReviewWriterError("OpenAI response was not valid JSON") from exc
+
+    generated_text = payload.get("generated_text")
+    if not isinstance(generated_text, str) or not generated_text.strip():
+        raise ReviewWriterError("OpenAI response did not include generated_text")
+    return generated_text.strip()
 
 
 def render_supportive_text(result: WeeklyReviewResult) -> str:

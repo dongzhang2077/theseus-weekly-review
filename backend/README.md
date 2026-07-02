@@ -33,6 +33,17 @@ The default local database is `data/local/theseus.db`. Override it with `THESEUS
 The local frontend demo origin is allowed by default. Override browser origins with
 `THESEUS_CORS_ORIGINS`, using a comma-separated list.
 
+`supportive_text` review generation uses the local evidence-bound writer by
+default. To use the OpenAI Responses API adapter, set:
+
+```bash
+export THESEUS_REVIEW_WRITER=openai
+export OPENAI_API_KEY=your_api_key
+export THESEUS_OPENAI_MODEL=gpt-5.5  # Optional.
+```
+
+Do not commit API keys or `.env` files.
+
 Generate a review from an initialized and populated database with:
 
 ```bash

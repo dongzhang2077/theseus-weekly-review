@@ -13,7 +13,11 @@ from ..db.repositories import (
     WeeklyReviewRepository,
 )
 from ..schemas import WeeklyReviewGenerateRequest, WeeklyReviewRead, WeeklyReviewResult
-from .review_writer import ReviewWriter, TemplateSupportiveReviewWriter
+from .review_writer import (
+    ReviewWriter,
+    TemplateSupportiveReviewWriter,
+    review_writer_from_environment,
+)
 
 
 class WeeklyPlanNotFound(LookupError):
@@ -60,7 +64,7 @@ class ReviewService:
         result = WeeklyReviewResult.model_validate(analyze_week(payload))
         writer = self.writer
         if request.mode == "supportive_text" and writer is None:
-            writer = TemplateSupportiveReviewWriter()
+            writer = review_writer_from_environment() or TemplateSupportiveReviewWriter()
         if writer is not None:
             result = writer.rewrite(result)
         return WeeklyReviewRepository(self.connection).save(
