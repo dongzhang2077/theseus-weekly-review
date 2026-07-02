@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Theseus Plan — App Prototype</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="plan.css">
+</head>
+<body class="plan-normal">
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></symbol>
+  <symbol id="i-book-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+  <symbol id="i-timer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.5L10.5 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a8 8 0 0 1 16 0"/><path d="M12 14l4-4"/><path d="M5 19h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+</svg>
+
+<div class="switcher" role="group" aria-label="Plan state switcher">
+  <div class="switcher-title">Plan</div>
+  <button class="switcher-btn active" data-plan-state="normal">Normal</button>
+  <button class="switcher-btn" data-plan-state="loading">Loading</button>
+  <button class="switcher-btn" data-plan-state="empty">Empty</button>
+  <button class="switcher-btn" data-plan-state="error">Error</button>
+</div>
+
+<div class="phone plan-phone" id="phone">
+  <header class="app-header">
+    <button class="icon-btn" aria-label="Previous week"><svg><use href="#i-chevron-left"/></svg></button>
+    <div class="week-label">Jun 15 - Jun 21</div>
+    <button class="icon-btn" aria-label="Next week"><svg><use href="#i-chevron-right"/></svg></button>
+  </header>
+
+  <main class="app-content">
+    <div class="plan-l1">
+      <div class="plan-content">
+        <button class="balance-orbit" data-sheet="slack" aria-label="Week balance">
+          <span class="balance-ring" aria-hidden="true">
+            <span class="balance-arc green"></span>
+            <span class="balance-arc amber"></span>
+            <span class="balance-core"><svg><use href="#i-gauge"/></svg></span>
+          </span>
+        </button>
+
+        <button class="suggestion-card" id="suggestionCard" data-sheet="suggestion" aria-label="Review suggestion">
+          <span class="suggestion-mark" aria-hidden="true"><svg><use href="#i-route"/></svg></span>
+          <span class="suggestion-copy">
+            <span class="suggestion-title" id="suggestionTitle">Resume restart</span>
+            <span class="suggestion-meta" id="suggestionMeta">Tue / Thu mornings</span>
+          </span>
+        </button>
+
+        <div class="plan-entry-grid">
+          <button class="plan-entry focus" data-sheet="focus" aria-label="Focus project"><svg><use href="#i-target"/></svg></button>
+          <button class="plan-entry slack" data-sheet="slack" aria-label="Slack and capacity"><svg><use href="#i-gauge"/></svg></button>
+          <button class="plan-entry projects" data-sheet="projects" aria-label="Projects"><svg><use href="#i-folder"/></svg></button>
+        </div>
+      </div>
+
+      <div class="plan-state-surface plan-empty-surface">
+        <svg class="ss-icon"><use href="#i-calendar"/></svg>
+        <div class="ss-title">No plan blocks yet.</div>
+        <button class="ss-action primary" id="emptyStartBtn"><svg><use href="#i-target"/></svg>Start</button>
+      </div>
+
+      <div class="plan-state-surface plan-error-surface">
+        <svg class="ss-icon red"><use href="#i-refresh"/></svg>
+        <div class="ss-title">Could not load plan.</div>
+        <button class="ss-action primary" data-plan-state="normal"><svg><use href="#i-refresh"/></svg>Retry</button>
+      </div>
+    </div>
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav-item" aria-label="Review" onclick="window.location.href='index.html'"><svg><use href="#i-book-open"/></svg></button>
+    <button class="nav-item" aria-label="Signals" onclick="window.location.href='signals.html'"><svg><use href="#i-activity"/></svg></button>
+    <button class="nav-item" aria-label="Track" onclick="window.location.href='track.html'"><svg><use href="#i-timer"/></svg></button>
+    <button class="nav-item selected" aria-label="Plan" aria-current="page"><svg><use href="#i-calendar"/></svg></button>
+  </nav>
+
+  <div class="sheet-backdrop" id="sheetBackdrop"></div>
+
+  <div class="sheet plan-sheet" id="sheet-suggestion" data-sheet-id="suggestion">
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-header">
+      <svg class="sh-icon risks"><use href="#i-route"/></svg>
+      <div class="sh-title">Suggestion</div>
+      <button class="icon-btn sh-close" data-close aria-label="Close"><svg><use href="#i-chevron-down"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <button class="list-row" data-detail="plan-resume">
+        <div class="lr-text">
+          <div class="lr-title">Add two Resume restart blocks</div>
+          <div class="lr-severity attention">From Review</div>
+        </div>
+        <div class="lr-dot amber" aria-hidden="true"></div>
+      </button>
+      <div class="plan-sheet-actions">
+        <button class="plan-icon-action applied" id="applySuggestionBtn" aria-label="Apply suggestion"><svg><use href="#i-check"/></svg></button>
+        <button class="plan-icon-action" id="dismissSuggestionBtn" aria-label="Dismiss suggestion"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <div class="plan-inline-status" id="suggestionStatus" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <div class="sheet plan-sheet" id="sheet-focus" data-sheet-id="focus">
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-header">
+      <svg class="sh-icon wins"><use href="#i-target"/></svg>
+      <div class="sh-title">Focus</div>
+      <button class="icon-btn sh-close" data-close aria-label="Close"><svg><use href="#i-chevron-down"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <button class="list-row" data-detail="plan-frontend">
+        <div class="lr-text">
+          <div class="lr-title">Theseus frontend polish</div>
+          <div class="lr-severity">Primary</div>
+        </div>
+        <div class="lr-dot green" aria-hidden="true"></div>
+      </button>
+      <button class="list-row" data-detail="plan-backend">
+        <div class="lr-text">
+          <div class="lr-title">Backend demo verification</div>
+          <div class="lr-severity">Support</div>
+        </div>
+        <div class="lr-dot green" aria-hidden="true"></div>
+      </button>
+    </div>
+  </div>
+
+  <div class="sheet plan-sheet" id="sheet-slack" data-sheet-id="slack">
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-header">
+      <svg class="sh-icon risks"><use href="#i-gauge"/></svg>
+      <div class="sh-title">Slack</div>
+      <button class="icon-btn sh-close" data-close aria-label="Close"><svg><use href="#i-chevron-down"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <div class="capacity-strip" aria-label="Planned load">
+        <span class="capacity-fill"></span>
+      </div>
+      <div class="evidence-row"><div class="er-label">Planned</div><div class="er-value">14h</div></div>
+      <div class="evidence-row"><div class="er-label">Capacity</div><div class="er-value" id="capacityValue">18h</div></div>
+      <div class="evidence-row"><div class="er-label">Buffer</div><div class="er-value status-ok" id="bufferValue">4h</div></div>
+      <div class="capacity-chips" aria-label="Capacity">
+        <button class="capacity-chip" data-capacity="16" aria-pressed="false">16h</button>
+        <button class="capacity-chip selected" data-capacity="18" aria-pressed="true">18h</button>
+        <button class="capacity-chip" data-capacity="20" aria-pressed="false">20h</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet plan-sheet" id="sheet-projects" data-sheet-id="projects">
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-header">
+      <svg class="sh-icon full"><use href="#i-folder"/></svg>
+      <div class="sh-title">Projects</div>
+      <button class="icon-btn sh-close" data-close aria-label="Close"><svg><use href="#i-chevron-down"/></svg></button>
+    </div>
+    <div class="sheet-body">
+      <button class="list-row" data-detail="plan-frontend"><div class="lr-text"><div class="lr-title">Theseus frontend</div><div class="lr-severity attention">Polish</div></div><div class="lr-dot amber" aria-hidden="true"></div></button>
+      <button class="list-row" data-detail="plan-resume"><div class="lr-text"><div class="lr-title">Resume</div><div class="lr-severity severe">Restart</div></div><div class="lr-dot red" aria-hidden="true"></div></button>
+      <button class="list-row" data-detail="plan-backend"><div class="lr-text"><div class="lr-title">Theseus backend</div><div class="lr-severity">Healthy</div></div><div class="lr-dot green" aria-hidden="true"></div></button>
+    </div>
+  </div>
+
+  <div class="detail" id="detail-plan-resume">
+    <div class="detail-header"><button class="icon-btn" data-back aria-label="Back"><svg><use href="#i-chevron-left"/></svg></button><div class="dh-title">Resume</div></div>
+    <div class="detail-body">
+      <div class="detail-title">Resume restart</div>
+      <div class="detail-severity"><span class="ds-dot amber" aria-hidden="true"></span>Attention</div>
+      <div class="detail-reason">Review flagged this project as dormant, so next week needs a small restart block.</div>
+      <div class="evidence-row"><div class="er-label">Stage</div><div class="er-value">Restart</div></div>
+      <div class="evidence-row"><div class="er-label">Minimum</div><div class="er-value">3h</div></div>
+      <div class="evidence-row"><div class="er-label">Target</div><div class="er-value">4h</div></div>
+      <div class="evidence-row"><div class="er-label">Block</div><div class="er-value">Tue / Thu</div></div>
+      <button class="detail-action" data-save-plan><svg><use href="#i-check"/></svg><span>Save</span></button>
+      <div class="plan-inline-status detail-save-status" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <div class="detail" id="detail-plan-frontend">
+    <div class="detail-header"><button class="icon-btn" data-back aria-label="Back"><svg><use href="#i-chevron-left"/></svg></button><div class="dh-title">Frontend</div></div>
+    <div class="detail-body">
+      <div class="detail-title">Theseus frontend polish</div>
+      <div class="detail-severity"><span class="ds-dot green" aria-hidden="true"></span>Focus</div>
+      <div class="detail-reason">This is the clearest demo-facing work for the next review.</div>
+      <div class="evidence-row"><div class="er-label">Stage</div><div class="er-value">Polish</div></div>
+      <div class="evidence-row"><div class="er-label">Target</div><div class="er-value">6h</div></div>
+      <div class="evidence-row"><div class="er-label">Block</div><div class="er-value">Mon / Wed</div></div>
+    </div>
+  </div>
+
+  <div class="detail" id="detail-plan-backend">
+    <div class="detail-header"><button class="icon-btn" data-back aria-label="Back"><svg><use href="#i-chevron-left"/></svg></button><div class="dh-title">Backend</div></div>
+    <div class="detail-body">
+      <div class="detail-title">Backend demo verification</div>
+      <div class="detail-severity"><span class="ds-dot green" aria-hidden="true"></span>Healthy</div>
+      <div class="detail-reason">The backend is in a stable build stage; keep a small verification block.</div>
+      <div class="evidence-row"><div class="er-label">Stage</div><div class="er-value status-ok">Build</div></div>
+      <div class="evidence-row"><div class="er-label">Target</div><div class="er-value">2h</div></div>
+      <div class="evidence-row"><div class="er-label">Block</div><div class="er-value">Fri</div></div>
+    </div>
+  </div>
+</div>
+
+<script src="plan.js"></script>
+</body>
+</html>
