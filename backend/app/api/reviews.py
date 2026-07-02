@@ -13,6 +13,7 @@ from ..schemas import (
     WeeklyReviewResult,
 )
 from ..services import ReviewService, WeeklyPlanNotFound
+from ..services.review_writer import ReviewWriterError
 from .dependencies import get_connection
 
 
@@ -38,4 +39,9 @@ async def generate_weekly_review(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="The weekly review could not be persisted",
+        ) from exc
+    except ReviewWriterError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
         ) from exc

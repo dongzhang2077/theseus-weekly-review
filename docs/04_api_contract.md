@@ -201,9 +201,12 @@ Request:
 
 `mode` defaults to `deterministic_first`. Use `supportive_text` to keep the
 same deterministic evidence and structured findings while rewriting
-`generated_text` through the review writing adapter. The MVP adapter is local and
-evidence-bound; external LLM providers can be added behind the same service
-boundary later.
+`generated_text` through the review writing adapter. By default this uses the
+local evidence-bound template writer so the demo works without secrets. Set
+`THESEUS_REVIEW_WRITER=openai` and `OPENAI_API_KEY` to use the OpenAI Responses
+API adapter; `THESEUS_OPENAI_MODEL` can override the default model. Provider
+configuration or request failures return `502 Bad Gateway` from the generate
+endpoint.
 
 Response:
 
