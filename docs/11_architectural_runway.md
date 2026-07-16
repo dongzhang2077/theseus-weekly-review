@@ -200,7 +200,8 @@ web forms -> backend SQLite -> review_engine
 Current status: implemented through the React local-profile flow and typed
 goal, project, plan, and time-log API adapters. Signals consumes interpreted
 review evidence, and Plan can load, atomically replace, or Undo a user-scoped
-next-week adjustment in the current worktree.
+next-week adjustment. This path reached `main` through PR #64 on 2026-07-15
+PDT.
 
 ### Stage D: Mobile Export
 

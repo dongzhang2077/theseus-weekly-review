@@ -57,19 +57,19 @@ a general life assistant.
 
 | Capability | Current state | Direction |
 |---|---|---|
-| Stable review entities | Implemented in SQLite; schema v2 adds a local ownership root in the current worktree | Keep the core model stable while Signals and Plan consume it |
-| Persistent review path | User-scoped sample data can flow through SQLite, the review engine, and stored review; v1 migration and restart behavior are tested locally | Rehearse the browser-to-API restart path |
+| Stable review entities | Implemented in SQLite; schema v2 local ownership is merged to `main` through PR #64 | Keep the core model stable while Signals and Plan consume it |
+| Persistent review path | User-scoped sample data flows through SQLite, the review engine, and stored review; v1 migration and restart coverage are merged | Rehearse the browser-to-API restart path |
 | Review reasoning | Deterministic, evidence-first rules | Keep framework-independent |
 | AI wording | Evidence-bound writer adapters exist | Keep AI wording downstream of computed facts |
-| React app | Review, Track, and a simplified evidence-first Signals screen plus a Warm Stationery local-profile gate exist in the current worktree | Preserve Review/Track/Signals; make Plan a real adjustment surface |
-| Personal identity | Local user create/list/select, retained selection, scoped API requests, and explicit sample-data status are implemented locally | Keep this separate from production authentication |
+| React app | Review, Track, evidence-first Signals, actionable Plan, and the Warm Stationery local-profile gate are merged to `main` | Preserve the current hierarchy while validating the complete demo loop |
+| Personal identity | Local user create/list/select, retained selection, scoped API requests, and explicit sample-data status are on `main` | Keep this separate from production authentication |
 | Long-term preferences | Not represented | Add explicit, provenance-bearing preferences after user ownership |
 | Agent orchestration | Not implemented | Pilot one LangGraph workflow after the domain foundation is stable |
 | External execution | Not implemented | Add OpenClaw as an optional, policy-gated adapter later |
 
-The current branch may contain work that has not reached `origin/main`.
-Repository status and GitHub issues must be checked before every sprint plan;
-documents must not describe local or unmerged work as released behavior.
+The Sprint 5 integration reached `origin/main` as commit `306061c` through PR
+#64. Repository status and GitHub issues must still be checked before every
+sprint plan; documents must not describe later local work as released behavior.
 
 ## 4. Product Scope Boundaries
 
@@ -378,8 +378,7 @@ approve a realistic next-week adjustment.
 
 ### Task A: Lock the local-user contract
 
-Implementation status: completed in the current worktree on 2026-07-15;
-teammate review and merge status remain separate delivery checks.
+Delivery status: completed and merged through PR #64 on 2026-07-15 PDT.
 
 - Owner: Dong Zhang
 - Depends on: teacher feedback; current data model and API contract
@@ -400,9 +399,9 @@ Demo evidence: an approved schema/API diagram and one local-user request flow.
 
 ### Task B: Implement the persisted local-user vertical slice
 
-Implementation status: completed in the current worktree on 2026-07-15,
-including schema-v1 migration and cross-user isolation coverage; full sprint
-verification remains in Task F.
+Delivery status: completed and merged through PR #64 on 2026-07-15 PDT,
+including schema-v1 migration, cross-user isolation coverage, and full sprint
+verification.
 
 - Owner: Dong Zhang
 - Depends on: Task A
@@ -433,9 +432,9 @@ records and stored weekly review.
 
 ### Task C: Connect local user context in the frontend
 
-Implementation status: completed in the current worktree on 2026-07-15; the
-production frontend build is verified and integrated demo rehearsal remains in
-Tasks D-F.
+Delivery status: completed and merged through PR #64 on 2026-07-15 PDT; the
+production frontend build is verified and the integrated demo rehearsal remains
+in Task F.
 
 - Owner: Zhi Kang
 - Depends on: Task A and the accepted user endpoint contract; may use a typed
@@ -465,15 +464,15 @@ npm --prefix frontend/app run build
 Demo evidence: create a local profile on first run, restart the app, and show
 the same selected profile and user-owned records.
 
-Verification checkpoint (2026-07-15): the Issue #63 branch passes 91 Python
-tests, 64 frontend tests, Python compilation, the frontend production build,
+Verification checkpoint (2026-07-15): the merged Issue #63 delivery passes 91
+Python tests, 64 frontend tests, Python compilation, the frontend production build,
 the deterministic sample review, a schema-v1 migration test, and a separate-
-process sample -> SQLite -> review engine -> stored review run. This is a
-current-worktree result, not a claim that teammate review or merge is complete.
+process sample -> SQLite -> review engine -> stored review run. The verified
+tree was squash-merged through PR #64 as `306061c`.
 
-Tasks D and E are complete in the current worktree. Next active task: Task F,
-integration and rehearsal for the July 18 demo. Do not begin LangGraph or
-OpenClaw work on this critical path.
+Tasks A-E and the engineering portion of Task F are merged. The only active
+Sprint 5 work is timed rehearsal and fallback recording for the July 18 demo.
+Do not begin LangGraph or OpenClaw work on this critical path.
 
 ### Task D: Simplify Signals
 
@@ -482,12 +481,13 @@ OpenClaw work on this critical path.
 - Files/modules: `frontend/app/src/features/signals/`, weekly-review mapping,
   shared state surfaces, global styles
 
-Implementation checkpoint (2026-07-15): the decorative orbit and static dots
+Delivery checkpoint (2026-07-15 PDT): the decorative orbit and static dots
 are removed; one evidence-ranked priority signal and stable Plan, Stage, Goal,
 and Energy rows now drill into matching evidence and details. Canonical
 `on_track`, stage-health, goal, no-data, and request-error paths are covered.
-The complete frontend suite passes 46 tests across 11 files, and the production
-build succeeds. Teammate review and merge remain separate delivery steps.
+The focused checkpoint passed 46 tests across 11 files; the final integrated
+suite passes 64 tests across 14 files, and the production build succeeds. The
+result is included in PR #64 on `main`.
 
 Acceptance criteria:
 
@@ -517,7 +517,7 @@ project-level evidence.
 - Files/modules: `frontend/app/src/features/plan/`, plan API adapter, shared
   state surfaces
 
-Implementation checkpoint (2026-07-15): Plan now loads the selected user's
+Delivery checkpoint (2026-07-15 PDT): Plan now loads the selected user's
 plans and projects, derives the target week from review or the next Monday,
 shows a concrete project/load/slack diff, and atomically POSTs or PUTs the full
 weekly plan. A new plan is deleted on Undo; an existing plan is restored by
@@ -528,7 +528,7 @@ from the live surface while the Warm Stationery hierarchy was preserved.
 Verification checkpoint: 91 Python tests and 64 frontend tests pass; Python
 compilation, the frontend production build, deterministic sample review, and a
 separate sample -> SQLite -> review engine -> stored review run also succeed.
-This is a current-worktree result, not a claim of teammate review or merge.
+The verified result is included in PR #64 on `main`.
 
 Acceptance criteria:
 
@@ -555,8 +555,8 @@ Demo evidence: review recommendation to Plan diff to approved saved plan.
 - Depends on: Tasks B, C, D, and E
 - Files/modules: sanitized samples, demo script, evaluation notes, affected docs
 
-Implementation checkpoint (2026-07-15): engineering-complete and tracked by
-GitHub Issue #63. A secret-free
+Delivery checkpoint (2026-07-15 PDT): engineering-complete, merged through PR
+#64 as `306061c`, and tracked as Done by GitHub Issue #63. A secret-free
 `prepare_midterm_demo.py` entry point now creates a fresh temporary SQLite
 database, imports the sanitized user week, and stores local supportive wording.
 A restart integration test covers the prepared profile, records, and review.
@@ -564,8 +564,9 @@ The four app tabs have sanitized mobile screenshots, with desktop composition
 shots for Review and Plan, and a five-minute runbook now records preflight,
 fallback, limitations, and the recording checklist. Scenario review exposed
 and fixed one evidence inconsistency: unlinked planned items now count toward
-total planned time and slack. Teammate review and merge, one live rehearsal,
-and the actual fallback recording remain human delivery gates.
+total planned time and slack. The project owner explicitly approved direct
+merge and waived the separate teammate-review gate. One live rehearsal and the
+actual fallback recording remain human delivery gates.
 
 Acceptance criteria:
 
@@ -573,8 +574,8 @@ Acceptance criteria:
 - supportive wording failure falls back visibly to deterministic review;
 - no personal database, credentials, or raw export is committed;
 - known limitations are stated in the demo;
-- the other teammate reviews schema, contract, and cross-screen changes when
-  practical.
+- focused schema, contract, persistence, UX, and cross-screen findings are
+  recorded, and project-owner approval is explicit.
 
 Verification:
 

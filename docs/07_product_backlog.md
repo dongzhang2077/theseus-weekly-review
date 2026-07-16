@@ -262,11 +262,10 @@ profile.
 
 Priority: P0
 
-Implementation checkpoint (2026-07-15): implemented in the current worktree
-across SQLite schema v2/migration, scoped repositories and services, FastAPI
-local-user context, frontend profile selection, and focused isolation/restart
-tests. Full sprint verification, teammate review, and merge status are tracked
-separately.
+Delivery checkpoint (2026-07-15 PDT): implemented across SQLite schema
+v2/migration, scoped repositories and services, FastAPI local-user context,
+frontend profile selection, and focused isolation/restart tests. Full sprint
+verification passed and the work reached `main` through PR #64 (`306061c`).
 
 Acceptance criteria:
 
@@ -285,12 +284,11 @@ can trust the status without decoding decorative graphics.
 
 Priority: P1
 
-Implementation checkpoint (2026-07-15): complete in the current worktree. The
+Delivery checkpoint (2026-07-15 PDT): merged to `main` through PR #64. The
 decorative orbit was replaced by one evidence-ranked priority signal and four
 stable summary rows; every signal opens matching evidence or a track-first
 empty state. Canonical plan/stage/goal mappings, explicit load failure and retry,
 accessibility labels, component tests, and the production build are verified.
-This is not a claim of teammate review or merge completion.
 
 Acceptance criteria:
 
@@ -312,15 +310,14 @@ can act on the review without rebuilding my whole project setup.
 
 Priority: P1
 
-Implementation checkpoint (2026-07-15): complete in the current worktree. Plan
-now derives its target week and proposal from review/current data, loads the
+Delivery checkpoint (2026-07-15 PDT): merged to `main` through PR #64. Plan now
+derives its target week and proposal from review/current data, loads the
 selected user's persisted plans and projects, shows project/load/slack
 before-and-after evidence, and atomically creates or replaces one weekly plan.
 Success, conflict, load/save error, retry, and Undo are covered; Goal/Project
 creation and fixture-specific values are absent from the live Plan surface.
-Sanitized mobile/desktop screenshots were captured on 2026-07-15. Teammate
-review, merge, the final live rehearsal, and fallback recording remain Task F
-work.
+Sanitized mobile/desktop screenshots were captured on 2026-07-15. The final
+live rehearsal and fallback recording remain Task F work.
 
 Acceptance criteria:
 
