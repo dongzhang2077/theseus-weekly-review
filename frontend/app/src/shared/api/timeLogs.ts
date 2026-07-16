@@ -1,5 +1,6 @@
 import type { ActivityTimer, EnergyKind } from "../domain/track";
 import type { FetchLike } from "./loadAppWeek";
+import { isValidLocalUserId, localUserHeaders } from "./localUserContext";
 
 export type ApiActivityType = "consuming" | "neutral" | "restore" | "destroy";
 export type ApiActivityTypeSource = "user_selected" | "ai_suggested" | "user_corrected";
@@ -17,12 +18,14 @@ export interface TimeLogCreatePayload {
 
 export interface SaveTimeLogOptions {
   apiBaseUrl?: string;
+  userId?: number;
   payload: TimeLogCreatePayload;
   fetchImpl?: FetchLike;
 }
 
 export interface SaveActivitySessionOptions {
   apiBaseUrl?: string;
+  userId?: number;
   activity: ActivityTimer;
   date?: string;
   note?: string;
@@ -57,13 +60,14 @@ export async function saveTimeLog(options: SaveTimeLogOptions): Promise<SaveTime
   if (!apiBaseUrl) {
     return { saved: false, error: "API base URL is not configured" };
   }
+  if (!isValidLocalUserId(options.userId)) {
+    return { saved: false, error: "Local user is not selected" };
+  }
 
   try {
     const response = await (options.fetchImpl ?? fetch)(`${apiBaseUrl.replace(/\/$/, "")}/time-logs`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: localUserHeaders(options.userId, true),
       body: JSON.stringify(options.payload)
     });
 
@@ -91,6 +95,7 @@ export async function saveActivitySession(options: SaveActivitySessionOptions): 
 
   return saveTimeLog({
     apiBaseUrl: options.apiBaseUrl,
+    userId: options.userId,
     payload,
     fetchImpl: options.fetchImpl
   });

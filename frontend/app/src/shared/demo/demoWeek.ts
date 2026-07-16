@@ -102,6 +102,8 @@ export const demoWeek = {
         signalId: "stage",
         title: "Resume dormant",
         severity: "severe",
+        status: "Wake-up",
+        value: "6d",
         reason: "The project was planned, then received no active block.",
         rows: [
           { label: "Planned", value: "2h" },
@@ -115,6 +117,8 @@ export const demoWeek = {
         signalId: "stage",
         title: "Backend healthy",
         severity: "normal",
+        status: "Healthy",
+        value: "7h",
         reason: "Core API work continued with usable evidence.",
         rows: [
           { label: "Logged", value: "7h" },
@@ -127,6 +131,8 @@ export const demoWeek = {
         signalId: "plan",
         title: "Plan drift",
         severity: "attention",
+        status: "Drift",
+        value: "-2h",
         reason: "Backend moved forward, but restart work fell out of the week.",
         rows: [
           { label: "Backend", value: "+1h" },
@@ -140,6 +146,7 @@ export const demoWeek = {
         signalId: "goal",
         title: "Goal aligned",
         severity: "normal",
+        status: "Supported",
         reason: "The strongest work still supports the demo path.",
         rows: [
           { label: "MVP", value: "On" },
@@ -152,6 +159,8 @@ export const demoWeek = {
         signalId: "energy",
         title: "Energy thin",
         severity: "attention",
+        status: "Thin",
+        value: "9h",
         reason: "Recovery blocks are present, but not enough to offset build work.",
         rows: [
           { label: "Focus", value: "8h" },
@@ -207,11 +216,71 @@ export const demoWeek = {
     ] satisfies ActivityTimer[]
   },
   plan: {
-    initialState: {
-      suggestionStatus: "available",
-      focusProject: "Backend MVP",
-      slackHours: 4,
-      savedAt: null
+    reviewWeek: { start: "2026-06-08", end: "2026-06-14" },
+    targetWeek: { start: "2026-06-15", end: "2026-06-21" },
+    sourcePlan: {
+      id: null,
+      week: { start: "2026-06-08", end: "2026-06-14" },
+      capacityMinutes: 1800,
+      slackTargetPercent: 20,
+      items: [
+        {
+          projectId: 1,
+          title: "Design backend schema and API",
+          plannedMinutes: 300,
+          priority: 1,
+          isCompleted: false
+        },
+        {
+          projectId: 2,
+          title: "Draft review page layout",
+          plannedMinutes: 240,
+          priority: 2,
+          isCompleted: false
+        },
+        {
+          projectId: 3,
+          title: "Update resume and apply to two roles",
+          plannedMinutes: 120,
+          priority: 3,
+          isCompleted: false
+        }
+      ],
+      note: "Progress report preparation week."
+    },
+    projects: [
+      {
+        id: 1,
+        title: "Theseus backend",
+        stage: "startup",
+        status: "active",
+        weeklyMinMinutes: 180,
+        weeklyTargetMinutes: 480
+      },
+      {
+        id: 2,
+        title: "Theseus frontend",
+        stage: "startup",
+        status: "active",
+        weeklyMinMinutes: 120,
+        weeklyTargetMinutes: 360
+      },
+      {
+        id: 3,
+        title: "Resume and applications",
+        stage: "stable",
+        status: "active",
+        weeklyMinMinutes: 60,
+        weeklyTargetMinutes: 180
+      }
+    ],
+    suggestion: {
+      title: "Protect one restart block",
+      reason: "A small protected block gives the dormant project a realistic restart.",
+      kind: "add",
+      projectId: 3,
+      projectTitle: "Resume and applications",
+      deltaMinutes: 60
     }
   }
 } satisfies AppWeekViewModel;

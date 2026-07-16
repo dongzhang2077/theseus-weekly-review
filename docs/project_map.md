@@ -8,9 +8,9 @@ This page gives a quick visual overview of the Theseus repository, product modul
 theseus-weekly-review/
   README.md                         Project landing page and quick start
   docs/                             Product, architecture, Agile, and reporting docs
-  backend/                          FastAPI backend skeleton and Pydantic schemas
+  backend/                          FastAPI API, SQLite repositories, and schemas
   review_engine/                    Rule-based weekly review analysis
-  frontend/                         Frontend planning placeholder
+  frontend/app/                     React review app and local-profile flow
   data/sample/                      Demo weekly dataset
   evaluation/                       Review quality rubric
   scripts/                          Local helper scripts
@@ -21,10 +21,11 @@ theseus-weekly-review/
 
 ```mermaid
 flowchart TB
-    User[User] --> UI[Frontend UI]
+    User[Local User] --> UI[Frontend UI]
     UI --> API[FastAPI Backend]
-    API --> DB[(SQLite Database)]
-    API --> Engine[Review Engine]
+    API --> Scope[Local User Scope]
+    Scope --> DB[(SQLite Database)]
+    Scope --> Engine[Review Engine]
     Engine --> Rules[Deterministic Checks]
     Engine --> AI[AI Review Generation]
     Rules --> Evidence[Evidence Package]
@@ -67,6 +68,7 @@ flowchart LR
 | Decisions and rationale | [09_decision_log.md](09_decision_log.md) |
 | GitHub collaboration workflow | [10_github_workflow.md](10_github_workflow.md) |
 | Sustainable architecture runway | [11_architectural_runway.md](11_architectural_runway.md) |
+| Product and Agent development strategy | [13_product_agent_development_strategy.md](13_product_agent_development_strategy.md) |
 | Mobile capture plan | [mobile_capture_plan.md](mobile_capture_plan.md) |
 
 ## 5. MVP Execution Flow

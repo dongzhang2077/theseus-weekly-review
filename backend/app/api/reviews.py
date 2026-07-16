@@ -8,13 +8,14 @@ from review_engine.rules import analyze_week
 
 from ..schemas import (
     WeeklyReviewGenerateRequest,
+    LocalUserRead,
     WeeklyReviewRead,
     WeeklyReviewRequest,
     WeeklyReviewResult,
 )
 from ..services import ReviewService, WeeklyPlanNotFound
 from ..services.review_writer import ReviewWriterError
-from .dependencies import get_connection
+from .dependencies import get_connection, get_local_user
 
 
 router = APIRouter(prefix="/reviews/weekly", tags=["weekly-reviews"])
@@ -29,10 +30,11 @@ async def analyze_weekly_review(request: WeeklyReviewRequest) -> WeeklyReviewRes
 @router.post("/generate", response_model=WeeklyReviewRead)
 async def generate_weekly_review(
     request: WeeklyReviewGenerateRequest,
+    user: LocalUserRead = Depends(get_local_user),
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> WeeklyReviewRead:
     try:
-        return ReviewService(connection).generate(request)
+        return ReviewService(connection, user.id).generate(request)
     except WeeklyPlanNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except sqlite3.IntegrityError as exc:

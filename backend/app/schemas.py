@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, time
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 ActivityType = Literal["consuming", "neutral", "restore", "destroy"]
@@ -26,6 +26,26 @@ class APIModel(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
+class LocalUserCreate(APIModel):
+    display_name: str = Field(min_length=1, max_length=80)
+    timezone: str = Field(min_length=1, max_length=80, default="UTC")
+    locale: str = Field(min_length=1, max_length=32, default="en")
+
+    @field_validator("display_name", "timezone", "locale")
+    @classmethod
+    def strip_required_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+
+class LocalUserRead(LocalUserCreate):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
 class GoalCreate(APIModel):
     title: str = Field(min_length=1)
     description: str = ""
@@ -38,6 +58,7 @@ class Goal(GoalCreate):
 
 
 class GoalRead(Goal):
+    user_id: int
     created_at: datetime
     updated_at: datetime
 
@@ -58,6 +79,7 @@ class Project(ProjectCreate):
 
 
 class ProjectRead(Project):
+    user_id: int
     created_at: datetime
     updated_at: datetime
 
@@ -72,6 +94,7 @@ class ActivityCreate(APIModel):
 
 class ActivityRead(ActivityCreate):
     id: int
+    user_id: int
     created_at: datetime
     updated_at: datetime
 
@@ -116,6 +139,7 @@ class WeeklyPlan(WeeklyPlanCreate):
 
 class WeeklyPlanRead(WeeklyPlanCreate):
     id: int
+    user_id: int
     items: list[PlannedItemRead] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
@@ -146,6 +170,7 @@ class TimeLog(TimeLogCreate):
 
 class TimeLogRead(TimeLogCreate):
     id: int
+    user_id: int
     created_at: datetime
     updated_at: datetime
 
@@ -193,6 +218,7 @@ class DailyReflection(DailyReflectionCreate):
 
 class DailyReflectionRead(DailyReflectionCreate):
     id: int
+    user_id: int
     created_at: datetime
     updated_at: datetime
 
@@ -246,6 +272,7 @@ class WeeklyReviewGenerateRequest(APIModel):
 
 class WeeklyReviewRead(WeeklyReviewResult):
     id: int
+    user_id: int
     model_name: str | None = None
     created_at: datetime
     updated_at: datetime

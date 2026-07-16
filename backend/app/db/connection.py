@@ -7,6 +7,33 @@ from typing import Iterator
 
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
+SCHEMA_VERSION = 2
+
+LEGACY_TABLES = (
+    "weekly_reviews",
+    "daily_reflections",
+    "time_logs",
+    "planned_items",
+    "activities",
+    "weekly_plans",
+    "projects",
+    "goals",
+)
+
+LEGACY_INDEXES = (
+    "idx_projects_goal_id",
+    "idx_projects_status",
+    "idx_activities_project_id",
+    "idx_activities_type",
+    "idx_weekly_plans_dates",
+    "idx_planned_items_plan_id",
+    "idx_planned_items_project_id",
+    "idx_time_logs_date",
+    "idx_time_logs_project_id",
+    "idx_time_logs_activity_id",
+    "idx_time_logs_activity_type",
+    "idx_weekly_reviews_dates",
+)
 
 
 class Database:
@@ -24,7 +51,126 @@ class Database:
         if self.path != ":memory:":
             Path(self.path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as connection:
+            tables = {
+                row["name"]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                ).fetchall()
+            }
+            if "goals" in tables and "users" not in tables:
+                self._migrate_legacy_schema(connection)
             connection.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            if version != SCHEMA_VERSION:
+                raise RuntimeError(
+                    f"Unsupported Theseus schema version {version}; expected {SCHEMA_VERSION}"
+                )
+
+    def _migrate_legacy_schema(self, connection: sqlite3.Connection) -> None:
+        schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
+        rename_sql = "\n".join(
+            f"ALTER TABLE {table} RENAME TO {table}_legacy;"
+            for table in LEGACY_TABLES
+        )
+        drop_index_sql = "\n".join(
+            f"DROP INDEX IF EXISTS {index};" for index in LEGACY_INDEXES
+        )
+        drop_legacy_sql = "\n".join(
+            f"DROP TABLE {table}_legacy;" for table in LEGACY_TABLES
+        )
+        connection.executescript(
+            f"""
+            PRAGMA foreign_keys = OFF;
+            PRAGMA legacy_alter_table = ON;
+            BEGIN IMMEDIATE;
+
+            {rename_sql}
+            {drop_index_sql}
+            {schema_sql}
+
+            INSERT INTO users (id, display_name, timezone, locale)
+            VALUES (1, 'Local User', 'UTC', 'en');
+
+            INSERT INTO goals (
+                id, user_id, title, description, priority, active_status,
+                created_at, updated_at
+            )
+            SELECT id, 1, title, description, priority, active_status,
+                   created_at, updated_at
+            FROM goals_legacy;
+
+            INSERT INTO projects (
+                id, user_id, goal_id, title, stage, deadline,
+                weekly_min_minutes, weekly_target_minutes, status,
+                last_activity_date, created_at, updated_at
+            )
+            SELECT id, 1, goal_id, title, stage, deadline,
+                   weekly_min_minutes, weekly_target_minutes, status,
+                   last_activity_date, created_at, updated_at
+            FROM projects_legacy;
+
+            INSERT INTO activities (
+                id, user_id, project_id, name, description, activity_type,
+                type_source, created_at, updated_at
+            )
+            SELECT id, 1, project_id, name, description, activity_type,
+                   type_source, created_at, updated_at
+            FROM activities_legacy;
+
+            INSERT INTO weekly_plans (
+                id, user_id, week_start, week_end, planned_capacity_minutes,
+                slack_target_percent, note, created_at, updated_at
+            )
+            SELECT id, 1, week_start, week_end, planned_capacity_minutes,
+                   slack_target_percent, note, created_at, updated_at
+            FROM weekly_plans_legacy;
+
+            INSERT INTO planned_items (
+                id, weekly_plan_id, project_id, title, planned_minutes,
+                priority, is_completed, created_at, updated_at
+            )
+            SELECT id, weekly_plan_id, project_id, title, planned_minutes,
+                   priority, is_completed, created_at, updated_at
+            FROM planned_items_legacy;
+
+            INSERT INTO time_logs (
+                id, user_id, activity_id, project_id, date, start_time,
+                end_time, duration_minutes, activity_name, activity_type,
+                type_source, note, created_at, updated_at
+            )
+            SELECT id, 1, activity_id, project_id, date, start_time,
+                   end_time, duration_minutes, activity_name, activity_type,
+                   type_source, note, created_at, updated_at
+            FROM time_logs_legacy;
+
+            INSERT INTO daily_reflections (
+                id, user_id, date, small_win, mood_note, free_note,
+                created_at, updated_at
+            )
+            SELECT id, 1, date, small_win, mood_note, free_note,
+                   created_at, updated_at
+            FROM daily_reflections_legacy;
+
+            INSERT INTO weekly_reviews (
+                id, user_id, week_start, week_end, wins_json, insights_json,
+                next_steps_json, risk_flags_json, evidence_json,
+                generated_text, model_name, created_at, updated_at
+            )
+            SELECT id, 1, week_start, week_end, wins_json, insights_json,
+                   next_steps_json, risk_flags_json, evidence_json,
+                   generated_text, model_name, created_at, updated_at
+            FROM weekly_reviews_legacy;
+
+            {drop_legacy_sql}
+
+            COMMIT;
+            PRAGMA legacy_alter_table = OFF;
+            PRAGMA foreign_keys = ON;
+            """
+        )
+        violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+        if violations:
+            raise RuntimeError("The legacy Theseus database could not be migrated safely")
 
     @contextmanager
     def session(self) -> Iterator[sqlite3.Connection]:

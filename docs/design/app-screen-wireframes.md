@@ -265,31 +265,31 @@ Error:
 Allowed:
 
 - 1 compact title or icon header.
-- 1 central signal symbol.
-- 4 signal icons.
-- Up to 4 status dots.
+- 1 evidence-ranked priority signal with a compact reason.
+- 4 aligned summary rows in Plan, Stage, Goal, Energy order.
+- 1 written status per summary; an optional color mark may reinforce it.
 - 1 bottom navigation.
 
 Default not allowed:
 
-- Visible labels under signal icons.
 - Raw numbers.
 - Evidence rows.
 - Tables.
 - Raw logs.
 - Review narrative.
 
-Fallbacks:
-
-- If a signal icon is unclear during manual review, allow a 1 to 2 word fallback label.
-
 ### Level 1 Region Order
 
 ```text
-        [central signal symbol]
+[Signals]
 
-    [plan icon]     [stage icon]
-    [goal icon]     [energy icon]
+[Priority: Stage | Wake-up]
+[one concrete reason]
+
+[Plan icon    Plan      Drift    >]
+[Stage icon   Stage     Wake-up  >]
+[Goal icon    Goal      Aligned  >]
+[Energy icon  Energy    Thin     >]
 
 [bottom nav icons]
 ```
@@ -303,7 +303,8 @@ When multiple signals have attention states:
 - If multiple red signals exist, prioritize: Stage, Plan, Goal, Energy.
 - If multiple amber signals exist, prioritize: Stage, Plan, Goal, Energy.
 - Only the highest-priority signal may receive expanded visual emphasis on Level 1.
-- Other signals remain compact icons with status dots.
+- All four signals remain in stable aligned rows with visible status text.
+- Do not use a central orbit, arbitrary rotation, or static severity dots.
 
 ### Level 2 Sections
 
@@ -348,7 +349,7 @@ Optional action: open related Plan detail
 
 Loading:
 
-- Show central signal symbol placeholder and disabled signal icons.
+- Show one compact loading state; do not expose stale sample signals as API data.
 
 Empty:
 
@@ -502,9 +503,9 @@ Error:
 Allowed:
 
 - 1 week range.
-- 1 week balance visual.
+- 1 data-backed week balance surface.
 - 1 primary suggested adjustment, if it exists.
-- 3 to 4 compact action entries.
+- 3 compact action entries.
 - 1 bottom navigation.
 
 Default not allowed:
@@ -522,12 +523,15 @@ Default not allowed:
 ```text
 Jun 15 - Jun 21
 
-        [week balance visual]
+[Week balance                        >]
+[Balanced]
+[Planned 12h | Capacity 18h | Slack 6h]
 
-        [suggested adjustment, if exists]
+[Suggested adjustment                >]
+[Resume and applications | +1h]
+[one concrete reason]
 
-    [focus icon]   [restart icon or replacement]
-    [slack icon]   [projects icon]
+    [focus icon] [slack icon] [projects icon]
 
 [bottom nav icons]
 ```
@@ -535,10 +539,11 @@ Jun 15 - Jun 21
 ### Suggestion Priority And Deduplication
 
 - If a review suggestion exists, it becomes the primary Level 1 action.
-- If the suggestion is a restart action, it replaces the restart entry.
-- Do not show both "apply suggestion" and "restart" for the same project.
-- If no suggestion exists, show focus, restart, slack, and projects entries.
+- Do not add a separate restart entry beside a restart suggestion.
+- If no suggestion exists, show a short review-first state plus focus, slack,
+  and projects entries.
 - Suggested adjustment must connect back to the Full Review source.
+- Do not show a static balance ring or decorative plan severity.
 
 ### Level 2 Sections
 
@@ -546,6 +551,7 @@ Suggested adjustment:
 
 - Show proposed change.
 - Show target project or plan block.
+- Show project time, total planned time, and slack before and after.
 - Allow apply or dismiss.
 
 Focus:
@@ -602,11 +608,19 @@ Suggestion available:
 Saved:
 
 - Show compact confirmation.
+- Offer Undo. Undo replaces the previous saved plan or deletes the plan created
+  by this adjustment.
+
+Conflict:
+
+- Say that the plan changed elsewhere.
+- Primary action: reload current data.
 
 Error:
 
 - Show one short error.
 - Preserve unsaved adjustment if possible.
+- Primary action: retry.
 
 ## 7. Prototype Acceptance Checklist
 

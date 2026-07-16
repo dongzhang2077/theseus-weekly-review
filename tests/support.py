@@ -3,17 +3,21 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 from backend.app.db.repositories import (
     DailyReflectionRepository,
     GoalRepository,
     ProjectRepository,
     TimeLogRepository,
+    UserRepository,
     WeeklyPlanRepository,
 )
 from backend.app.schemas import (
     DailyReflectionCreate,
     GoalCreate,
+    LocalUserCreate,
+    LocalUserRead,
     ProjectCreate,
     TimeLogCreate,
     WeeklyPlanCreate,
@@ -22,25 +26,47 @@ from backend.app.schemas import (
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLE_PATH = ROOT / "data" / "sample" / "sample_week.json"
+LOCAL_USER_HEADER = "X-Theseus-User-Id"
 
 
 def load_sample_payload() -> dict:
     return json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
 
 
-def seed_sample_week(connection: sqlite3.Connection) -> None:
+async def create_and_select_api_user(
+    client: Any,
+    display_name: str = "API Test User",
+) -> dict[str, Any]:
+    response = await client.post("/users", json={"display_name": display_name})
+    if response.status_code != 201:
+        raise AssertionError(f"Could not create API test user: {response.text}")
+    user = response.json()
+    client.headers[LOCAL_USER_HEADER] = str(user["id"])
+    return user
+
+
+def seed_sample_week(
+    connection: sqlite3.Connection,
+    user_id: int | None = None,
+) -> LocalUserRead:
     sample = load_sample_payload()
+    users = UserRepository(connection)
+    user = (
+        users.create(LocalUserCreate(display_name="Sample User"))
+        if user_id is None
+        else users.get(user_id)
+    )
     goal_ids: dict[int, int] = {}
     project_ids: dict[int, int] = {}
 
-    goals = GoalRepository(connection)
+    goals = GoalRepository(connection, user.id)
     for source in sample["goals"]:
         values = dict(source)
         source_id = values.pop("id")
         created = goals.create(GoalCreate.model_validate(values))
         goal_ids[source_id] = created.id
 
-    projects = ProjectRepository(connection)
+    projects = ProjectRepository(connection, user.id)
     for source in sample["projects"]:
         values = dict(source)
         source_id = values.pop("id")
@@ -61,15 +87,18 @@ def seed_sample_week(connection: sqlite3.Connection) -> None:
         }
         for item in plan_values["items"]
     ]
-    WeeklyPlanRepository(connection).create(WeeklyPlanCreate.model_validate(plan_values))
+    WeeklyPlanRepository(connection, user.id).create(
+        WeeklyPlanCreate.model_validate(plan_values)
+    )
 
-    logs = TimeLogRepository(connection)
+    logs = TimeLogRepository(connection, user.id)
     for source in sample["time_logs"]:
         values = dict(source)
         if values.get("project_id") is not None:
             values["project_id"] = project_ids[values["project_id"]]
         logs.create(TimeLogCreate.model_validate(values))
 
-    reflections = DailyReflectionRepository(connection)
+    reflections = DailyReflectionRepository(connection, user.id)
     for source in sample.get("daily_reflections", []):
         reflections.create(DailyReflectionCreate.model_validate(source))
+    return user

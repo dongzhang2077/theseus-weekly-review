@@ -7,9 +7,12 @@ from backend.app.services import ReviewService
 from tests.support import load_sample_payload
 
 
-def test_persisted_context_matches_sample_semantics(seeded_connection) -> None:
+def test_persisted_context_matches_sample_semantics(
+    seeded_connection,
+    seeded_user,
+) -> None:
     expected = analyze_week(load_sample_payload())
-    stored = ReviewService(seeded_connection).generate(
+    stored = ReviewService(seeded_connection, seeded_user.id).generate(
         WeeklyReviewGenerateRequest(
             week_start=date(2026, 6, 8),
             week_end=date(2026, 6, 14),
@@ -17,7 +20,7 @@ def test_persisted_context_matches_sample_semantics(seeded_connection) -> None:
     )
     actual = stored.model_dump(
         mode="json",
-        exclude={"id", "model_name", "created_at", "updated_at"},
+        exclude={"id", "user_id", "model_name", "created_at", "updated_at"},
     )
 
     assert actual == expected

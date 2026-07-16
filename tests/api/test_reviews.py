@@ -2,7 +2,12 @@ import httpx
 import pytest
 
 from backend.app.main import create_app
-from tests.support import load_sample_payload, seed_sample_week
+from tests.support import (
+    LOCAL_USER_HEADER,
+    create_and_select_api_user,
+    load_sample_payload,
+    seed_sample_week,
+)
 
 
 pytestmark = pytest.mark.anyio
@@ -11,17 +16,19 @@ pytestmark = pytest.mark.anyio
 async def test_generate_endpoint_persists_review(database) -> None:
     app = create_app(database.path)
     with database.session() as connection:
-        seed_sample_week(connection)
+        user = seed_sample_week(connection)
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/reviews/weekly/generate",
+            headers={LOCAL_USER_HEADER: str(user.id)},
             json={"week_start": "2026-06-08", "week_end": "2026-06-14"},
         )
 
     assert response.status_code == 200
     assert response.json()["id"] == 1
+    assert response.json()["user_id"] == user.id
     with database.session() as connection:
         count = connection.execute("SELECT COUNT(*) FROM weekly_reviews").fetchone()[0]
     assert count == 1
@@ -31,6 +38,7 @@ async def test_generate_endpoint_returns_404_without_plan(database) -> None:
     app = create_app(database.path)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        user = await create_and_select_api_user(client)
         response = await client.post(
             "/reviews/weekly/generate",
             json={"week_start": "2026-06-08", "week_end": "2026-06-14"},
@@ -40,15 +48,32 @@ async def test_generate_endpoint_returns_404_without_plan(database) -> None:
     assert response.json()["detail"].startswith("No weekly plan exists")
 
 
-async def test_generate_endpoint_supports_supportive_text_mode(database) -> None:
+async def test_generate_endpoint_does_not_read_another_users_plan(database) -> None:
     app = create_app(database.path)
     with database.session() as connection:
         seed_sample_week(connection)
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client, "Second")
         response = await client.post(
             "/reviews/weekly/generate",
+            json={"week_start": "2026-06-08", "week_end": "2026-06-14"},
+        )
+
+    assert response.status_code == 404
+
+
+async def test_generate_endpoint_supports_supportive_text_mode(database) -> None:
+    app = create_app(database.path)
+    with database.session() as connection:
+        user = seed_sample_week(connection)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/reviews/weekly/generate",
+            headers={LOCAL_USER_HEADER: str(user.id)},
             json={
                 "week_start": "2026-06-08",
                 "week_end": "2026-06-14",
@@ -69,12 +94,13 @@ async def test_generate_endpoint_returns_502_for_misconfigured_writer(
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     app = create_app(database.path)
     with database.session() as connection:
-        seed_sample_week(connection)
+        user = seed_sample_week(connection)
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/reviews/weekly/generate",
+            headers={LOCAL_USER_HEADER: str(user.id)},
             json={
                 "week_start": "2026-06-08",
                 "week_end": "2026-06-14",
@@ -94,12 +120,13 @@ async def test_generate_endpoint_returns_502_for_missing_opencode_go_key(
     monkeypatch.delenv("OPENCODE_GO_API_KEY", raising=False)
     app = create_app(database.path)
     with database.session() as connection:
-        seed_sample_week(connection)
+        user = seed_sample_week(connection)
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/reviews/weekly/generate",
+            headers={LOCAL_USER_HEADER: str(user.id)},
             json={
                 "week_start": "2026-06-08",
                 "week_end": "2026-06-14",

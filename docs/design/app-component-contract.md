@@ -15,7 +15,9 @@ This document does not define colors, typography, or decoration. Visual styling 
 ## 1. Global Component Rules
 
 - Components must support mobile app layouts first.
-- Level 1 entry points are icon-only by default.
+- Level 1 entry points are icon-only by default. Evidence summary rows such as
+  Signals are the exception because their identity and written status are
+  decision content.
 - Compact visible labels are fallback only after manual review shows the icon is unclear.
 - Every icon-only control must have an accessible name.
 - Do not use emoji.
@@ -152,7 +154,6 @@ Purpose:
 Used in:
 
 - Review chapter icons.
-- Signals signal icons.
 - Plan action entries.
 - Track project and activity type entries.
 
@@ -164,7 +165,8 @@ Level allowed:
 Content rules:
 
 - One icon.
-- Optional status dot or small state mark.
+- Optional status dot or small state mark when it cannot be mistaken for
+  computed evidence.
 - Optional compact fallback label only after review.
 - Minimum comfortable touch target.
 - Accessible name is required.
@@ -234,12 +236,12 @@ Do not:
 
 Purpose:
 
-- Communicates compact state without text.
+- Reinforces a compact written state.
 
 Used in:
 
 - Review state mark.
-- Signals status dots.
+- Signals status marks paired with status text.
 - Plan balance state.
 - Project/status rows.
 
@@ -255,7 +257,7 @@ Content rules:
 - Amber: attention.
 - Red: severe risk only.
 - Gray: no data or unavailable.
-- Color must not be the only signal at Level 2 or Level 3; add compact status text there when needed.
+- Color must never be the only signal; pair it with compact status text.
 
 States:
 
@@ -549,9 +551,10 @@ Level allowed:
 
 Content rules:
 
-- Compact visual.
-- Indicates planned load, slack, or attention state.
-- May use status mark.
+- Compact data surface rather than a dense chart.
+- Written balance status.
+- Planned load, capacity, and slack.
+- A subtle progress line or status mark may reinforce the written state.
 
 States:
 
@@ -590,7 +593,9 @@ Content rules:
 
 - One suggested action only.
 - Target project or plan block.
-- Apply or dismiss at Level 2.
+- Signed time change on Level 1.
+- Project time, total planned time, and slack before and after on Level 2.
+- Apply or dismiss at Level 2; Undo is available after a successful Apply.
 - If the suggestion is a restart action, it replaces the restart entry on Plan Level 1.
 
 States:
@@ -598,7 +603,10 @@ States:
 - Available.
 - Applied.
 - Dismissed.
+- Saving.
+- Conflict.
 - Error.
+- Restored.
 
 Do not:
 
@@ -606,27 +614,31 @@ Do not:
 - Offer multiple suggestions at Level 1.
 - Add long rationale text.
 
-## 17. Signal Row
+## 17. Signal Summary And Evidence Row
 
 Purpose:
 
-- Shows a compact Level 2 interpreted evidence item.
+- Shows either a Level 1 signal summary or a compact Level 2 interpreted
+  evidence item.
 
 Used in:
 
 - Signals chapters.
+- Signals Level 1 summary.
 - Review risk chapter when linking evidence.
 
 Level allowed:
 
-- Level 2.
+- Level 1 for the four stable summaries.
+- Level 2 for supporting evidence.
 
 Content rules:
 
-- Subject.
-- Compact status.
+- Signal identity or evidence subject.
+- Compact written status.
 - Optional single value.
-- Tapping opens detail sheet.
+- Level 1 order is always Plan, Stage, Goal, Energy.
+- Tapping a summary opens its evidence chapter; tapping evidence opens detail.
 
 States:
 
@@ -719,12 +731,14 @@ Do not:
 Before implementation or HTML prototype approval:
 
 - Level 1 screens use the allowed component budget.
-- Level 1 entry points are icon-only by default.
+- Icon-only Level 1 entry points have an explicit exception only when visible
+  text is decision content, as in Signals.
 - Every icon-only control has an accessible name.
 - Section and detail sheets do not create Level 4 navigation.
 - Track does not use traditional forms.
 - Timer stop opens save confirmation.
 - Plan suggestion is deduplicated with restart.
-- Signals rows sort by priority before display.
+- Signals shows one evidence-ranked priority signal, then Plan, Stage, Goal,
+  and Energy in stable order.
 - Empty and error states use short, screen-specific copy.
 - No component uses emoji.

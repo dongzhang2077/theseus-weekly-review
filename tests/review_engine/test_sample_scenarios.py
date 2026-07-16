@@ -53,6 +53,9 @@ def test_overloaded_drift_scenario_exercises_risks_without_blame_language() -> N
         "slack_risk",
         "destroy_pattern",
     }.issubset(risk_types(result))
+    assert result["evidence"]["summary"]["planned_total_minutes"] == 960
+    assert result["evidence"]["plan"]["planned_slack_minutes"] == 0
+    assert result["evidence"]["plan"]["slack_status"] == "tight"
     rendered = result["generated_text"].lower()
     assert "lazy" not in rendered
     assert "failing" not in rendered

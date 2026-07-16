@@ -251,3 +251,156 @@ Acceptance criteria:
 - Sync backend is documented as a later extension.
 - Sync API design is preserved as a future reference.
 - Sprint 1 does not depend on cloud deployment or authentication.
+
+## Epic 7: Local User Ownership and Trustworthy UX
+
+### STORY-022 Add local user-scoped persistence
+
+As a local user, I want my goals, plans, logs, reflections, and reviews stored
+under my profile so that my data survives restart and does not mix with another
+profile.
+
+Priority: P0
+
+Implementation checkpoint (2026-07-15): implemented in the current worktree
+across SQLite schema v2/migration, scoped repositories and services, FastAPI
+local-user context, frontend profile selection, and focused isolation/restart
+tests. Full sprint verification, teammate review, and merge status are tracked
+separately.
+
+Acceptance criteria:
+
+- A local user can be created, listed, and selected without production auth.
+- User-owned records are scoped by a stable `user_id`.
+- Weekly-plan, daily-reflection, and weekly-review uniqueness is user-scoped.
+- Cross-user references and unscoped reads are rejected.
+- The full sample data -> SQLite -> review engine -> stored weekly review path
+  runs under one user and still works after process restart.
+- Local databases and personal data remain excluded from Git.
+
+### STORY-023 Simplify Signals around inspectable evidence
+
+As a user, I want Signals to explain the review conclusion clearly so that I
+can trust the status without decoding decorative graphics.
+
+Priority: P1
+
+Implementation checkpoint (2026-07-15): complete in the current worktree. The
+decorative orbit was replaced by one evidence-ranked priority signal and four
+stable summary rows; every signal opens matching evidence or a track-first
+empty state. Canonical plan/stage/goal mappings, explicit load failure and retry,
+accessibility labels, component tests, and the production build are verified.
+This is not a claim of teammate review or merge completion.
+
+Acceptance criteria:
+
+- The first screen shows one priority signal and aligned Plan, Stage, Goal, and
+  Energy rows.
+- Static severity decoration is removed; status always comes from evidence.
+- The current Warm Stationery palette, paper texture, line treatment, and
+  purposeful companion-art language are preserved.
+- The result remains visually consistent with Review and Track rather than
+  becoming a generic dashboard.
+- Every summary opens matching evidence or an explicit no-evidence state.
+- API, sample, loading, empty, and error states are distinguishable.
+- Severity is not communicated by color alone.
+
+### STORY-024 Make Plan a real next-week adjustment surface
+
+As a user, I want to see and approve a concrete next-week adjustment so that I
+can act on the review without rebuilding my whole project setup.
+
+Priority: P1
+
+Implementation checkpoint (2026-07-15): complete in the current worktree. Plan
+now derives its target week and proposal from review/current data, loads the
+selected user's persisted plans and projects, shows project/load/slack
+before-and-after evidence, and atomically creates or replaces one weekly plan.
+Success, conflict, load/save error, retry, and Undo are covered; Goal/Project
+creation and fixture-specific values are absent from the live Plan surface.
+Sanitized mobile/desktop screenshots were captured on 2026-07-15. Teammate
+review, merge, the final live rehearsal, and fallback recording remain Task F
+work.
+
+Acceptance criteria:
+
+- Week, project, planned time, capacity, and slack come from current data.
+- The current Warm Stationery palette, paper texture, line treatment, and
+  restrained illustration language are preserved.
+- The result remains visually consistent with Review and Track rather than
+  becoming a generic dashboard.
+- The first screen shows one evidence-linked proposal and a before/after diff.
+- Apply persists one consistent user-scoped weekly plan and exposes success,
+  conflict, error, retry, and Undo states.
+- Goal and Project creation are moved out of Plan Level 1.
+- Hard-coded fixture dates and project names are absent from the live path.
+
+## Epic 8: Personal Assistant Evolution
+
+These stories are roadmap work. They are not part of the 2026-07-18 demo and
+must satisfy the phase gates in `docs/13_product_agent_development_strategy.md`.
+
+### STORY-025 Add preference, proposal, approval, action, and outcome records
+
+As a user, I want Theseus to remember why a suggestion was made and what
+happened after I accepted it so that personalization remains inspectable and
+correctable.
+
+Priority: P2
+
+Acceptance criteria:
+
+- Explicit preferences and model inferences are stored separately.
+- Inferences carry provenance, confidence, scope, timestamps, and an expiry or
+  review rule.
+- Proposals, approvals, actions, undo operations, and outcomes are auditable.
+- The user can inspect, correct, and delete learned preferences.
+
+### STORY-026 Pilot one LangGraph weekly-adjustment workflow
+
+As a user, I want an approved review-to-plan workflow that can pause and resume
+so that AI assistance remains durable and under my control.
+
+Priority: P2
+
+Acceptance criteria:
+
+- The workflow computes evidence through the existing review engine.
+- It drafts one adjustment, shows a diff, and waits for approval or edit.
+- Approved writes are idempotent, verified, and recorded in the action ledger.
+- LangGraph checkpoints do not become the canonical domain database.
+- Retry, resume, rejection, and failure paths have integration tests.
+
+### STORY-027 Add an OpenClaw conversation adapter
+
+As a user, I want to reach Theseus through one conversational channel so that I
+can review and capture information without opening the main UI every time.
+
+Priority: P2
+
+Acceptance criteria:
+
+- OpenClaw calls a typed Theseus adapter and does not access the database
+  directly.
+- The first release is read-only.
+- Write operations require bounded permissions, approval, idempotency, audit,
+  verification, and Undo where practical.
+- High-risk tools are denied by default.
+- Removing the adapter does not change domain or review-engine behavior.
+
+### STORY-028 Learn bounded suggestion preferences
+
+As a user, I want suggestions to improve from my decisions and outcomes so that
+Theseus becomes more useful without pretending to know how I should live.
+
+Priority: P2
+
+Acceptance criteria:
+
+- A rule or statistical baseline exists before a learned ranker is introduced.
+- Training/evaluation inputs come from consented proposal, feedback, and
+  outcome records.
+- Offline evaluation compares the learned method with the baseline.
+- Confidence, correction, expiry, and deletion are visible to the user.
+- Optimization targets are bounded, such as usefulness, plan adherence,
+  protected slack, or restart success.

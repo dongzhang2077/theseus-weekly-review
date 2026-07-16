@@ -218,21 +218,17 @@ Signals
 
 Main state:
 
-- A central signal symbol or compact visual.
-
-Four signal icons:
-
-- Plan signal.
-- Stage signal.
-- Goal signal.
-- Energy signal.
-
-Each signal icon may have a small status dot:
-
-- Green: normal.
-- Amber: needs attention.
-- Red: risk.
-- Gray: no data.
+- One evidence-ranked priority signal with its identity, compact status, and one
+  concrete reason.
+- Four aligned summary rows in the stable order Plan, Stage, Goal, and Energy.
+- Each row combines a line icon, visible signal label, compact status text, and
+  an optional status mark.
+- Green means normal, amber means attention, red means severe risk, and gray
+  means no data. Color and marks reinforce the written status; they never
+  replace it.
+- Preserve the Warm Stationery paper, muted palette, restrained borders, and
+  line-icon language. Do not use a decorative orbit, static severity dots, or
+  arbitrary card rotation as evidence.
 
 ### Level 1 Must Not Show
 
@@ -272,7 +268,7 @@ Energy:
 
 ### Level 2 Sections
 
-Tap a signal icon:
+Tap the priority signal or a summary row:
 
 - Open that signal chapter.
 - Show a short list of affected projects, goals, or activity categories.
@@ -425,15 +421,20 @@ Jun 15 - Jun 21
 
 Main state:
 
-- Simple week balance visual.
+- One compact week-balance surface showing written status, planned load,
+  capacity, and slack from the selected user's data.
+- One evidence-linked suggested adjustment, when the review produced one.
+  Show the target project and signed time change; keep the concrete reason to
+  one short sentence.
 
 Primary icon entries:
 
 - Focus project.
-- Restart project.
 - Slack or capacity.
 - Projects.
-- Apply suggestion, only when a suggestion exists.
+
+The balance indicator must be computed from the current plan. Do not use a
+static ring or decorative segments that look like plan evidence.
 
 ### Level 1 Must Not Show
 
@@ -469,6 +470,10 @@ Tap projects:
 Tap apply suggestion:
 
 - Open suggested adjustment from Review.
+- Show project time, total planned time, and slack before and after.
+- Apply replaces one complete user-scoped weekly plan; a newly created plan can
+  be undone.
+- Show compact saving, saved, conflict, error, retry, and restored states.
 
 ### Level 3 Details
 

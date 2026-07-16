@@ -42,12 +42,13 @@ def load_sample_payload(path: str | Path = DEFAULT_SAMPLE_PATH) -> dict[str, Any
 
 def import_sample_week(
     connection: sqlite3.Connection,
+    user_id: int,
     payload: dict[str, Any] | None = None,
 ) -> SampleImportResult:
     sample = payload or load_sample_payload()
     connection.execute("SAVEPOINT import_sample_week")
     try:
-        result = _replace_sample_week(connection, sample)
+        result = _replace_sample_week(connection, user_id, sample)
     except Exception:
         connection.execute("ROLLBACK TO SAVEPOINT import_sample_week")
         connection.execute("RELEASE SAVEPOINT import_sample_week")
@@ -58,21 +59,22 @@ def import_sample_week(
 
 def _replace_sample_week(
     connection: sqlite3.Connection,
+    user_id: int,
     sample: dict[str, Any],
 ) -> SampleImportResult:
-    _delete_existing_fixture(connection, sample)
+    _delete_existing_fixture(connection, user_id, sample)
 
     goal_ids: dict[int, int] = {}
     project_ids: dict[int, int] = {}
 
-    goals = GoalRepository(connection)
+    goals = GoalRepository(connection, user_id)
     for source in sample["goals"]:
         values = dict(source)
         source_id = values.pop("id")
         created = goals.create(GoalCreate.model_validate(values))
         goal_ids[source_id] = created.id
 
-    projects = ProjectRepository(connection)
+    projects = ProjectRepository(connection, user_id)
     for source in sample["projects"]:
         values = dict(source)
         source_id = values.pop("id")
@@ -93,16 +95,18 @@ def _replace_sample_week(
         }
         for item in plan_values["items"]
     ]
-    WeeklyPlanRepository(connection).create(WeeklyPlanCreate.model_validate(plan_values))
+    WeeklyPlanRepository(connection, user_id).create(
+        WeeklyPlanCreate.model_validate(plan_values)
+    )
 
-    logs = TimeLogRepository(connection)
+    logs = TimeLogRepository(connection, user_id)
     for source in sample["time_logs"]:
         values = dict(source)
         if values.get("project_id") is not None:
             values["project_id"] = project_ids[values["project_id"]]
         logs.create(TimeLogCreate.model_validate(values))
 
-    reflections = DailyReflectionRepository(connection)
+    reflections = DailyReflectionRepository(connection, user_id)
     for source in sample.get("daily_reflections", []):
         reflections.create(DailyReflectionCreate.model_validate(source))
 
@@ -116,7 +120,11 @@ def _replace_sample_week(
     )
 
 
-def _delete_existing_fixture(connection: sqlite3.Connection, sample: dict[str, Any]) -> None:
+def _delete_existing_fixture(
+    connection: sqlite3.Connection,
+    user_id: int,
+    sample: dict[str, Any],
+) -> None:
     plan = sample["weekly_plan"]
     week_start = plan["week_start"]
     week_end = plan["week_end"]
@@ -125,20 +133,28 @@ def _delete_existing_fixture(connection: sqlite3.Connection, sample: dict[str, A
     goal_titles = [row["title"] for row in sample["goals"]]
 
     connection.execute(
-        "DELETE FROM weekly_reviews WHERE week_start = ? AND week_end = ?",
-        (week_start, week_end),
+        """
+        DELETE FROM weekly_reviews
+        WHERE user_id = ? AND week_start = ? AND week_end = ?
+        """,
+        (user_id, week_start, week_end),
     )
     connection.execute(
-        "DELETE FROM time_logs WHERE date BETWEEN ? AND ?",
-        (week_start, week_end),
+        "DELETE FROM time_logs WHERE user_id = ? AND date BETWEEN ? AND ?",
+        (user_id, week_start, week_end),
     )
-    _delete_where_in(connection, "daily_reflections", "date", reflection_dates)
+    _delete_where_in(
+        connection, "daily_reflections", "date", reflection_dates, user_id
+    )
     connection.execute(
-        "DELETE FROM weekly_plans WHERE week_start = ? AND week_end = ?",
-        (week_start, week_end),
+        """
+        DELETE FROM weekly_plans
+        WHERE user_id = ? AND week_start = ? AND week_end = ?
+        """,
+        (user_id, week_start, week_end),
     )
-    _delete_where_in(connection, "projects", "title", project_titles)
-    _delete_where_in(connection, "goals", "title", goal_titles)
+    _delete_where_in(connection, "projects", "title", project_titles, user_id)
+    _delete_where_in(connection, "goals", "title", goal_titles, user_id)
 
 
 def _delete_where_in(
@@ -146,11 +162,12 @@ def _delete_where_in(
     table: str,
     column: str,
     values: list[str],
+    user_id: int,
 ) -> None:
     if not values:
         return
     placeholders = ", ".join("?" for _ in values)
     connection.execute(
-        f"DELETE FROM {table} WHERE {column} IN ({placeholders})",
-        values,
+        f"DELETE FROM {table} WHERE user_id = ? AND {column} IN ({placeholders})",
+        [user_id, *values],
     )

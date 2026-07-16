@@ -77,6 +77,19 @@ Acceptance criteria:
 - The team records factual accuracy, usefulness, positivity, realism, and slack protection.
 - 2-3 classmates provide limited feedback.
 
+### US-06 Local Profile Persistence
+
+As a local user, I want my weekly evidence to remain under a stable profile so
+that it survives restart and is not mixed with another local profile.
+
+Acceptance criteria:
+
+- A local profile can be created and selected without production login.
+- Goals, projects, plans, logs, reflections, and reviews are stored under that
+  profile.
+- Restart restores the selected profile and its persisted records.
+- Cross-profile references and unscoped personal-data reads are rejected.
+
 ## 5. Functional Requirements
 
 | ID | Requirement | Priority |
@@ -93,6 +106,7 @@ Acceptance criteria:
 | FR-10 | Collect user feedback on review quality | P1 |
 | FR-11 | AI-suggest activity labels | P2 |
 | FR-12 | Conversational extension through OpenClaw | P3 |
+| FR-13 | Create/select a local profile and scope persisted personal records | P0 |
 
 ## 6. Non-Functional Requirements
 
@@ -100,7 +114,7 @@ Acceptance criteria:
 |---|---|
 | Explainability | Review claims must be traceable to input evidence. |
 | Safety | The system must not provide mental health diagnosis. |
-| Privacy | MVP should be local-first with SQLite. |
+| Privacy | MVP should be local-first with SQLite and explicit per-profile ownership. |
 | Maintainability | Review checks should be separated from API and UI code. |
 | Portability | Schema should be compatible with a future PostgreSQL upgrade. |
 | Usability | The user should enter a weekly log without complex setup. |

@@ -1,305 +1,619 @@
-import { useEffect, useState } from "react";
-import { DetailPanel } from "../../shared/components/DetailPanel";
-import { Icon } from "../../shared/icons/Icon";
-import { IconButton } from "../../shared/components/IconButton";
-import { applySuggestion, dismissSuggestion, savePlanDetail, type PlanState } from "./planModel";
+import { useEffect, useMemo, useState } from "react";
+import type { AppWeekSource, FetchLike } from "../../shared/api/loadAppWeek";
+import {
+  deletePlan,
+  loadPlanRecords,
+  savePlanDraft,
+  type PlanApiStatus
+} from "../../shared/api/planApi";
 import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
-import { createGoal, createProject, createWeeklyPlan } from "../../shared/api/coreRecords";
+import { DetailPanel } from "../../shared/components/DetailPanel";
+import { StateSurface } from "../../shared/components/StateSurface";
+import { Icon } from "../../shared/icons/Icon";
+import {
+  buildPlanProposal,
+  calculatePlanMetrics,
+  createPlanWorkspace,
+  createUpcomingPlanSeed,
+  dismissPlanSuggestion,
+  formatPlanWeek,
+  type PlanDraft,
+  type PlanMetrics,
+  type PlanWorkspace
+} from "./planModel";
 
 export type PlanDetail = "suggestion" | "focus" | "slack" | "projects";
-type SaveStatus = "idle" | "saved" | "demo" | "error";
-type EditableProjectStage = "sprint" | "startup";
+type LoadPhase = "loading" | "ready" | "error";
+type OperationPhase = "idle" | "saving" | "saved" | "conflict" | "error" | "undoing" | "undone";
+type OperationAction = "apply" | "undo" | null;
+
+interface OperationState {
+  phase: OperationPhase;
+  action: OperationAction;
+  message: string;
+  detail: string | null;
+}
+
+interface UndoSnapshot {
+  before: PlanDraft | null;
+  baseline: PlanDraft;
+  appliedPlanId: number | null;
+}
 
 interface PlanScreenProps {
   planData: AppWeekViewModel["plan"];
+  reviewSource: AppWeekSource;
   apiBaseUrl?: string;
+  userId?: number;
   entryRequest: {
     id: number;
     detail: PlanDetail;
   } | null;
+  onReview: () => void;
+  fetchImpl?: FetchLike;
 }
 
-export function PlanScreen({ apiBaseUrl, planData, entryRequest }: PlanScreenProps) {
-  const [plan, setPlan] = useState<PlanState>(planData.initialState);
+const idleOperation: OperationState = {
+  phase: "idle",
+  action: null,
+  message: "",
+  detail: null
+};
+
+export function PlanScreen({
+  apiBaseUrl,
+  userId,
+  planData,
+  reviewSource,
+  entryRequest,
+  onReview,
+  fetchImpl
+}: PlanScreenProps) {
+  const hasLiveApi = Boolean(apiBaseUrl && userId);
+  const initialSeed = hasLiveApi && reviewSource !== "api"
+    ? createUpcomingPlanSeed()
+    : planData;
+  const [workspace, setWorkspace] = useState<PlanWorkspace>(() =>
+    createPlanWorkspace(initialSeed)
+  );
+  const [loadPhase, setLoadPhase] = useState<LoadPhase>(hasLiveApi ? "loading" : "ready");
   const [detail, setDetail] = useState<PlanDetail | null>(null);
-  const [goalTitle, setGoalTitle] = useState("Career");
-  const [projectTitle, setProjectTitle] = useState("Resume restart");
-  const [projectStage, setProjectStage] = useState<EditableProjectStage>("sprint");
-  const [planItemTitle, setPlanItemTitle] = useState("Restart block");
-  const [planHours, setPlanHours] = useState(2);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [operation, setOperation] = useState<OperationState>(idleOperation);
+  const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
+  const [reload, setReload] = useState(0);
+  const metrics = useMemo(() => calculatePlanMetrics(workspace.draft), [workspace.draft]);
+  const proposal = useMemo(() => buildPlanProposal(workspace), [workspace]);
+  const projectNames = useMemo(
+    () => new Map(workspace.projects.map((project) => [project.id, project.title])),
+    [workspace.projects]
+  );
 
   useEffect(() => {
-    setPlan(planData.initialState);
-  }, [planData.initialState]);
-
-  useEffect(() => {
-    if (entryRequest) {
-      setDetail(entryRequest.detail);
+    const seed = hasLiveApi && reviewSource !== "api"
+      ? createUpcomingPlanSeed()
+      : planData;
+    if (!hasLiveApi) {
+      setWorkspace(createPlanWorkspace(seed));
+      setLoadPhase("ready");
+      setOperation(idleOperation);
+      setUndoSnapshot(null);
+      return;
     }
+
+    let ignore = false;
+    setLoadPhase("loading");
+    loadPlanRecords({ apiBaseUrl, userId, fetchImpl }).then((result) => {
+      if (ignore) return;
+      if (result.status !== "ok" || !result.data) {
+        setLoadPhase("error");
+        return;
+      }
+      setWorkspace(createPlanWorkspace(seed, result.data));
+      setLoadPhase("ready");
+      setOperation(idleOperation);
+      setUndoSnapshot(null);
+    });
+
+    return () => {
+      ignore = true;
+    };
+  }, [apiBaseUrl, fetchImpl, hasLiveApi, planData, reload, reviewSource, userId]);
+
+  useEffect(() => {
+    if (entryRequest) setDetail(entryRequest.detail);
   }, [entryRequest]);
 
-  function mark(status: SaveStatus) {
-    setSaveStatus(status);
-    window.setTimeout(() => setSaveStatus("idle"), 1400);
+  async function applySuggestion() {
+    if (!proposal || operation.phase === "saving" || operation.phase === "undoing") return;
+    const snapshot: UndoSnapshot = {
+      before: workspace.persistedPlan ? copyPlan(workspace.persistedPlan) : null,
+      baseline: copyPlan(workspace.draft),
+      appliedPlanId: null
+    };
+    setOperation({ phase: "saving", action: "apply", message: "Saving adjustment", detail: null });
+
+    if (!hasLiveApi) {
+      setWorkspace((current) => ({
+        ...current,
+        draft: proposal.after,
+        persistedPlan: proposal.after,
+        suggestionStatus: "applied"
+      }));
+      setUndoSnapshot(snapshot);
+      setOperation({ phase: "saved", action: "apply", message: "Sample adjustment applied", detail: null });
+      setDetail(null);
+      return;
+    }
+
+    const result = await savePlanDraft({
+      apiBaseUrl,
+      userId,
+      draft: proposal.after,
+      fetchImpl
+    });
+    if (result.status !== "ok" || !result.data) {
+      setOperation(operationFailure("apply", result.status, result.error));
+      setDetail(null);
+      return;
+    }
+    snapshot.appliedPlanId = result.data.id;
+    setWorkspace((current) => ({
+      ...current,
+      draft: result.data as PlanDraft,
+      persistedPlan: result.data as PlanDraft,
+      suggestionStatus: "applied"
+    }));
+    setUndoSnapshot(snapshot);
+    setOperation({ phase: "saved", action: "apply", message: "Plan saved", detail: null });
+    setDetail(null);
   }
 
-  async function onSaveProjectSetup() {
-    setPlan((current) => savePlanDetail(current, { focusProject: projectTitle }));
+  async function undoAdjustment() {
+    if (!undoSnapshot || operation.phase === "saving" || operation.phase === "undoing") return;
+    setOperation({ phase: "undoing", action: "undo", message: "Restoring plan", detail: null });
 
-    if (!apiBaseUrl) {
-      mark("demo");
+    if (!hasLiveApi) {
+      restoreSnapshot(undoSnapshot);
       return;
     }
 
-    const goal = await createGoal({
-      apiBaseUrl,
-      payload: {
-        title: goalTitle,
-        priority: 1,
-        active_status: true
+    if (undoSnapshot.before) {
+      const result = await savePlanDraft({
+        apiBaseUrl,
+        userId,
+        draft: undoSnapshot.before,
+        fetchImpl
+      });
+      if (result.status !== "ok" || !result.data) {
+        setOperation(operationFailure("undo", result.status, result.error));
+        setDetail(null);
+        return;
       }
-    });
-    const goalId = readId(goal.data);
-    if (!goal.ok || goalId === null) {
-      mark("error");
+      setWorkspace((current) => ({
+        ...current,
+        draft: result.data as PlanDraft,
+        persistedPlan: result.data as PlanDraft,
+        suggestionStatus: "available"
+      }));
+      setUndoSnapshot(null);
+      setOperation({ phase: "undone", action: null, message: "Plan restored", detail: null });
+      setDetail(null);
       return;
     }
 
-    const project = await createProject({
-      apiBaseUrl,
-      payload: {
-        goal_id: goalId,
-        title: projectTitle,
-        stage: projectStage,
-        weekly_min_minutes: 60,
-        weekly_target_minutes: planHours * 60,
-        status: "active"
-      }
-    });
-
-    mark(project.ok ? "saved" : "error");
+    const planId = undoSnapshot.appliedPlanId ?? workspace.persistedPlan?.id ?? null;
+    if (planId === null) {
+      setOperation({ phase: "error", action: "undo", message: "Plan could not be restored", detail: null });
+      return;
+    }
+    const result = await deletePlan({ apiBaseUrl, userId, planId, fetchImpl });
+    if (result.status !== "ok") {
+      setOperation(operationFailure("undo", result.status, result.error));
+      setDetail(null);
+      return;
+    }
+    restoreSnapshot(undoSnapshot);
   }
 
-  async function onSaveWeeklyPlan() {
-    setPlan((current) => savePlanDetail(current, { focusProject: projectTitle }));
+  function restoreSnapshot(snapshot: UndoSnapshot) {
+    setWorkspace((current) => ({
+      ...current,
+      draft: copyPlan(snapshot.baseline),
+      persistedPlan: snapshot.before ? copyPlan(snapshot.before) : null,
+      suggestionStatus: "available"
+    }));
+    setUndoSnapshot(null);
+    setOperation({ phase: "undone", action: null, message: "Plan restored", detail: null });
+    setDetail(null);
+  }
 
-    if (!apiBaseUrl) {
-      mark("demo");
-      return;
-    }
-
-    const result = await createWeeklyPlan({
-      apiBaseUrl,
-      payload: {
-        week_start: "2026-06-15",
-        week_end: "2026-06-21",
-        planned_capacity_minutes: 18 * 60,
-        slack_target_percent: 20,
-        items: [
-          {
-            title: planItemTitle,
-            planned_minutes: planHours * 60,
-            priority: 1
-          }
-        ],
-        note: "Planned from Theseus app."
-      }
-    });
-
-    mark(result.ok ? "saved" : "error");
+  function retryOperation() {
+    if (operation.action === "undo") void undoAdjustment();
+    else void applySuggestion();
   }
 
   return (
     <section className="screen plan-screen">
       <header className="screen-header">
-        <IconButton label="Previous" icon="chevronLeft" />
-        <div className="screen-title">Jun 15 - Jun 21</div>
-        <IconButton label="Next" icon="chevronRight" />
+        <div className="screen-title">{formatPlanWeek(workspace.draft.week)}</div>
       </header>
 
-      <div className="plan-cover">
-        <button className="balance-orb" aria-label="Week balance" onClick={() => setDetail("slack")}>
-          <span className="balance-ring">
-            <span className="balance-arc green" />
-            <span className="balance-arc amber" />
-            <span className="balance-core">
-              <Icon name="gauge" />
-            </span>
-          </span>
-        </button>
-
-        {plan.suggestionStatus === "available" ? (
-          <button className="suggestion-card" aria-label="Review suggestion" onClick={() => setDetail("suggestion")}>
-            <span className="suggestion-mark">
-              <Icon name="route" />
-            </span>
-            <span className="suggestion-copy">
-              <strong>Resume restart</strong>
-              <small>Tue / Thu mornings</small>
-            </span>
-          </button>
-        ) : (
-          <button className={`suggestion-card ${plan.suggestionStatus}`} aria-label="Suggestion status" onClick={() => setDetail("suggestion")}>
-            <span className="suggestion-mark">
-              <Icon name={plan.suggestionStatus === "applied" ? "check" : "x"} />
-            </span>
-            <span className="suggestion-copy">
-              <strong>{plan.suggestionStatus === "applied" ? "Applied" : "Dismissed"}</strong>
-              <small>Review suggestion</small>
-            </span>
-          </button>
-        )}
-
-        <div className="plan-entry-grid">
-          <button className="plan-entry focus" aria-label="Focus" onClick={() => setDetail("focus")}>
-            <Icon name="target" />
-          </button>
-          <button className="plan-entry slack" aria-label="Slack" onClick={() => setDetail("slack")}>
-            <Icon name="gauge" />
-          </button>
-          <button className="plan-entry projects" aria-label="Projects" onClick={() => setDetail("projects")}>
-            <Icon name="folder" />
-          </button>
+      {loadPhase === "loading" ? (
+        <div className="plan-state">
+          <StateSurface icon="calendar" title="Loading plan" />
         </div>
-      </div>
+      ) : null}
 
-      <DetailPanel title={detailTitle(detail)} open={detail !== null} onBack={() => setDetail(null)}>
-        {detail === "suggestion" ? (
-          <div className="detail-stack">
-            <span className="status-chip severity-attention">attention</span>
-            <h2>Resume restart</h2>
-            <p>Protect one small restart block before adding more build work.</p>
-            <div className="action-row">
-              <button className="paper-action" onClick={() => setPlan((current) => applySuggestion(current))}>
-                Apply
-              </button>
-              <button className="paper-action subtle" onClick={() => setPlan((current) => dismissSuggestion(current))}>
-                Dismiss
-              </button>
+      {loadPhase === "error" ? (
+        <div className="plan-state">
+          <StateSurface
+            icon="info"
+            title="Plan could not load"
+            actionLabel="Retry"
+            actionIcon="activity"
+            onAction={() => setReload((value) => value + 1)}
+          />
+        </div>
+      ) : null}
+
+      {loadPhase === "ready" ? (
+        <div className="plan-workspace">
+          <button
+            className={`plan-balance-summary status-${metrics.status}`}
+            type="button"
+            aria-label={`Week balance: ${balanceLabel(metrics.status)}`}
+            onClick={() => setDetail("slack")}
+          >
+            <span className="plan-balance-head">
+              <span className="plan-balance-icon" aria-hidden="true"><Icon name="gauge" /></span>
+              <span>
+                <small>Week balance</small>
+                <strong>{balanceLabel(metrics.status)}</strong>
+              </span>
+              <Icon name="chevronRight" />
+            </span>
+            <span className="plan-load-track" aria-hidden="true">
+              <span style={{ width: `${loadPercent(metrics)}%` }} />
+            </span>
+            <span className="plan-balance-values">
+              <span><small>Planned</small><strong>{formatMinutes(metrics.plannedMinutes)}</strong></span>
+              <span><small>Capacity</small><strong>{formatMinutesOrDash(metrics.capacityMinutes)}</strong></span>
+              <span><small>Slack</small><strong>{formatNullableMinutes(metrics.slackMinutes)}</strong></span>
+            </span>
+          </button>
+
+          {operation.phase !== "idle" ? (
+            <div
+              className={`plan-operation operation-${operation.phase}`}
+              role={operation.phase === "error" || operation.phase === "conflict" ? "alert" : "status"}
+              title={operation.detail ?? undefined}
+            >
+              <Icon name={operationIcon(operation.phase)} />
+              <span>{operation.message}</span>
+              {operation.phase === "saved" && undoSnapshot && detail !== "suggestion" ? (
+                <button type="button" onClick={() => void undoAdjustment()}>Undo</button>
+              ) : null}
+              {operation.phase === "error" ? (
+                <button type="button" onClick={retryOperation}>Retry</button>
+              ) : null}
+              {operation.phase === "conflict" ? (
+                <button type="button" onClick={() => setReload((value) => value + 1)}>Reload</button>
+              ) : null}
             </div>
+          ) : null}
+
+          {proposal ? (
+            <button
+              className="plan-proposal-card"
+              type="button"
+              aria-label={`Suggested adjustment: ${proposal.suggestion.title}`}
+              onClick={() => setDetail("suggestion")}
+            >
+              <span className="plan-proposal-kicker">Suggested adjustment</span>
+              <span className="plan-proposal-icon" aria-hidden="true"><Icon name="route" /></span>
+              <span className="plan-proposal-copy">
+                <strong>{proposal.suggestion.title}</strong>
+                <small>
+                  {proposal.suggestion.projectTitle ?? "Flexible block"}
+                  {" · "}{formatSignedMinutes(proposal.suggestion.deltaMinutes)}
+                </small>
+                <span>{proposal.suggestion.reason}</span>
+              </span>
+              <Icon name="chevronRight" />
+            </button>
+          ) : workspace.suggestionStatus === "applied" ? (
+            <button className="plan-proposal-state applied" type="button" onClick={() => setDetail("suggestion")}>
+              <Icon name="check" />
+              <span><strong>Adjustment applied</strong><small>Saved in this week</small></span>
+              <Icon name="chevronRight" />
+            </button>
+          ) : workspace.suggestionStatus === "dismissed" && workspace.suggestion ? (
+            <button className="plan-proposal-state" type="button" onClick={() => setDetail("suggestion")}>
+              <Icon name="x" />
+              <span><strong>Suggestion dismissed</strong><small>Review when useful</small></span>
+              <Icon name="chevronRight" />
+            </button>
+          ) : (
+            <div className="plan-empty-action">
+              <StateSurface
+                icon="book"
+                title="Review the week before adjusting"
+                actionLabel="Open review"
+                actionIcon="book"
+                onAction={onReview}
+              />
+            </div>
+          )}
+
+          <div className="plan-action-grid" aria-label="Plan details">
+            <button type="button" aria-label="Focus" onClick={() => setDetail("focus")}>
+              <Icon name="target" />
+            </button>
+            <button type="button" aria-label="Slack" onClick={() => setDetail("slack")}>
+              <Icon name="gauge" />
+            </button>
+            <button type="button" aria-label="Projects" onClick={() => setDetail("projects")}>
+              <Icon name="folder" />
+            </button>
           </div>
+        </div>
+      ) : null}
+
+      <DetailPanel title={detailTitle(detail)} open={detail !== null && loadPhase === "ready"} onBack={() => setDetail(null)}>
+        {detail === "suggestion" ? (
+          <SuggestionDetail
+            workspace={workspace}
+            operation={operation}
+            onApply={() => void applySuggestion()}
+            onDismiss={() => setWorkspace((current) => dismissPlanSuggestion(current))}
+            onRestore={() => setWorkspace((current) => ({ ...current, suggestionStatus: "available" }))}
+            canUndo={undoSnapshot !== null}
+            onUndo={() => void undoAdjustment()}
+          />
         ) : null}
         {detail === "focus" ? (
-          <div className="detail-stack">
-            <h2>{plan.focusProject ?? "Focus"}</h2>
-            <label className="paper-field">
-              <span>Plan</span>
-              <input type="text" value={planItemTitle} aria-label="Planned item" onChange={(event) => setPlanItemTitle(event.currentTarget.value)} />
-            </label>
-            <label className="paper-field">
-              <span>Hours</span>
-              <input
-                type="number"
-                min="1"
-                max="12"
-                value={planHours}
-                aria-label="Planned hours"
-                onChange={(event) => setPlanHours(normalizeHours(event.currentTarget.value))}
-              />
-            </label>
-            <dl className="evidence-list">
-              <div>
-                <dt>Primary</dt>
-                <dd>{projectTitle}</dd>
-              </div>
-              <div>
-                <dt>Slack</dt>
-                <dd>{plan.slackHours}h</dd>
-              </div>
-            </dl>
-            <button className="paper-action" onClick={onSaveWeeklyPlan}>Save</button>
-            {saveStatus !== "idle" ? <span className={`status-chip save-${saveStatus}`}>{saveStatusLabel(saveStatus)}</span> : null}
-          </div>
+          <FocusDetail workspace={workspace} projectNames={projectNames} onReview={onReview} />
         ) : null}
-        {detail === "slack" ? (
-          <div className="detail-stack">
-            <h2>{plan.slackHours}h slack</h2>
-            <dl className="evidence-list">
-              <div>
-                <dt>Planned</dt>
-                <dd>14h</dd>
-              </div>
-              <div>
-                <dt>Capacity</dt>
-                <dd>18h</dd>
-              </div>
-              <div>
-                <dt>Buffer</dt>
-                <dd>{plan.slackHours}h</dd>
-              </div>
-            </dl>
-            <div className="chip-row">
-              {[2, 4, 6].map((hours) => (
-                <button key={hours} className={plan.slackHours === hours ? "selected" : ""} onClick={() => setPlan((current) => savePlanDetail(current, { slackHours: hours }))}>
-                  {hours}h
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        {detail === "projects" ? (
-          <div className="detail-stack">
-            <label className="paper-field">
-              <span>Goal</span>
-              <input type="text" value={goalTitle} aria-label="Goal title" onChange={(event) => setGoalTitle(event.currentTarget.value)} />
-            </label>
-            <label className="paper-field">
-              <span>Project</span>
-              <input type="text" value={projectTitle} aria-label="Project title" onChange={(event) => setProjectTitle(event.currentTarget.value)} />
-            </label>
-            <div className="chip-section" aria-label="Stage">
-              {(["sprint", "startup"] as const).map((stage) => (
-                <button
-                  key={stage}
-                  className={`choice-chip ${projectStage === stage ? "selected" : ""}`}
-                  aria-pressed={projectStage === stage}
-                  onClick={() => setProjectStage(stage)}
-                >
-                  {stage}
-                </button>
-              ))}
-            </div>
-            <dl className="evidence-list">
-              <div>
-                <dt>Stage</dt>
-                <dd>{projectStage}</dd>
-              </div>
-              <div>
-                <dt>Target</dt>
-                <dd>{planHours}h</dd>
-              </div>
-            </dl>
-            <button className="paper-action" onClick={onSaveProjectSetup}>Save</button>
-            {saveStatus !== "idle" ? <span className={`status-chip save-${saveStatus}`}>{saveStatusLabel(saveStatus)}</span> : null}
-          </div>
-        ) : null}
+        {detail === "slack" ? <SlackDetail metrics={metrics} /> : null}
+        {detail === "projects" ? <ProjectsDetail workspace={workspace} /> : null}
       </DetailPanel>
     </section>
   );
 }
 
-function readId(data: unknown): number | null {
-  if (data && typeof data === "object" && "id" in data && typeof data.id === "number") {
-    return data.id;
+function SuggestionDetail({
+  workspace,
+  operation,
+  onApply,
+  onDismiss,
+  onRestore,
+  canUndo,
+  onUndo
+}: {
+  workspace: PlanWorkspace;
+  operation: OperationState;
+  onApply: () => void;
+  onDismiss: () => void;
+  onRestore: () => void;
+  canUndo: boolean;
+  onUndo: () => void;
+}) {
+  const proposal = buildPlanProposal(workspace);
+  if (!workspace.suggestion) {
+    return <StateSurface icon="book" title="No review suggestion yet" />;
   }
-  return null;
+  if (workspace.suggestionStatus === "applied") {
+    return (
+      <StateSurface
+        icon="check"
+        title="Adjustment applied"
+        actionLabel={canUndo ? "Undo" : undefined}
+        actionIcon="activity"
+        onAction={canUndo ? onUndo : undefined}
+      />
+    );
+  }
+  if (workspace.suggestionStatus === "dismissed") {
+    return (
+      <div className="detail-stack">
+        <StateSurface
+          icon="x"
+          title="Suggestion dismissed"
+          actionLabel="Restore"
+          actionIcon="activity"
+          onAction={onRestore}
+        />
+      </div>
+    );
+  }
+  if (!proposal) {
+    return <StateSurface icon="info" title="This adjustment has no plan change" />;
+  }
+
+  return (
+    <div className="detail-stack plan-suggestion-detail">
+      <span className="status-chip severity-attention">Suggested</span>
+      <h2>{proposal.suggestion.title}</h2>
+      <p>{proposal.suggestion.reason}</p>
+      <div className="plan-diff" aria-label="Plan change">
+        <div className="plan-diff-head"><span /><span>Before</span><span>After</span></div>
+        <DiffRow
+          label={proposal.suggestion.projectTitle ?? "Block"}
+          before={formatMinutes(proposal.beforeProjectMinutes)}
+          after={formatMinutes(proposal.afterProjectMinutes)}
+        />
+        <DiffRow
+          label="Planned"
+          before={formatMinutes(proposal.beforeMetrics.plannedMinutes)}
+          after={formatMinutes(proposal.afterMetrics.plannedMinutes)}
+        />
+        <DiffRow
+          label="Slack"
+          before={formatNullableMinutes(proposal.beforeMetrics.slackMinutes)}
+          after={formatNullableMinutes(proposal.afterMetrics.slackMinutes)}
+        />
+      </div>
+      <div className="action-row">
+        <button
+          className="paper-action"
+          type="button"
+          disabled={operation.phase === "saving" || operation.phase === "undoing"}
+          onClick={onApply}
+        >
+          {operation.phase === "saving" ? "Saving" : "Apply"}
+        </button>
+        <button
+          className="paper-action subtle"
+          type="button"
+          disabled={operation.phase === "saving" || operation.phase === "undoing"}
+          onClick={onDismiss}
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
 }
 
-function saveStatusLabel(status: SaveStatus): string {
-  if (status === "saved") return "Saved";
-  if (status === "demo") return "Demo";
-  return "Error";
+function DiffRow({ label, before, after }: { label: string; before: string; after: string }) {
+  return <div className="plan-diff-row"><strong>{label}</strong><span>{before}</span><span>{after}</span></div>;
 }
 
-function normalizeHours(value: string): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return 1;
-  return Math.min(12, Math.max(1, Math.round(parsed)));
+function FocusDetail({
+  workspace,
+  projectNames,
+  onReview
+}: {
+  workspace: PlanWorkspace;
+  projectNames: Map<number, string>;
+  onReview: () => void;
+}) {
+  const items = [...workspace.draft.items].sort((a, b) => a.priority - b.priority);
+  if (items.length === 0) {
+    return (
+      <StateSurface
+        icon="target"
+        title="No focus block yet"
+        actionLabel="Open review"
+        actionIcon="book"
+        onAction={onReview}
+      />
+    );
+  }
+  return (
+    <div className="plan-item-list">
+      {items.map((item, index) => (
+        <div className="plan-item-row" key={item.id ?? `${item.title}-${index}`}>
+          <span className="plan-item-priority">{item.priority}</span>
+          <span><strong>{item.title}</strong><small>{item.projectId ? projectNames.get(item.projectId) ?? "Project" : "Flexible"}</small></span>
+          <strong>{formatMinutes(item.plannedMinutes)}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SlackDetail({ metrics }: { metrics: PlanMetrics }) {
+  return (
+    <div className="detail-stack">
+      <span className={`status-chip plan-status-${metrics.status}`}>{balanceLabel(metrics.status)}</span>
+      <h2>{formatNullableMinutes(metrics.slackMinutes)} slack</h2>
+      <dl className="evidence-list">
+        <div><dt>Planned</dt><dd>{formatMinutes(metrics.plannedMinutes)}</dd></div>
+        <div><dt>Capacity</dt><dd>{formatMinutesOrDash(metrics.capacityMinutes)}</dd></div>
+        <div><dt>Target buffer</dt><dd>{formatNullableMinutes(metrics.requiredSlackMinutes)}</dd></div>
+      </dl>
+    </div>
+  );
+}
+
+function ProjectsDetail({ workspace }: { workspace: PlanWorkspace }) {
+  if (workspace.projects.length === 0) {
+    return <StateSurface icon="folder" title="No projects linked yet" />;
+  }
+  return (
+    <div className="plan-project-list">
+      {workspace.projects.map((project) => (
+        <div className="plan-project-row" key={project.id}>
+          <span className={`project-stage-mark stage-${project.stage}`} aria-hidden="true" />
+          <span><strong>{project.title}</strong><small>{stageLabel(project.stage)}</small></span>
+          <strong>{formatMinutes(projectMinutes(workspace.draft, project.id))}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function operationFailure(
+  action: Exclude<OperationAction, null>,
+  status: PlanApiStatus,
+  detail: string | null
+): OperationState {
+  return status === "conflict"
+    ? { phase: "conflict", action, message: "Plan changed elsewhere", detail }
+    : {
+        phase: "error",
+        action,
+        message: action === "undo" ? "Plan could not be restored" : "Plan could not be saved",
+        detail
+      };
+}
+
+function copyPlan(plan: PlanDraft): PlanDraft {
+  return { ...plan, week: { ...plan.week }, items: plan.items.map((item) => ({ ...item })) };
+}
+
+function projectMinutes(plan: PlanDraft, projectId: number): number {
+  return plan.items
+    .filter((item) => item.projectId === projectId)
+    .reduce((total, item) => total + item.plannedMinutes, 0);
+}
+
+function loadPercent(metrics: PlanMetrics): number {
+  return metrics.loadRatio === null ? 0 : Math.min(100, Math.max(0, Math.round(metrics.loadRatio * 100)));
+}
+
+function balanceLabel(status: PlanMetrics["status"]): string {
+  if (status === "balanced") return "Balanced";
+  if (status === "tight") return "Tight";
+  if (status === "overloaded") return "Overloaded";
+  return "Capacity needed";
+}
+
+function operationIcon(phase: OperationPhase): "check" | "info" | "activity" {
+  if (phase === "saved" || phase === "undone") return "check";
+  if (phase === "saving" || phase === "undoing") return "activity";
+  return "info";
+}
+
+function formatMinutes(minutes: number): string {
+  const sign = minutes < 0 ? "-" : "";
+  const absolute = Math.abs(minutes);
+  const hours = Math.floor(absolute / 60);
+  const rest = absolute % 60;
+  if (hours === 0) return `${sign}${rest}m`;
+  return rest === 0 ? `${sign}${hours}h` : `${sign}${hours}h ${rest}m`;
+}
+
+function formatMinutesOrDash(minutes: number): string {
+  return minutes > 0 ? formatMinutes(minutes) : "-";
+}
+
+function formatNullableMinutes(minutes: number | null): string {
+  return minutes === null ? "-" : formatMinutes(minutes);
+}
+
+function formatSignedMinutes(minutes: number): string {
+  return `${minutes > 0 ? "+" : ""}${formatMinutes(minutes)}`;
+}
+
+function stageLabel(stage: PlanWorkspace["projects"][number]["stage"]): string {
+  if (stage === "wake_up") return "Wake-up";
+  return stage.charAt(0).toUpperCase() + stage.slice(1);
 }
 
 function detailTitle(detail: PlanDetail | null): string {
-  if (detail === "suggestion") return "Suggestion";
+  if (detail === "suggestion") return "Adjustment";
   if (detail === "focus") return "Focus";
   if (detail === "slack") return "Slack";
   if (detail === "projects") return "Projects";

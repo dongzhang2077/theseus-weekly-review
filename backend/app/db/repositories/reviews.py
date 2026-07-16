@@ -7,13 +7,15 @@ from ...schemas import WeeklyReviewRead, WeeklyReviewResult
 
 
 class WeeklyReviewRepository:
-    def __init__(self, connection: sqlite3.Connection) -> None:
+    def __init__(self, connection: sqlite3.Connection, user_id: int) -> None:
         self.connection = connection
+        self.user_id = user_id
 
     def save(self, result: WeeklyReviewResult, model_name: str | None = None) -> WeeklyReviewRead:
         values = result.model_dump(mode="json")
         values.update(
             {
+                "user_id": self.user_id,
                 "wins_json": self._encode(values.pop("wins")),
                 "insights_json": self._encode(values.pop("insights")),
                 "next_steps_json": self._encode(values.pop("next_steps")),
@@ -25,13 +27,15 @@ class WeeklyReviewRepository:
         self.connection.execute(
             """
             INSERT INTO weekly_reviews (
-                week_start, week_end, wins_json, insights_json, next_steps_json,
-                risk_flags_json, evidence_json, generated_text, model_name
+                user_id, week_start, week_end, wins_json, insights_json,
+                next_steps_json, risk_flags_json, evidence_json,
+                generated_text, model_name
             ) VALUES (
-                :week_start, :week_end, :wins_json, :insights_json, :next_steps_json,
-                :risk_flags_json, :evidence_json, :generated_text, :model_name
+                :user_id, :week_start, :week_end, :wins_json, :insights_json,
+                :next_steps_json, :risk_flags_json, :evidence_json,
+                :generated_text, :model_name
             )
-            ON CONFLICT (week_start, week_end) DO UPDATE SET
+            ON CONFLICT (user_id, week_start, week_end) DO UPDATE SET
                 wins_json = excluded.wins_json,
                 insights_json = excluded.insights_json,
                 next_steps_json = excluded.next_steps_json,
@@ -50,8 +54,11 @@ class WeeklyReviewRepository:
 
     def get_by_week(self, week_start: str, week_end: str) -> WeeklyReviewRead | None:
         row = self.connection.execute(
-            "SELECT * FROM weekly_reviews WHERE week_start = ? AND week_end = ?",
-            (week_start, week_end),
+            """
+            SELECT * FROM weekly_reviews
+            WHERE user_id = ? AND week_start = ? AND week_end = ?
+            """,
+            (self.user_id, week_start, week_end),
         ).fetchone()
         return None if row is None else self._decode_row(row)
 
