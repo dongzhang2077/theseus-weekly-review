@@ -148,8 +148,8 @@ same bottom navigation as Review and Track.
   source of truth.
 - Review feedback collection is documented but does not yet have a persisted
   API/UI implementation.
-- GitHub Issue #63 tracks the July 15 integrated replan; GitHub remains the
-  source of truth for PR review and merge status.
+- GitHub Issue #63 is completed, PR #64 is squash-merged to `main` as
+  `306061c`, and the project board is `Done`.
 
 ## 8. Review and Release Gates
 
@@ -163,10 +163,15 @@ Engineering review on 2026-07-15:
 - review engine: fixed an inconsistency where unlinked planned items were
   omitted from total planned time and slack evidence.
 
+Release status:
+
+- PR #64 was squash-merged to `main` as `306061c` on 2026-07-15 PDT;
+- the project owner explicitly approved direct merge and waived the separate
+  teammate-review gate for this checkpoint;
+- Issue #63 is closed as completed and its project-board status is `Done`.
+
 Still requires human completion:
 
-- the other teammate reviews schema, contract, and cross-screen changes;
-- the Issue #63 pull request receives teammate review and is merged;
 - one live five-minute rehearsal and one fallback recording are completed.
 
 Full verification commands:
