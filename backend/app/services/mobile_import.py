@@ -23,8 +23,9 @@ ACTIVITY_TYPE_ALIASES = {
 def import_mobile_time_logs(
     payload: MobileTimeLogImportRequest,
     connection: sqlite3.Connection,
+    user_id: int,
 ) -> MobileTimeLogImportSummary:
-    repository = TimeLogRepository(connection)
+    repository = TimeLogRepository(connection, user_id)
     imported = 0
     skipped = 0
     needs_mapping = 0

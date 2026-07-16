@@ -54,14 +54,15 @@ describe("loadAppWeek", () => {
       };
     };
 
-    const loaded = await loadAppWeek({ apiBaseUrl: "http://127.0.0.1:8000/", fetchImpl });
+    const loaded = await loadAppWeek({ apiBaseUrl: "http://127.0.0.1:8000/", userId: 7, fetchImpl });
 
     expect(loaded.source).toBe("api");
     expect(loaded.error).toBeNull();
     expect(loaded.week.review.wins[0].title).toBe("Backend shipped");
-    expect(loaded.week.plan.initialState.focusProject).toBe("Protect frontend block");
+    expect(loaded.week.plan.suggestion?.title).toBe("Protect frontend block");
     expect(calls[0].input).toBe("http://127.0.0.1:8000/reviews/weekly/generate");
     expect(calls[0].init.method).toBe("POST");
+    expect(calls[0].init.headers).toMatchObject({ "X-Theseus-User-Id": "7" });
     expect(JSON.parse(String(calls[0].init.body)).mode).toBe("supportive_text");
   });
 
@@ -77,6 +78,7 @@ describe("loadAppWeek", () => {
 
     const loaded = await loadAppWeek({
       apiBaseUrl: "http://127.0.0.1:8000",
+      userId: 7,
       fetchImpl
     });
 
@@ -92,7 +94,7 @@ describe("loadAppWeek", () => {
     );
   });
 
-  it("falls back to demo data when the backend is unavailable", async () => {
+  it("shows an empty week when the selected user has no weekly plan", async () => {
     let calls = 0;
     const fetchImpl: FetchLike = async () => {
       calls += 1;
@@ -103,11 +105,42 @@ describe("loadAppWeek", () => {
       };
     };
 
-    const loaded = await loadAppWeek({ apiBaseUrl: "http://127.0.0.1:8000", fetchImpl });
+    const loaded = await loadAppWeek({ apiBaseUrl: "http://127.0.0.1:8000", userId: 7, fetchImpl });
 
-    expect(loaded.source).toBe("demo");
+    expect(loaded.source).toBe("empty");
     expect(loaded.week).toBe(demoWeek);
-    expect(loaded.error).toBe("Backend returned 404");
+    expect(loaded.error).toBeNull();
     expect(calls).toBe(1);
+  });
+
+  it("returns an explicit error state when the backend fails", async () => {
+    const loaded = await loadAppWeek({
+      apiBaseUrl: "http://127.0.0.1:8000",
+      userId: 7,
+      fetchImpl: async () => ({
+        ok: false,
+        status: 500,
+        json: async () => ({})
+      })
+    });
+
+    expect(loaded.source).toBe("error");
+    expect(loaded.week).toBe(demoWeek);
+    expect(loaded.error).toBe("Backend returned 500");
+  });
+
+  it("does not request personal data without a selected local user", async () => {
+    let calls = 0;
+    const loaded = await loadAppWeek({
+      apiBaseUrl: "http://127.0.0.1:8000",
+      fetchImpl: async () => {
+        calls += 1;
+        return { ok: true, status: 200, json: async () => apiReview };
+      }
+    });
+
+    expect(loaded.source).toBe("error");
+    expect(loaded.error).toBe("Local user is not selected");
+    expect(calls).toBe(0);
   });
 });

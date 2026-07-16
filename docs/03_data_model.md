@@ -3,21 +3,23 @@
 ## 1. Core Entities
 
 ```text
-Goal
-  └── Project
-        ├── Activity
-        ├── PlannedItem
-        └── TimeLog
-
-WeeklyPlan
-  └── PlannedItem
-
-WeeklyReview
-  ├── ReviewFinding
-  └── ReviewRecommendation
-
-DailyReflection
+LocalUser
+  ├── Goal
+  │     └── Project
+  │           ├── Activity
+  │           ├── PlannedItem
+  │           └── TimeLog
+  ├── WeeklyPlan
+  │     └── PlannedItem
+  ├── DailyReflection
+  └── WeeklyReview
+        ├── ReviewFinding
+        └── ReviewRecommendation
 ```
+
+`LocalUser` is an ownership root for the local MVP, not a production
+authentication identity. `PlannedItem` inherits ownership from its
+`WeeklyPlan`; every other persisted personal table stores `user_id` directly.
 
 ## 2. Enumerations
 
@@ -61,11 +63,23 @@ DailyReflection
 
 ## 3. Tables
 
+### users
+
+| Field | Type | Notes |
+|---|---|---|
+| id | integer pk | Stable local profile ID |
+| display_name | text | Required |
+| timezone | text | Required; defaults to `UTC` |
+| locale | text | Required; defaults to `en` |
+| created_at | datetime | System timestamp |
+| updated_at | datetime | System timestamp |
+
 ### goals
 
 | Field | Type | Notes |
 |---|---|---|
 | id | integer pk | Internal ID |
+| user_id | integer fk | Required owner; cascades on user deletion |
 | title | text | Required |
 | description | text | Optional |
 | priority | integer | 1 is highest |
@@ -78,6 +92,7 @@ DailyReflection
 | Field | Type | Notes |
 |---|---|---|
 | id | integer pk | Internal ID |
+| user_id | integer fk | Required owner; must match `goal_id` owner |
 | goal_id | integer fk | Nullable for support projects |
 | title | text | Required |
 | stage | text enum | `startup`, `stable`, `sprint`, `dormant`, `wake_up` |
@@ -94,6 +109,7 @@ DailyReflection
 | Field | Type | Notes |
 |---|---|---|
 | id | integer pk | Internal ID |
+| user_id | integer fk | Required owner; must match `project_id` owner |
 | project_id | integer fk | Optional |
 | name | text | Required |
 | description | text | Optional |
@@ -107,6 +123,7 @@ DailyReflection
 | Field | Type | Notes |
 |---|---|---|
 | id | integer pk | Internal ID |
+| user_id | integer fk | Required owner |
 | week_start | date | Required |
 | week_end | date | Required |
 | planned_capacity_minutes | integer | Optional |
@@ -126,12 +143,18 @@ DailyReflection
 | planned_minutes | integer | Required |
 | priority | integer | Optional |
 | is_completed | boolean | Optional manual flag |
+| created_at | datetime | System timestamp |
+| updated_at | datetime | System timestamp |
+
+Ownership is inherited through `weekly_plan_id`. When `project_id` is present,
+the project must belong to the same user as the plan.
 
 ### time_logs
 
 | Field | Type | Notes |
 |---|---|---|
 | id | integer pk | Internal ID |
+| user_id | integer fk | Required owner; linked activity/project must have the same owner |
 | activity_id | integer fk | Optional if activity is ad hoc |
 | project_id | integer fk | Optional |
 | date | date | Required |
@@ -150,17 +173,20 @@ DailyReflection
 | Field | Type | Notes |
 |---|---|---|
 | id | integer pk | Internal ID |
+| user_id | integer fk | Required owner |
 | date | date | Required |
 | small_win | text | Optional |
 | mood_note | text | Optional |
 | free_note | text | Optional |
 | created_at | datetime | System timestamp |
+| updated_at | datetime | System timestamp |
 
 ### weekly_reviews
 
 | Field | Type | Notes |
 |---|---|---|
 | id | integer pk | Internal ID |
+| user_id | integer fk | Required owner |
 | week_start | date | Required |
 | week_end | date | Required |
 | wins_json | json text | Structured wins |
@@ -176,10 +202,20 @@ DailyReflection
 ## 4. API Representation Rules
 
 - Create requests do not accept database IDs or system timestamps.
-- Read responses include persisted IDs and timestamps.
+- User-owned create requests receive the owner from the explicit API user
+  context; clients cannot set `user_id` in the JSON body.
+- Read responses include persisted IDs, `user_id`, and timestamps.
 - Dates, times, and datetimes use ISO 8601 JSON strings.
-- A weekly plan and its planned items are created in one transaction.
-- One Sprint 1 weekly review is stored per `(week_start, week_end)` pair; regeneration replaces the stored structured result while preserving its ID.
+- A weekly plan and its planned items are created or replaced in one
+  transaction. A failed replacement preserves the previous plan and items.
+- Weekly plans are unique per `(user_id, week_start, week_end)`.
+- Daily reflections are unique per `(user_id, date)`.
+- Weekly reviews are unique per `(user_id, week_start, week_end)`; regeneration
+  replaces that user's stored structured result while preserving its ID.
+- Foreign keys and database triggers reject cross-user goal, project, activity,
+  planned-item, and time-log references.
+- Schema version 2 adds local ownership. Initializing a version 1 database
+  migrates existing records to a generated `Local User` profile with ID `1`.
 
 ## 5. Reference Mapping Notes
 

@@ -64,3 +64,78 @@ Consequences:
 
 - No cloud database setup is required for early development.
 - Schema should still be designed so PostgreSQL can be used later.
+
+## 2026-07-15: Add a Local User as the Data Ownership Root
+
+Decision:
+
+Add local user creation and selection, then scope personal records and weekly
+review persistence to that user. This is local identity for data ownership, not
+production authentication.
+
+Reason:
+
+Teacher feedback identified restart-safe personal persistence as valuable for
+the demo. A stable ownership root is also required before Theseus can maintain
+long-term preferences or safely expose agent tools.
+
+Consequences:
+
+- The data model and API contract define `users` as the ownership root.
+- User-owned HTTP operations use `X-Theseus-User-Id`; the header is an explicit
+  local ownership scope, not an authentication credential.
+- The browser retains the selected local user ID and restores it on restart.
+- User-owned uniqueness rules must include the user context.
+- Cross-user references and unscoped list/review operations are invalid.
+- Schema version 1 data migrates to a generated `Local User` instead of being
+  silently discarded.
+- Production auth, cloud sync, and multi-tenant security remain deferred.
+
+## 2026-07-15: Simplify Signals and Plan Before Adding More Features
+
+Decision:
+
+Preserve the current Review and Track information hierarchy. Redesign Signals
+as an evidence explanation surface and Plan as a next-week adjustment surface.
+
+Reason:
+
+Signals currently uses decorative severity cues that compete with evidence.
+Plan combines weekly adjustment, capacity, and Goal/Project setup while relying
+on fixture-specific values. Both increase interpretation cost and weaken trust.
+
+Consequences:
+
+- This is an information-architecture refactor, not an art-direction change.
+- Signals and Plan retain the current Warm Stationery palette, paper texture,
+  line treatment, and purposeful companion-art language so they remain
+  visually consistent with Review and Track.
+- Signals uses aligned, data-backed rows and evidence details instead of a
+  decorative orbit.
+- Plan shows real week/capacity/slack data, one proposal, a diff, and reversible
+  application.
+- Goal and Project creation move outside Plan Level 1.
+- Fixture, loading, empty, and error states must be explicit.
+
+## 2026-07-15: Separate Domain Truth, Agent Workflow, and Execution Channels
+
+Decision:
+
+Treat Theseus as the source of truth, LangGraph as a future workflow
+orchestrator, and OpenClaw as an optional conversation/execution adapter.
+
+Reason:
+
+This preserves the evidence-first domain model and avoids three competing
+memory systems or duplicated review logic.
+
+Consequences:
+
+- LangGraph is introduced only for a workflow that needs durable state and
+  human approval.
+- OpenClaw starts read-only and never accesses the domain database directly.
+- Material writes require policy, approval, idempotency, audit, verification,
+  and Undo where practical.
+- Agent and personalization work remains outside the 2026-07-18 demo scope.
+- The detailed phase gates live in
+  `docs/13_product_agent_development_strategy.md`.

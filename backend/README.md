@@ -61,6 +61,7 @@ Generate a review from an initialized and populated database with:
 ```bash
 python3 scripts/run_persisted_review.py \
   --database data/local/theseus.db \
+  --user-id 1 \
   --week-start 2026-06-08 \
   --week-end 2026-06-14
 ```

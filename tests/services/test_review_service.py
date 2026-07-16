@@ -48,12 +48,15 @@ class StaticChatCompletionsTransport:
         }
 
 
-def test_service_generates_and_upserts_persisted_review(seeded_connection) -> None:
-    service = ReviewService(seeded_connection)
+def test_service_generates_and_upserts_persisted_review(
+    seeded_connection,
+    seeded_user,
+) -> None:
+    service = ReviewService(seeded_connection, seeded_user.id)
 
     first = service.generate(REQUEST)
     second = service.generate(REQUEST)
-    stored = WeeklyReviewRepository(seeded_connection).get_by_week(
+    stored = WeeklyReviewRepository(seeded_connection, seeded_user.id).get_by_week(
         "2026-06-08", "2026-06-14"
     )
     count = seeded_connection.execute("SELECT COUNT(*) FROM weekly_reviews").fetchone()[0]
@@ -65,21 +68,21 @@ def test_service_generates_and_upserts_persisted_review(seeded_connection) -> No
     assert second.wins[0].title == "Progress on Theseus backend"
 
 
-def test_service_can_store_supportive_text_mode(seeded_connection) -> None:
+def test_service_can_store_supportive_text_mode(seeded_connection, seeded_user) -> None:
     request = WeeklyReviewGenerateRequest(
         week_start=date(2026, 6, 8),
         week_end=date(2026, 6, 14),
         mode="supportive_text",
     )
 
-    review = ReviewService(seeded_connection).generate(request)
+    review = ReviewService(seeded_connection, seeded_user.id).generate(request)
 
     assert review.model_name == "template-supportive-v1"
     assert review.generated_text.startswith("You moved this forward:")
     assert review.wins[0].title == "Progress on Theseus backend"
 
 
-def test_service_persists_openai_writer_result(seeded_connection) -> None:
+def test_service_persists_openai_writer_result(seeded_connection, seeded_user) -> None:
     request = WeeklyReviewGenerateRequest(
         week_start=date(2026, 6, 8),
         week_end=date(2026, 6, 14),
@@ -91,8 +94,10 @@ def test_service_persists_openai_writer_result(seeded_connection) -> None:
         transport=StaticOpenAITransport(),
     )
 
-    review = ReviewService(seeded_connection, writer=writer).generate(request)
-    stored = WeeklyReviewRepository(seeded_connection).get_by_week(
+    review = ReviewService(
+        seeded_connection, seeded_user.id, writer=writer
+    ).generate(request)
+    stored = WeeklyReviewRepository(seeded_connection, seeded_user.id).get_by_week(
         "2026-06-08", "2026-06-14"
     )
 
@@ -102,7 +107,10 @@ def test_service_persists_openai_writer_result(seeded_connection) -> None:
     assert stored == review
 
 
-def test_service_persists_opencode_go_writer_result(seeded_connection) -> None:
+def test_service_persists_opencode_go_writer_result(
+    seeded_connection,
+    seeded_user,
+) -> None:
     request = WeeklyReviewGenerateRequest(
         week_start=date(2026, 6, 8),
         week_end=date(2026, 6, 14),
@@ -113,8 +121,10 @@ def test_service_persists_opencode_go_writer_result(seeded_connection) -> None:
         transport=StaticChatCompletionsTransport(),
     )
 
-    review = ReviewService(seeded_connection, writer=writer).generate(request)
-    stored = WeeklyReviewRepository(seeded_connection).get_by_week(
+    review = ReviewService(
+        seeded_connection, seeded_user.id, writer=writer
+    ).generate(request)
+    stored = WeeklyReviewRepository(seeded_connection, seeded_user.id).get_by_week(
         "2026-06-08", "2026-06-14"
     )
 
@@ -124,6 +134,6 @@ def test_service_persists_opencode_go_writer_result(seeded_connection) -> None:
     assert stored == review
 
 
-def test_service_rejects_week_without_plan(connection) -> None:
+def test_service_rejects_week_without_plan(connection, local_user) -> None:
     with pytest.raises(WeeklyPlanNotFound):
-        ReviewService(connection).generate(REQUEST)
+        ReviewService(connection, local_user.id).generate(REQUEST)

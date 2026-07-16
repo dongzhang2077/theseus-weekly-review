@@ -20,6 +20,7 @@ This avoids rewriting core logic when the project later adds a mobile app, histo
 
 These concepts should remain stable:
 
+- LocalUser as a local data-ownership root
 - Goal
 - Project
 - WeeklyPlan
@@ -103,8 +104,13 @@ Sprint 1 schema should include long-term extension points now:
 - Keep project stage and weekly target fields in the database.
 - Store review evidence JSON with generated text.
 - Add indexes for date, project, goal, and activity type queries.
+- Scope personal records, date uniqueness, repository reads, imports, and
+  review generation by a stable local `user_id`.
+- Reject references that cross local-user ownership boundaries.
 
-Do not add production-grade auth or multi-user complexity in Sprint 1 unless it is required for the course demo.
+The local user is an explicit persistence scope required by the course demo;
+it is not production-grade authentication or cloud multi-tenancy. Keep
+production auth and sync deferred.
 
 ## 6. Review Engine Design Rules
 
@@ -182,7 +188,8 @@ Current status: implemented.
 sample_week.json -> SQLite -> review_engine -> stored weekly_review
 ```
 
-Sprint 1 target.
+Current status: implemented with SQLite schema version 2, version 1 migration,
+user-scoped repositories, and restart-path tests.
 
 ### Stage C: Web Input
 
@@ -190,7 +197,10 @@ Sprint 1 target.
 web forms -> backend SQLite -> review_engine
 ```
 
-Sprint 2 or Sprint 3 target.
+Current status: implemented through the React local-profile flow and typed
+goal, project, plan, and time-log API adapters. Signals consumes interpreted
+review evidence, and Plan can load, atomically replace, or Undo a user-scoped
+next-week adjustment in the current worktree.
 
 ### Stage D: Mobile Export
 
@@ -230,3 +240,7 @@ Sprint 1 should implement:
 5. Tests or scripts proving the same review output can be generated from persisted data.
 
 This gives the team a real product foundation while still keeping the course MVP feasible.
+
+Current status: the persistence foundation is implemented. The active runway
+continues in `docs/13_product_agent_development_strategy.md` with truthful
+Signals/Plan states before any LangGraph or OpenClaw integration.

@@ -1,6 +1,22 @@
 # API Contract
 
-The API uses JSON over HTTP. Authentication is optional for the local MVP and can be added later.
+The API uses JSON over HTTP. Production authentication is deferred, but every
+persisted personal-data operation runs under an explicit local profile.
+
+Send the selected profile ID in this header:
+
+```http
+X-Theseus-User-Id: 1
+```
+
+The header is required for goals, projects, weekly plans, time logs, mobile
+imports, and persisted weekly-review generation. It is not required for
+health, local-user creation/list/get, or the pure in-memory
+`POST /reviews/weekly/analyze` endpoint. The header selects an ownership scope;
+it is not an authentication credential.
+
+Persisted personal records include `user_id` in read responses. Clients cannot
+override it in request bodies.
 
 For the local browser demo, the backend allows `http://127.0.0.1:5173` and
 `http://localhost:5173` as CORS origins by default. Override this with the
@@ -19,7 +35,45 @@ Response:
 }
 ```
 
-## 2. Goals
+## 2. Local Users
+
+### POST /users
+
+Request:
+
+```json
+{
+  "display_name": "Douglas",
+  "timezone": "America/Los_Angeles",
+  "locale": "en-US"
+}
+```
+
+Response:
+
+```json
+{
+  "id": 1,
+  "display_name": "Douglas",
+  "timezone": "America/Los_Angeles",
+  "locale": "en-US",
+  "created_at": "2026-07-15T12:00:00",
+  "updated_at": "2026-07-15T12:00:00"
+}
+```
+
+Status: `201 Created`. This endpoint does not require an existing user header.
+
+### GET /users
+
+Returns all local profiles ordered by ID. It does not return records owned by
+those profiles.
+
+### GET /users/{user_id}
+
+Returns one local profile or `404 Not Found`.
+
+## 3. Goals
 
 ### POST /goals
 
@@ -39,10 +93,13 @@ Response:
 ```json
 {
   "id": 1,
+  "user_id": 1,
   "title": "Research Proposal",
   "description": "Finish and refine applied research proposal work.",
   "priority": 1,
-  "active_status": true
+  "active_status": true,
+  "created_at": "2026-07-15T12:00:00",
+  "updated_at": "2026-07-15T12:00:00"
 }
 ```
 
@@ -52,7 +109,7 @@ Status: `201 Created`.
 
 Returns all goals ordered by priority and ID. Persisted responses also include `created_at` and `updated_at`.
 
-## 3. Projects
+## 4. Projects
 
 ### POST /projects
 
@@ -76,7 +133,7 @@ Status: `201 Created`. A missing `goal_id` returns a controlled `4xx` response.
 
 Returns projects ordered by ID.
 
-## 4. Weekly Plans
+## 5. Weekly Plans
 
 ### POST /weekly-plans
 
@@ -106,7 +163,27 @@ Status: `201 Created`. The plan and all items are committed atomically.
 
 Returns persisted plans with item IDs and deterministic item ordering.
 
-## 5. Time Logs
+### PUT /weekly-plans/{plan_id}
+
+Replaces one user-owned weekly plan and its complete planned-item collection.
+The request body is the same as `POST /weekly-plans`. The plan ID and
+`created_at` are preserved; replacement items receive persisted IDs and the
+response uses the normal weekly-plan read shape.
+
+Status: `200 OK`. The plan header and all replacement items are committed
+atomically. If any item or date conflicts with database constraints, the API
+returns `409 Conflict` and preserves the prior plan. A plan outside the selected
+local-user scope is reported as `404 Not Found`.
+
+### DELETE /weekly-plans/{plan_id}
+
+Deletes one user-owned weekly plan and its planned items. This is used by the
+course MVP to Undo a newly created next-week adjustment.
+
+Status: `204 No Content`. A missing plan or a plan outside the selected
+local-user scope returns `404 Not Found`.
+
+## 6. Time Logs
 
 ### POST /time-logs
 
@@ -132,7 +209,7 @@ Status: `201 Created`.
 
 Returns time logs ordered by date, start time, and ID.
 
-## 6. Mobile Imports
+## 7. Mobile Imports
 
 ### POST /imports/mobile-time-logs
 
@@ -185,7 +262,7 @@ logs and counted as `needs_mapping` so the UI can later ask the user to map
 them. Duplicate `source_record_id` values inside one batch are skipped. Invalid
 payload shape returns `422`.
 
-## 7. Weekly Review
+## 8. Weekly Review
 
 ### POST /reviews/weekly/generate
 
@@ -309,22 +386,39 @@ defined by the Sprint 2 evidence contract.
       ]
     }
   },
-  "generated_text": "Win: ... Insight: ... Risk: ... Next step: ..."
+  "generated_text": "Win: ... Insight: ... Risk: ... Next step: ...",
+  "model_name": null,
+  "created_at": "2026-07-15T12:00:00",
+  "updated_at": "2026-07-15T12:00:00"
 }
 ```
 
-The persisted response also includes `id`, `created_at`, and `updated_at`. If no matching weekly plan exists, the endpoint returns `404`. The endpoint reads normalized evidence from SQLite, calls the framework-independent review engine, and stores the structured result before responding.
+If no matching weekly plan exists for the selected user, the endpoint returns
+`404`. The endpoint reads only that user's normalized evidence from SQLite,
+calls the framework-independent review engine, and stores the structured result
+under the same user before responding.
 
-## 8. Validation and Errors
+## 9. Validation and Errors
 
 - Invalid request data returns `422`.
+- A missing or invalid `X-Theseus-User-Id` on a user-owned endpoint returns
+  `422`; an unknown positive user ID returns `404`.
 - Missing referenced entities return `404` or `409`, depending on whether the operation is a lookup or a conflicting write.
+- Weekly-plan replacement is whole-resource and atomic; it never leaves a
+  partially replaced item collection.
+- A reference to another user's goal, project, activity, or plan is rejected as
+  `409`; APIs never fall back to an unscoped lookup.
 - Create requests never accept database-managed IDs or timestamps.
+- User-owned create bodies never accept `user_id`; ownership comes only from
+  the request header.
 - Empty optional strings are accepted; required names and titles must not be empty.
 - `start_time` and `end_time` must be supplied together.
 - Batch mobile imports report unresolved `activity_id` or `project_id` as record-level `skipped` and `needs_mapping` counts instead of failing the whole request.
 
-## 9. Evaluation
+## 10. Evaluation
+
+Planned contract only: this endpoint is not implemented in the 2026-07-18
+checkpoint.
 
 ### POST /evaluation/review-feedback
 

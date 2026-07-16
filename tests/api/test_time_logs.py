@@ -2,6 +2,7 @@ import httpx
 import pytest
 
 from backend.app.main import create_app
+from tests.support import create_and_select_api_user
 
 
 pytestmark = pytest.mark.anyio
@@ -11,6 +12,7 @@ async def test_time_log_api_creates_project_linked_and_ad_hoc_logs(database) -> 
     app = create_app(database.path)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client)
         goal = (await client.post("/goals", json={"title": "Build MVP"})).json()
         project = (
             await client.post(
@@ -53,6 +55,7 @@ async def test_time_log_api_validates_references_types_and_times(database) -> No
     app = create_app(database.path)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client)
         missing_project = await client.post(
             "/time-logs",
             json={

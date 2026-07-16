@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { choosePrioritySignal, sortSignalEvidence, type SignalSummary } from "./signalModel";
+import { choosePrioritySignal, orderSignalSummaries, sortSignalEvidence, type SignalSummary } from "./signalModel";
 
 const baseSignals: SignalSummary[] = [
   { id: "plan", label: "Plan", severity: "attention", status: "Plan drift", reason: "Plan changed." },
@@ -10,12 +10,12 @@ const baseSignals: SignalSummary[] = [
 
 describe("signalModel", () => {
   it("chooses the highest severity signal", () => {
-    expect(choosePrioritySignal(baseSignals).id).toBe("stage");
+    expect(choosePrioritySignal(baseSignals)?.id).toBe("stage");
   });
 
   it("uses the product priority order when severity ties", () => {
     const tied = baseSignals.map((signal) => ({ ...signal, severity: "attention" as const }));
-    expect(choosePrioritySignal(tied).id).toBe("stage");
+    expect(choosePrioritySignal(tied)?.id).toBe("stage");
   });
 
   it("sorts evidence rows by severity", () => {
@@ -25,5 +25,18 @@ describe("signalModel", () => {
     ]);
 
     expect(sorted.map((row) => row.id)).toEqual(["risk", "healthy"]);
+  });
+
+  it("keeps the four summary rows in a stable scan order", () => {
+    expect(orderSignalSummaries([...baseSignals].reverse()).map((row) => row.id)).toEqual([
+      "plan",
+      "stage",
+      "goal",
+      "energy"
+    ]);
+  });
+
+  it("returns no priority when signal data is absent", () => {
+    expect(choosePrioritySignal([])).toBeNull();
   });
 });

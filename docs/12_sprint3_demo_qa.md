@@ -1,5 +1,10 @@
 # Sprint 3 Demo QA Note
 
+> Historical checkpoint: this file records the Sprint 3 QA surface. Backend
+> integration and the current Review/Signals/Track/Plan flow have since moved
+> forward. Use [`14_midterm_demo_runbook.md`](14_midterm_demo_runbook.md) for
+> the 2026-07-18 demo and current limitations.
+
 ## Demo Scope
 
 Sample week:

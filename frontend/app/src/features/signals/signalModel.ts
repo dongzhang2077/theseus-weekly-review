@@ -13,12 +13,14 @@ export interface SignalEvidence {
   id: string;
   title: string;
   severity: SignalSeverity;
+  status?: string;
+  value?: string;
   reason: string;
   rows: Array<{
     label: string;
     value: string;
   }>;
-  action?: string;
+  action?: "Plan";
 }
 
 export const severityRank: Record<SignalSeverity, number> = {
@@ -29,8 +31,10 @@ export const severityRank: Record<SignalSeverity, number> = {
 };
 
 export const signalPriorityOrder: SignalId[] = ["stage", "plan", "goal", "energy"];
+export const signalDisplayOrder: SignalId[] = ["plan", "stage", "goal", "energy"];
 
-export function choosePrioritySignal(signals: SignalSummary[]): SignalSummary {
+export function choosePrioritySignal(signals: SignalSummary[]): SignalSummary | null {
+  if (signals.length === 0) return null;
   return [...signals].sort((a, b) => {
     const severityDelta = severityRank[b.severity] - severityRank[a.severity];
     if (severityDelta !== 0) return severityDelta;
@@ -39,5 +43,15 @@ export function choosePrioritySignal(signals: SignalSummary[]): SignalSummary {
 }
 
 export function sortSignalEvidence(rows: SignalEvidence[]): SignalEvidence[] {
-  return [...rows].sort((a, b) => severityRank[b.severity] - severityRank[a.severity]);
+  return [...rows].sort((a, b) => {
+    const severityDelta = severityRank[b.severity] - severityRank[a.severity];
+    return severityDelta !== 0 ? severityDelta : a.title.localeCompare(b.title);
+  });
+}
+
+export function orderSignalSummaries(signals: SignalSummary[]): SignalSummary[] {
+  return signalDisplayOrder.flatMap((id) => {
+    const signal = signals.find((candidate) => candidate.id === id);
+    return signal ? [signal] : [];
+  });
 }

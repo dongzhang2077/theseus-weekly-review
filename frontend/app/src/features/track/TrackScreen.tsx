@@ -22,9 +22,10 @@ type TrackSheet = "logs" | "create";
 interface TrackScreenProps {
   track: AppWeekViewModel["track"];
   apiBaseUrl?: string;
+  userId?: number;
 }
 
-export function TrackScreen({ apiBaseUrl, track }: TrackScreenProps) {
+export function TrackScreen({ apiBaseUrl, userId, track }: TrackScreenProps) {
   const [activities, setActivities] = useState(track.activities);
   const [activeSheet, setActiveSheet] = useState<TrackSheet | null>(null);
   const [detail, setDetail] = useState<ActivityTimer | null>(null);
@@ -54,7 +55,7 @@ export function TrackScreen({ apiBaseUrl, track }: TrackScreenProps) {
     setActivities((current) => {
       const activity = current.find((item) => item.id === activityId);
       if (activity?.running && apiBaseUrl) {
-        void saveActivitySession({ apiBaseUrl, activity });
+        void saveActivitySession({ apiBaseUrl, userId, activity });
       }
 
       return toggleActivity(current, activityId);

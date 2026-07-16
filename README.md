@@ -17,6 +17,7 @@ The MVP is intentionally narrow. Theseus is not a full autonomous planner, not a
 The MVP supports:
 
 - Goal and project setup
+- Local profile creation and user-scoped SQLite persistence
 - Weekly plan input
 - Time log input
 - Activity energy-impact labels: `consuming`, `neutral`, `restore`, `destroy`
@@ -87,7 +88,7 @@ FastAPI Backend
   Validation, persistence, API contracts, review orchestration
 
 SQLite Database
-  Goals, projects, weekly plans, time logs, reflections, weekly reviews
+  Local users, goals, projects, weekly plans, time logs, reflections, weekly reviews
 
 Review Engine
   Deterministic checks + structured AI generation
@@ -97,6 +98,9 @@ Evaluation Layer
 ```
 
 See [System Architecture](docs/02_system_architecture.md) for the full design.
+Use the [Product and Agent Development Strategy](docs/13_product_agent_development_strategy.md)
+for the 2026-07-18 stabilization priorities and the gated path toward
+LangGraph, OpenClaw, long-term memory, and learned personalization.
 
 ## Development Priorities
 
@@ -129,6 +133,17 @@ Expected output:
 - `evidence`
 - `generated_text`
 
+Prepare a fresh, sanitized database for the July 18 integrated demo:
+
+```bash
+.venv/bin/python scripts/prepare_midterm_demo.py
+```
+
+The command prints the temporary database path and local demo-user ID. Follow
+the [Midterm Demo Runbook](docs/14_midterm_demo_runbook.md) for startup,
+preflight, the five-minute flow, screenshots, fallback behavior, and known
+limitations.
+
 Start the backend after installing dependencies:
 
 ```bash
@@ -136,6 +151,23 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
 uvicorn backend.app.main:app --reload
+```
+
+Load and verify the sanitized persisted demo path in a separate terminal:
+
+```bash
+python3 scripts/load_sample_data.py --database /tmp/theseus-demo.db --user-name "Demo User"
+python3 scripts/run_persisted_review.py --database /tmp/theseus-demo.db --user-id 1 --week-start 2026-06-08 --week-end 2026-06-14
+```
+
+The first command prints the selected `user_id`; use that value in the second
+command if the database already contains profiles. Personal API routes use the
+same ID through `X-Theseus-User-Id`.
+
+Run the React app against the local API:
+
+```bash
+VITE_THESEUS_API_BASE_URL=http://127.0.0.1:8000 npm --prefix frontend/app run dev
 ```
 
 ## GitHub Setup

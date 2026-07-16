@@ -2,6 +2,7 @@ import httpx
 import pytest
 
 from backend.app.main import create_app
+from tests.support import create_and_select_api_user
 
 
 pytestmark = pytest.mark.anyio
@@ -11,6 +12,7 @@ async def test_project_api_creates_linked_project_and_lists_by_id(database) -> N
     app = create_app(database.path)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client)
         goal = (await client.post("/goals", json={"title": "Build MVP"})).json()
         first = await client.post(
             "/projects",
@@ -35,6 +37,7 @@ async def test_project_api_returns_controlled_error_for_missing_goal(database) -
     app = create_app(database.path)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client)
         response = await client.post("/projects", json={"goal_id": 999, "title": "Missing"})
 
     assert response.status_code == 409

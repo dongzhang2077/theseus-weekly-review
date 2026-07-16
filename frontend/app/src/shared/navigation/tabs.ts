@@ -14,3 +14,8 @@ export const tabs: TabItem[] = [
   { id: "track", label: "Track", icon: "timer" },
   { id: "plan", label: "Plan", icon: "calendar" }
 ];
+
+export function resolveInitialTab(search: string): AppTab {
+  const requested = new URLSearchParams(search).get("tab");
+  return tabs.some((tab) => tab.id === requested) ? requested as AppTab : "review";
+}

@@ -25,14 +25,22 @@ class WeeklyPlanNotFound(LookupError):
 
 
 class ReviewService:
-    def __init__(self, connection: sqlite3.Connection, writer: ReviewWriter | None = None) -> None:
+    def __init__(
+        self,
+        connection: sqlite3.Connection,
+        user_id: int,
+        writer: ReviewWriter | None = None,
+    ) -> None:
         self.connection = connection
+        self.user_id = user_id
         self.writer = writer
 
     def generate(self, request: WeeklyReviewGenerateRequest) -> WeeklyReviewRead:
         week_start = request.week_start.isoformat()
         week_end = request.week_end.isoformat()
-        plan = WeeklyPlanRepository(self.connection).get_by_week(week_start, week_end)
+        plan = WeeklyPlanRepository(self.connection, self.user_id).get_by_week(
+            week_start, week_end
+        )
         if plan is None:
             raise WeeklyPlanNotFound(
                 f"No weekly plan exists for {week_start} through {week_end}"
@@ -41,22 +49,24 @@ class ReviewService:
         payload = {
             "goals": [
                 item.model_dump(mode="json")
-                for item in GoalRepository(self.connection).list()
+                for item in GoalRepository(self.connection, self.user_id).list()
             ],
             "projects": [
                 item.model_dump(mode="json")
-                for item in ProjectRepository(self.connection).list()
+                for item in ProjectRepository(self.connection, self.user_id).list()
             ],
             "weekly_plan": plan.model_dump(mode="json"),
             "time_logs": [
                 item.model_dump(mode="json")
-                for item in TimeLogRepository(self.connection).list_between(
+                for item in TimeLogRepository(self.connection, self.user_id).list_between(
                     week_start, week_end
                 )
             ],
             "daily_reflections": [
                 item.model_dump(mode="json")
-                for item in DailyReflectionRepository(self.connection).list_between(
+                for item in DailyReflectionRepository(
+                    self.connection, self.user_id
+                ).list_between(
                     week_start, week_end
                 )
             ],
@@ -67,7 +77,7 @@ class ReviewService:
             writer = review_writer_from_environment() or TemplateSupportiveReviewWriter()
         if writer is not None:
             result = writer.rewrite(result)
-        return WeeklyReviewRepository(self.connection).save(
+        return WeeklyReviewRepository(self.connection, self.user_id).save(
             result,
             model_name=writer.model_name if writer is not None else None,
         )

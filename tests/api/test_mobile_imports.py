@@ -2,6 +2,7 @@ import httpx
 import pytest
 
 from backend.app.main import create_app
+from tests.support import create_and_select_api_user
 
 
 pytestmark = pytest.mark.anyio
@@ -11,6 +12,7 @@ async def test_mobile_import_creates_normalized_time_logs(database) -> None:
     app = create_app(database.path)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client)
         goal = (await client.post("/goals", json={"title": "Build MVP"})).json()
         project = (
             await client.post(
@@ -68,6 +70,7 @@ async def test_mobile_import_skips_duplicate_source_records_and_missing_project(
     app = create_app(database.path)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client)
         response = await client.post(
             "/imports/mobile-time-logs",
             json={
@@ -101,6 +104,7 @@ async def test_mobile_import_validates_payload_shape(database) -> None:
     app = create_app(database.path)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client)
         empty_batch = await client.post(
             "/imports/mobile-time-logs",
             json={"time_logs": []},

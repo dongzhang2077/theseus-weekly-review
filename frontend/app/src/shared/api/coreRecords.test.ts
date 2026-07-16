@@ -20,6 +20,7 @@ describe("coreRecords api helpers", () => {
     await expect(
       createGoal({
         apiBaseUrl: "http://127.0.0.1:8000/",
+        userId: 7,
         payload: {
           title: "Research Proposal",
           priority: 1,
@@ -30,6 +31,7 @@ describe("coreRecords api helpers", () => {
     ).resolves.toEqual({ ok: true, data: { id: 1 }, error: null });
 
     expect(calls[0].input).toBe("http://127.0.0.1:8000/goals");
+    expect(calls[0].init.headers).toMatchObject({ "X-Theseus-User-Id": "7" });
     expect(JSON.parse(String(calls[0].init.body))).toMatchObject({
       title: "Research Proposal",
       priority: 1,
@@ -42,6 +44,7 @@ describe("coreRecords api helpers", () => {
 
     await createProject({
       apiBaseUrl: "http://127.0.0.1:8000",
+      userId: 7,
       payload: {
         goal_id: 1,
         title: "Theseus MVP",
@@ -66,6 +69,7 @@ describe("coreRecords api helpers", () => {
 
     await createWeeklyPlan({
       apiBaseUrl: "http://127.0.0.1:8000",
+      userId: 7,
       payload: {
         week_start: "2026-06-08",
         week_end: "2026-06-14",
@@ -97,6 +101,16 @@ describe("coreRecords api helpers", () => {
       ok: false,
       data: null,
       error: "API base URL is not configured"
+    });
+  });
+
+  it("does not write when the local user is missing", async () => {
+    await expect(
+      createGoal({ apiBaseUrl: "http://127.0.0.1:8000", payload: { title: "Research" } })
+    ).resolves.toEqual({
+      ok: false,
+      data: null,
+      error: "Local user is not selected"
     });
   });
 });

@@ -143,7 +143,10 @@ def _build_evidence(
     actual_by_goal: dict[int, int],
     activity_mix: dict[str, int],
 ) -> dict[str, Any]:
-    planned_total = sum(planned_by_project.values())
+    planned_total = sum(
+        int(item.get("planned_minutes", 0))
+        for item in weekly_plan.get("items", [])
+    )
     actual_total = sum(int(log.get("duration_minutes", 0)) for log in time_logs)
     capacity = int(weekly_plan.get("planned_capacity_minutes", 0))
     slack_minutes = capacity - planned_total if capacity > 0 else None
