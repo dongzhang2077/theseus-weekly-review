@@ -130,6 +130,37 @@ describe("PlanScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByRole("button", { name: "Suggested adjustment: Protect one restart block" })).toBeInTheDocument();
   });
+
+  it("offers a discoverable manual editor without requiring Review", async () => {
+    renderPlan();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit plan" })[0]);
+    const editor = screen.getByRole("region", { name: "Edit plan" });
+    expect(within(editor).getByLabelText("Weekly capacity hours")).toHaveValue(30);
+
+    fireEvent.click(within(editor).getByRole("button", { name: "Add block" }));
+    fireEvent.change(within(editor).getByLabelText("Plan block 4 title"), {
+      target: { value: "Demo rehearsal" }
+    });
+    fireEvent.change(within(editor).getByLabelText("Plan block 4 duration"), {
+      target: { value: "45" }
+    });
+    fireEvent.click(within(editor).getByRole("button", { name: "Save plan" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Sample plan updated");
+    expect(screen.getByRole("button", { name: "Week balance: Balanced" })).toHaveTextContent("11h 45m");
+  });
+
+  it("starts a planned block through the parent Focus callback", () => {
+    const onFocusItem = vi.fn();
+    renderPlan({ onFocusItem });
+
+    fireEvent.click(screen.getByRole("button", { name: "Focus Design backend schema and API" }));
+    expect(onFocusItem).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Design backend schema and API", plannedMinutes: 300 }),
+      "Theseus backend"
+    );
+  });
 });
 
 function renderPlan(overrides: Partial<React.ComponentProps<typeof PlanScreen>> = {}) {

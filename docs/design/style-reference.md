@@ -10,6 +10,10 @@ Reference image:
 
 This is the primary visual direction for the Theseus frontend. Use it as a style reference, not as a fixed layout template.
 
+The accepted implementation and governance rules are recorded in
+`docs/design/frontend-design-governance.md`. Its 2026-07-17 decisions take
+precedence over older icon-only or decoration-heavy guidance.
+
 ## Intent
 
 The UI should feel like a bright weekly-review desk: calm, organized, lightly personal, and usable for repeated planning and reflection. It should avoid dark, heavy, game-like, or marketing-page presentation.
@@ -35,7 +39,7 @@ Desktop:
 
 Mobile:
 
-- Bottom icon navigation.
+- Bottom navigation with icons and short visible labels.
 - Compact week selector in the top bar.
 - Stack review sections into small panels.
 - Collapse tables into abbreviated rows or summary cards.
@@ -63,8 +67,9 @@ Avoid:
 
 ## Components
 
-- Navigation items should be icon-only with clear selected state.
-- Buttons should be icon-only by default, following `theseus-ux-standards`.
+- Primary navigation items use an icon and a one-word visible label with a clear selected state.
+- Familiar utility controls may be icon-only when they have accessible names.
+- Primary and ambiguous actions use concise visible labels.
 - Tables should use thin row dividers, compact labels, and clear numeric alignment.
 - Status chips should be small, soft, and color-coded.
 - Review sections should use light section dividers and compact headers.
@@ -100,7 +105,7 @@ Decoration is allowed only as a light stationery cue.
 ## Hard Constraints
 
 - No emoji in the UI.
-- No visible text on buttons by default.
+- Do not hide the meaning of primary or ambiguous actions behind icons.
 - Do not add explanatory product copy to main screens.
 - Do not turn this into a landing page.
 - Do not let decoration compete with review evidence.

@@ -4,6 +4,7 @@ export interface ActivityTimer {
   id: string;
   activityId?: number;
   projectId?: number;
+  projectTitle?: string;
   name: string;
   category: string;
   energy: EnergyKind;

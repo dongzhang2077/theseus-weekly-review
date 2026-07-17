@@ -9,13 +9,13 @@ Reusable component rules live in `docs/design/app-component-contract.md`.
 
 ### Level 1 Icon Rule
 
-Level 1 entry points are icon-only by default.
+Primary navigation uses icons plus one-word labels. Other Level 1 entries are
+icon-first.
 
 Rules:
 
 - Use stable, familiar icons before adding visible text.
-- Do not add default text labels to Level 1 entry icons.
-- If manual review or user testing shows that an icon is unclear, add a compact fallback label.
+- Add a compact label to primary or ambiguous actions.
 - Fallback labels may be 1 to 2 words only.
 - Fallback labels name the entry point; they do not explain it.
 - Every icon-only control must have an accessible name.
@@ -24,7 +24,7 @@ Rules:
 Example:
 
 ```text
-Allowed fallback: Signals
+Allowed: Signals
 Not allowed: See why your review was generated
 ```
 
@@ -627,7 +627,7 @@ Error:
 Before converting the app UX into production frontend code, the HTML prototype must pass this checklist:
 
 - Each main screen follows the Level 1 information budget.
-- Level 1 entry points are icon-only by default.
+- Primary navigation uses icon-plus-label entries; other Level 1 actions remain icon-first.
 - No Level 1 screen uses a table, full list, or long paragraph.
 - No Track screen uses a traditional form.
 - Any detail is reachable within two taps from its parent tab.
@@ -635,4 +635,4 @@ Before converting the app UX into production frontend code, the HTML prototype m
 - Plan deduplicates review suggestion and restart entry.
 - Track includes startup, running, paused, stop, and save states.
 - Each screen has loading, empty/no-data, error, and success states where relevant.
-- Compact visible labels appear only as reviewed fallbacks.
+- Compact visible labels name primary or ambiguous actions without adding explanatory copy.

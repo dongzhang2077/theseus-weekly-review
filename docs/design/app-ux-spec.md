@@ -6,6 +6,9 @@ Related visual direction lives in `docs/design/style-reference.md`.
 Screen-level wireframe details live in `docs/design/app-screen-wireframes.md`.
 Component-level constraints live in `docs/design/app-component-contract.md`.
 App visual tokens and style rules live in `docs/design/app-visual-system.md`.
+Accepted frontend implementation decisions live in
+`docs/design/frontend-design-governance.md` and take precedence when older
+guidance conflicts.
 
 ## 1. Demo Position
 
@@ -29,12 +32,13 @@ The app has four conceptual tabs:
 
 - Review: this week's feedback.
 - Signals: why the app reached that feedback.
-- Track: raw behavior capture and time tracking.
+- Focus: raw behavior capture and time tracking (the internal module remains `track`).
 - Plan: next-week adjustment.
 
-Bottom navigation should use icons. Visible tab text is not required in the final app UI, but each icon must have an accessible name.
-
-Level 1 entry points are icon-only by default. Compact visible labels are a fallback after manual review or user testing shows that an icon is unclear. If a fallback label is added, it may only name the entry point; it must not explain the feature.
+Bottom navigation uses icons plus the short visible labels `Review`, `Signals`,
+`Focus`, and `Plan`. Other Level 1 entry points are icon-first, but primary or
+ambiguous actions use a compact visible label. Every icon-only control has an
+accessible name.
 
 ## 4. Information Layering
 
@@ -79,10 +83,11 @@ Rules:
 Primary navigation:
 
 ```text
-Review | Signals | Track | Plan
+Review | Signals | Focus | Plan
 ```
 
-Implementation note: final UI should use icons for these entries. Text labels may be hidden visually but must remain available to assistive technology.
+Implementation note: final UI shows both the icon and the one-word label for
+these entries; the selected state is not communicated by color alone.
 
 Global top bars should be compact. Do not add permanent utility actions unless they are needed for the current state.
 

@@ -12,6 +12,9 @@ import { createLocalUser, listLocalUsers, type LocalUser, type LocalUserCreatePa
 import { LocalProfileScreen } from "./features/profile/LocalProfileScreen";
 import { StateSurface } from "./shared/components/StateSurface";
 import { clearStoredUserId, readStoredUserId, storeUserId } from "./shared/profile/localProfilePreference";
+import { tickActivities } from "./features/track/timerModel";
+import type { ActivityTimer } from "./shared/domain/track";
+import type { PlanItem } from "./features/plan/planModel";
 
 const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 const apiBaseUrl = env.VITE_THESEUS_API_BASE_URL?.trim();
@@ -41,10 +44,50 @@ export function App() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileReload, setProfileReload] = useState(0);
   const [weekReload, setWeekReload] = useState(0);
+  const [trackActivities, setTrackActivities] = useState<ActivityTimer[]>(demoWeek.track.activities);
+  const hasRunningTrackActivity = trackActivities.some((activity) => activity.running);
 
   function openPlanSuggestion() {
     setPlanEntryRequest({ id: Date.now(), detail: "suggestion" });
     setActiveTab("plan");
+  }
+
+  function focusPlanItem(item: PlanItem, projectTitle: string | null) {
+    const activityId = `plan-${item.id ?? `${item.projectId ?? "flex"}-${planItemKey(item.title)}`}`;
+    setTrackActivities((current) => {
+      const existing = current.find((activity) => activity.id === activityId);
+      if (existing) {
+        return current.map((activity) =>
+          activity.id === activityId
+            ? {
+                ...activity,
+                name: item.title,
+                category: "Project",
+                projectId: item.projectId ?? undefined,
+                projectTitle: projectTitle ?? undefined,
+                recommended: true
+              }
+            : activity
+        );
+      }
+      return [
+        {
+          id: activityId,
+          projectId: item.projectId ?? undefined,
+          name: item.title,
+          category: "Project",
+          energy: "consume",
+          color: "#6f8f6b",
+          projectTitle: projectTitle ?? undefined,
+          todaySeconds: 0,
+          sessionSeconds: 0,
+          running: false,
+          recommended: true
+        },
+        ...current
+      ];
+    });
+    setActiveTab("track");
   }
 
   useEffect(() => {
@@ -90,6 +133,7 @@ export function App() {
     loadAppWeek({ apiBaseUrl, userId: selectedUser.id }).then((loaded) => {
       if (!ignore) {
         setLoadedWeek(loaded);
+        setTrackActivities(loaded.week.track.activities);
         setWeekLoading(false);
       }
     });
@@ -98,6 +142,21 @@ export function App() {
       ignore = true;
     };
   }, [selectedUser, weekReload]);
+
+  useEffect(() => {
+    if (!hasRunningTrackActivity) return;
+
+    let lastTick = Date.now();
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      const elapsedSeconds = Math.floor((now - lastTick) / 1000);
+      if (elapsedSeconds <= 0) return;
+      lastTick += elapsedSeconds * 1000;
+      setTrackActivities((current) => tickActivities(current, elapsedSeconds));
+    }, 250);
+
+    return () => window.clearInterval(interval);
+  }, [hasRunningTrackActivity]);
 
   function selectUser(user: LocalUser) {
     storeUserId(user.id);
@@ -203,7 +262,14 @@ export function App() {
         />
       ) : null}
       {!weekLoading && activeTab === "track" ? (
-        <TrackScreen apiBaseUrl={apiBaseUrl} userId={selectedUser?.id} track={appWeek.track} />
+        <TrackScreen
+          apiBaseUrl={apiBaseUrl}
+          userId={selectedUser?.id}
+          track={appWeek.track}
+          activities={trackActivities}
+          onActivitiesChange={setTrackActivities}
+          onSessionSaved={() => setWeekReload((value) => value + 1)}
+        />
       ) : null}
       {!weekLoading && activeTab === "plan" ? (
         <PlanScreen
@@ -213,8 +279,13 @@ export function App() {
           reviewSource={loadedWeek.source}
           entryRequest={planEntryRequest}
           onReview={() => setActiveTab("review")}
+          onFocusItem={focusPlanItem}
         />
       ) : null}
     </AppShell>
   );
+}
+
+function planItemKey(title: string): string {
+  return title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "block";
 }

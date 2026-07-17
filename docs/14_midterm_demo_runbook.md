@@ -17,7 +17,7 @@ Dependencies:
 
 - local-user ownership and restart persistence;
 - deterministic review evidence and the local supportive template;
-- Review, Signals, Track, and Plan app surfaces;
+- Review, Signals, Focus, and Plan app surfaces;
 - sanitized sample data under `data/sample/`.
 
 Demo evidence:
@@ -130,13 +130,15 @@ All committed screenshots use the sanitized, explicit `Sample data` mode.
 |---|---|---|
 | Review | [review-mobile.png](demo/screenshots/review-mobile.png) | [review-desktop.png](demo/screenshots/review-desktop.png) |
 | Signals | [signals-mobile.png](demo/screenshots/signals-mobile.png) | Mobile is the primary surface. |
-| Track | [track-mobile.png](demo/screenshots/track-mobile.png) | Mobile is the primary surface. |
+| Focus | [track-mobile.png](demo/screenshots/track-mobile.png) | Mobile is the primary surface; `track` remains the internal module name. |
 | Plan | [plan-mobile.png](demo/screenshots/plan-mobile.png) | [plan-desktop.png](demo/screenshots/plan-desktop.png) |
 
-Visual review on 2026-07-15 found no clipped content, overlapping text, emoji,
-missing accessible icon labels, or cross-screen style break. Signals and Plan
-retain the paper texture, restrained borders, muted semantic colors, and the
-same bottom navigation as Review and Track.
+Visual review was repeated on 2026-07-17 after the Focus and Plan Tailwind
+recovery. The refreshed 500x932 mobile and 1440x1000 desktop evidence has no
+horizontal clipping, overlapping utility badges, emoji, missing accessible
+labels, or cross-screen style break. A 500x844 short-viewport check also keeps
+all three Plan actions visible. Focus and Plan use the same warm paper surface,
+restrained borders, semantic colors, and icon-plus-label navigation.
 
 ## 7. Known Limitations
 
@@ -148,6 +150,14 @@ same bottom navigation as Review and Track.
   source of truth.
 - Review feedback collection is documented but does not yet have a persisted
   API/UI implementation.
+- `global.css` remains as compatibility styling for screens not yet migrated.
+  STORY-029 adds no new Focus or Plan selectors there; removal is deferred until
+  each remaining consumer has screenshot and interaction coverage.
+- `npm audit --omit=dev` reports zero production vulnerabilities. The legacy
+  Vite 5/esbuild development toolchain reports five development-only findings;
+  the automated fix requires a breaking Vite 8 upgrade, so that upgrade is
+  deferred until after the demo and the dev server remains bound to
+  `127.0.0.1`.
 - GitHub Issue #63 is completed, PR #64 is squash-merged to `main` as
   `306061c`, and the project board is `Done`.
 
