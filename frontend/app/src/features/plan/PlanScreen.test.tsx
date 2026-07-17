@@ -112,6 +112,43 @@ describe("PlanScreen", () => {
     expect(screen.queryByText("Plan saved")).not.toBeInTheDocument();
   });
 
+  it("adds a project-linked plan block and carries it into Focus", async () => {
+    const onFocusItem = vi.fn();
+    renderPlan({ onFocusItem });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
+    const editor = screen.getByRole("region", { name: "Edit plan" });
+    fireEvent.click(within(editor).getByRole("button", { name: "Add block" }));
+
+    fireEvent.change(within(editor).getByLabelText("Plan block 4 title"), {
+      target: { value: "Design review block" }
+    });
+    fireEvent.change(within(editor).getByLabelText("Plan block 4 project"), {
+      target: { value: "2" }
+    });
+    fireEvent.change(within(editor).getByLabelText("Plan block 4 duration"), {
+      target: { value: "45" }
+    });
+    fireEvent.click(within(editor).getByRole("button", { name: "Save plan" }));
+
+    expect(await screen.findByText("Plan updated")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Week balance: Balanced" })).toHaveTextContent("11h 45m");
+
+    fireEvent.click(screen.getByRole("button", { name: "Focus" }));
+    const focusDetail = screen.getByRole("region", { name: "Focus" });
+    fireEvent.click(within(focusDetail).getByRole("button", { name: "Focus Design review block" }));
+
+    expect(onFocusItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: 2,
+        title: "Design review block",
+        plannedMinutes: 45,
+        priority: 4
+      }),
+      "Theseus frontend"
+    );
+  });
+
   it("offers Retry when live plan data cannot load", async () => {
     let shouldFail = true;
     const fetchImpl: FetchLike = async (input, init) => {

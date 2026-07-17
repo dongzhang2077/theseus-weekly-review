@@ -29,8 +29,8 @@ export const demoWeek = {
       },
       {
         id: "win-deep-work",
-        title: "Deep-work blocks protected",
-        reason: "Repeated focus blocks kept implementation moving without fragmenting the week.",
+        title: "Deep work protected",
+        reason: "Focus blocks kept implementation moving.",
         evidence: [
           { label: "Blocks", value: "4" },
           { label: "Longest", value: "2h" },
@@ -181,7 +181,10 @@ export const demoWeek = {
         todaySeconds: 42 * 60,
         sessionSeconds: 0,
         running: false,
-        recommended: true
+        recommended: true,
+        recommendationReason: "Frontend is under plan and supports the demo path.",
+        completionStandard: "Ship one visible UI improvement and verify it builds.",
+        suggestedMinutes: 25
       },
       {
         id: "backend",
@@ -191,7 +194,10 @@ export const demoWeek = {
         color: "#8aa9c0",
         todaySeconds: 24 * 60,
         sessionSeconds: 0,
-        running: false
+        running: false,
+        recommendationReason: "Backend changes are stable; keep this as a short polish pass.",
+        completionStandard: "Check one API path or test gap.",
+        suggestedMinutes: 15
       },
       {
         id: "research",
@@ -201,7 +207,10 @@ export const demoWeek = {
         color: "#c8a25f",
         todaySeconds: 55 * 60,
         sessionSeconds: 0,
-        running: false
+        running: false,
+        recommendationReason: "Neutral work fits a lower-energy block.",
+        completionStandard: "Capture one reusable note or decision.",
+        suggestedMinutes: 15
       },
       {
         id: "walk",
@@ -211,7 +220,10 @@ export const demoWeek = {
         color: "#7f9f85",
         todaySeconds: 45 * 60,
         sessionSeconds: 0,
-        running: false
+        running: false,
+        recommendationReason: "Recovery time helps offset a build-heavy week.",
+        completionStandard: "Take the walk without adding a second task.",
+        suggestedMinutes: 10
       }
     ] satisfies ActivityTimer[]
   },

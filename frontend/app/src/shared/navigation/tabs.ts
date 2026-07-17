@@ -11,7 +11,7 @@ export interface TabItem {
 export const tabs: TabItem[] = [
   { id: "review", label: "Review", icon: "book" },
   { id: "signals", label: "Signals", icon: "activity" },
-  { id: "track", label: "Track", icon: "timer" },
+  { id: "track", label: "Focus", icon: "timer" },
   { id: "plan", label: "Plan", icon: "calendar" }
 ];
 

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { DetailPanel } from "../../shared/components/DetailPanel";
+import { EvidenceTrace } from "../../shared/components/EvidenceTrace";
 import { Sheet } from "../../shared/components/Sheet";
 import { StateSurface } from "../../shared/components/StateSurface";
 import { Icon } from "../../shared/icons/Icon";
@@ -13,6 +14,10 @@ import {
   type SignalSeverity,
   type SignalSummary
 } from "./signalModel";
+
+const characterAttentionUrl = new URL("../../assets/character-attention.png", import.meta.url).href;
+const characterSteadyUrl = new URL("../../assets/character-steady.png", import.meta.url).href;
+const characterWaitingUrl = new URL("../../assets/character-waiting.png", import.meta.url).href;
 
 const iconBySignal: Record<SignalId, "calendar" | "target" | "layers" | "leaf"> = {
   plan: "calendar",
@@ -78,6 +83,18 @@ export function SignalsScreen({ signals, onPlan, onTrack }: SignalsScreenProps) 
               <strong>{priority.status}</strong>
               <small>{priority.reason}</small>
             </span>
+            <span className="signal-action-hint">
+              <Icon name={actionForSignal(priority.id).icon} />
+              {actionForSignal(priority.id).label}
+            </span>
+            <img
+              className="signal-priority-character"
+              src={signalCharacter(priority.severity)}
+              alt=""
+              aria-hidden="true"
+            />
+            <span className="signal-priority-motion one" aria-hidden="true" />
+            <span className="signal-priority-motion two" aria-hidden="true" />
             <Icon name="chevronRight" />
           </button>
 
@@ -93,11 +110,15 @@ export function SignalsScreen({ signals, onPlan, onTrack }: SignalsScreenProps) 
                 <span className="signal-summary-icon" aria-hidden="true">
                   <Icon name={iconBySignal[signal.id]} />
                 </span>
-                <strong>{signal.label}</strong>
+                <span className="signal-summary-copy">
+                  <strong>{signal.label}</strong>
+                  <small>{signal.reason}</small>
+                </span>
                 <span className="signal-summary-status">
                   <span className="signal-state-mark" aria-hidden="true" />
                   {signal.status}
                 </span>
+                <span className="signal-row-action">{actionForSignal(signal.id).label}</span>
                 <Icon name="chevronRight" />
               </button>
             ))}
@@ -119,6 +140,14 @@ export function SignalsScreen({ signals, onPlan, onTrack }: SignalsScreenProps) 
               {severityLabel(activeSummary.severity)}
             </span>
             <p>{activeSummary.reason}</p>
+            <button
+              className="paper-action signal-primary-action"
+              type="button"
+              onClick={() => runSignalAction(activeSummary.id, onPlan, onTrack)}
+            >
+              <Icon name={actionForSignal(activeSummary.id).icon} />
+              {actionForSignal(activeSummary.id).label}
+            </button>
           </div>
         ) : null}
 
@@ -156,27 +185,51 @@ export function SignalsScreen({ signals, onPlan, onTrack }: SignalsScreenProps) 
       </Sheet>
 
       <DetailPanel
-        title={activeDetail?.title ?? "Signal"}
+        title="Signal"
+        ariaLabel={activeDetail?.title}
         open={activeDetail !== null}
         onBack={() => setActiveDetail(null)}
       >
         {activeDetail ? (
-          <div className="detail-stack">
-            <span className={`status-chip severity-${activeDetail.severity}`}>
-              {activeDetail.status ?? severityLabel(activeDetail.severity)}
-            </span>
-            <p>{activeDetail.reason}</p>
-            <dl className="evidence-list">
-              {activeDetail.rows.map((row) => (
-                <div key={row.label}>
-                  <dt>{row.label}</dt>
-                  <dd>{row.value}</dd>
-                </div>
-              ))}
-            </dl>
+          <div className={`signal-detail-content severity-${activeDetail.severity}`}>
+            <section className="signal-detail-hero">
+              <span className="signal-detail-mark" aria-hidden="true">
+                <Icon name={activeSignal ? iconBySignal[activeSignal] : "activity"} />
+              </span>
+              <div>
+                <span className="signal-detail-severity">
+                  {activeDetail.status ?? severityLabel(activeDetail.severity)}
+                </span>
+                <h2>{activeDetail.title}</h2>
+                <p>{activeDetail.reason}</p>
+              </div>
+            </section>
+            <section className="signal-detail-section" aria-labelledby="signal-detail-evidence">
+              <div className="signal-detail-heading">
+                <Icon name="fileText" />
+                <h3 id="signal-detail-evidence">Evidence</h3>
+              </div>
+              <dl className="signal-detail-metrics">
+                {activeDetail.rows.map((row) => (
+                  <div key={row.label}>
+                    <dt>{row.label}</dt>
+                    <dd>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+            <section className="signal-detail-section signal-detail-trace" aria-label="Evidence source">
+              <div className="signal-detail-heading">
+                <Icon name="route" />
+                <h3>Source</h3>
+              </div>
+              <EvidenceTrace trace={activeDetail.trace} />
+            </section>
             {activeDetail.action === "Plan" ? (
-              <button className="paper-action" type="button" onClick={onPlan}>
-                Plan
+              <button className="signal-detail-action" type="button" onClick={onPlan}>
+                <Icon name="calendar" />
+                <span>Adjust plan</span>
+                <Icon name="chevronRight" />
               </button>
             ) : null}
           </div>
@@ -208,4 +261,25 @@ function severityLabel(severity: SignalSeverity): string {
   if (severity === "attention") return "Attention";
   if (severity === "normal") return "Steady";
   return "No data";
+}
+
+function signalCharacter(severity: SignalSeverity): string {
+  if (severity === "severe") return characterAttentionUrl;
+  if (severity === "attention") return characterWaitingUrl;
+  return characterSteadyUrl;
+}
+
+function actionForSignal(signal: SignalId): { label: string; icon: "calendar" | "timer" | "target" | "layers" } {
+  if (signal === "plan") return { label: "Adjust plan", icon: "calendar" };
+  if (signal === "stage") return { label: "Recover project", icon: "layers" };
+  if (signal === "goal") return { label: "Schedule time", icon: "target" };
+  return { label: "Start lighter", icon: "timer" };
+}
+
+function runSignalAction(signal: SignalId, onPlan: () => void, onTrack: () => void) {
+  if (signal === "energy") {
+    onTrack();
+    return;
+  }
+  onPlan();
 }

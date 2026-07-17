@@ -40,6 +40,13 @@ describe("SignalsScreen", () => {
             { label: "Actual", value: "1h" },
             { label: "Delta", value: "-3h" }
           ],
+          trace: {
+            range: "Jun 8 - Jun 14",
+            source: "Weekly plan",
+            relatedTo: "Theseus frontend",
+            records: "5 time logs",
+            judgement: "Plan and actual time differ enough to need attention."
+          },
           action: "Plan"
         }
       ]
@@ -54,7 +61,19 @@ describe("SignalsScreen", () => {
     expect(within(detail).getByText("Planned")).toBeInTheDocument();
     expect(within(detail).getByText("Actual")).toBeInTheDocument();
     expect(within(detail).getByText("Delta")).toBeInTheDocument();
-    fireEvent.click(within(detail).getByRole("button", { name: "Plan" }));
+    expect(within(detail).getByRole("region", { name: "Evidence trace" })).toHaveTextContent("5 time logs");
+    fireEvent.click(within(detail).getByRole("button", { name: "Adjust plan" }));
+    expect(onPlan).toHaveBeenCalledOnce();
+  });
+
+  it("offers a direct action from the signal sheet", () => {
+    const onPlan = vi.fn();
+
+    render(<SignalsScreen signals={demoWeek.signals} onPlan={onPlan} onTrack={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Stage: Dormant" }));
+    fireEvent.click(screen.getByRole("button", { name: "Recover project" }));
+
     expect(onPlan).toHaveBeenCalledOnce();
   });
 

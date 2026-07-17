@@ -1,4 +1,5 @@
 import type { SignalId, SignalSeverity } from "../../shared/domain/signals";
+import type { EvidenceTrace } from "../../shared/api/weeklyReview";
 export type { SignalId, SignalSeverity } from "../../shared/domain/signals";
 
 export interface SignalSummary {
@@ -20,6 +21,7 @@ export interface SignalEvidence {
     label: string;
     value: string;
   }>;
+  trace?: EvidenceTrace;
   action?: "Plan";
 }
 

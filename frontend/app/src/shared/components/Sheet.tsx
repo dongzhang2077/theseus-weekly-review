@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Icon } from "../icons/Icon";
 import { IconButton } from "./IconButton";
 
 interface SheetProps {
@@ -18,6 +19,10 @@ export function Sheet({ title, open, onClose, actions, children }: SheetProps) {
       <section className="sheet open" aria-label={title}>
         <div className="sheet-handle" aria-hidden="true" />
         <header className="sheet-header">
+          <button className="sheet-back-control" type="button" onClick={onClose}>
+            <Icon name="chevronLeft" />
+            <span>Back</span>
+          </button>
           <div className="sheet-title">{title}</div>
           <div className="sheet-actions">
             {actions}

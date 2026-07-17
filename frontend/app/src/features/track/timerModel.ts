@@ -34,16 +34,30 @@ export function tickActivities(activities: ActivityTimer[], seconds = 1): Activi
   );
 }
 
-export function chooseFocusActivity(activities: ActivityTimer[]): ActivityTimer {
+export function chooseFocusActivity(
+  activities: ActivityTimer[],
+  options: { ignoredIds?: readonly string[]; preferredId?: string | null } = {}
+): ActivityTimer {
   const running = activities.filter((activity) => activity.running);
-  const candidates = running.length > 0 ? running : activities.filter((activity) => activity.recommended);
-  const pool = candidates.length > 0 ? candidates : activities;
+  if (running.length > 0) return sortFocusCandidates(running)[0];
 
-  return [...pool].sort((a, b) => {
+  const ignored = new Set(options.ignoredIds ?? []);
+  const visible = activities.filter((activity) => !ignored.has(activity.id));
+  const preferred = visible.find((activity) => activity.id === options.preferredId);
+  if (preferred) return preferred;
+
+  const candidates = visible.filter((activity) => activity.recommended);
+  const pool = candidates.length > 0 ? candidates : visible.length > 0 ? visible : activities;
+
+  return sortFocusCandidates(pool)[0];
+}
+
+function sortFocusCandidates(activities: ActivityTimer[]): ActivityTimer[] {
+  return [...activities].sort((a, b) => {
     const energyDelta = energyRank[b.energy] - energyRank[a.energy];
     if (energyDelta !== 0) return energyDelta;
     return b.sessionSeconds - a.sessionSeconds;
-  })[0];
+  });
 }
 
 export function formatClock(seconds: number): string {

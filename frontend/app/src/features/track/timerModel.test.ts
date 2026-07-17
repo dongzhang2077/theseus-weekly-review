@@ -47,6 +47,11 @@ describe("timerModel", () => {
     expect(chooseFocusActivity(running).id).toBe("build");
   });
 
+  it("can ignore a recommendation or honor a manual choice", () => {
+    expect(chooseFocusActivity(activities, { ignoredIds: ["build"] }).id).toBe("walk");
+    expect(chooseFocusActivity(activities, { preferredId: "walk" }).id).toBe("walk");
+  });
+
   it("formats a session clock from zero", () => {
     expect(formatClock(42)).toBe("00:00:42");
   });

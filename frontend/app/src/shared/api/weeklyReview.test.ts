@@ -174,7 +174,12 @@ describe("weeklyReview mapper", () => {
     expect(mapped.review.risks[0]).toMatchObject({
       title: "Dormancy risk",
       severity: "severe",
-      action: "Plan"
+      action: "Plan",
+      trace: {
+        range: "Jun 8 - Jun 14",
+        records: "5 time logs",
+        source: "dormancy_risk"
+      }
     });
   });
 
@@ -200,7 +205,12 @@ describe("weeklyReview mapper", () => {
     });
     expect(mapped.signals.evidence.find((row) => row.title === "Theseus backend" && row.signalId === "plan")).toMatchObject({
       severity: "normal",
-      status: "On track"
+      status: "On track",
+      trace: {
+        range: "Jun 8 - Jun 14",
+        source: "Weekly plan",
+        relatedTo: "Theseus backend"
+      }
     });
     expect(mapped.signals.evidence.find((row) => row.title === "Prepare for internship search")).toMatchObject({
       signalId: "goal",
