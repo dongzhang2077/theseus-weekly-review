@@ -332,6 +332,37 @@ Acceptance criteria:
 - Goal and Project creation are moved out of Plan Level 1.
 - Hard-coded fixture dates and project names are absent from the live path.
 
+### STORY-029 Stabilize the demo frontend with semantic Tailwind UI
+
+As a user, I want Focus and Plan to be calm, legible, and connected so that I
+can move from an explained recommendation to execution without decoding a
+decorative dashboard.
+
+Priority: P0 for the 2026-07-18 demo
+
+Implementation checkpoint (2026-07-17 PDT): implemented and verified on
+`feature/story-029-tailwind-demo-ui`. The accepted Kimi K3 “Desk Pad” proposal
+uses semantic Tailwind v4 tokens; the teammate's large prototype stylesheet
+and decoration-only motion are intentionally excluded. The full frontend suite
+passes 71 tests, the production build passes, production dependency audit is
+clean, and sanitized mobile/desktop screenshots were refreshed.
+
+Acceptance criteria:
+
+- Tailwind is integrated through Vite and new styling uses shared `desk-*`
+  semantic tokens rather than page-specific CSS.
+- Focus explains its recommendation and supports Next, Delay, Skip, Choose,
+  start, pause/resume, end, and a result note.
+- Plan shows capacity, planned time, slack, one adjustment, manual editing, and
+  direct handoff from a plan block to Focus.
+- Primary navigation has visible one-word labels and accessible selected
+  states.
+- Sample-only and view-local behavior is labelled truthfully.
+- No teammate CSS bundle, decorative animation system, personal data, or
+  credentials enter the change.
+- Full frontend tests, TypeScript, production build, diff check, and mobile and
+  desktop screenshot review pass.
+
 ## Epic 8: Personal Assistant Evolution
 
 These stories are roadmap work. They are not part of the 2026-07-18 demo and

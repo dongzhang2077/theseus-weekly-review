@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { chooseFocusActivity, formatClock, tickActivities, toggleActivity, type ActivityTimer } from "./timerModel";
+import {
+  chooseFocusActivity,
+  completeActivity,
+  formatClock,
+  formatCompactClock,
+  pauseActivity,
+  startActivity,
+  tickActivities,
+  type ActivityTimer
+} from "./timerModel";
 
 const activities: ActivityTimer[] = [
   {
@@ -26,19 +35,7 @@ const activities: ActivityTimer[] = [
 ];
 
 describe("timerModel", () => {
-  it("starts and stops an activity without a save confirmation step", () => {
-    const started = toggleActivity(activities, "build");
-    expect(started[0].running).toBe(true);
-    expect(started[0].sessionSeconds).toBe(0);
-
-    const ticked = tickActivities(started, 15);
-    const stopped = toggleActivity(ticked, "build");
-    expect(stopped[0].running).toBe(false);
-    expect(stopped[0].todaySeconds).toBe(1215);
-    expect(stopped[0].sessionSeconds).toBe(0);
-  });
-
-  it("keeps multi-running support and focuses the highest energy active activity", () => {
+  it("resolves a legacy multi-running state to the highest-energy activity", () => {
     const running = [
       { ...activities[0], running: true, sessionSeconds: 10 },
       { ...activities[1], running: true, sessionSeconds: 90 }
@@ -47,7 +44,35 @@ describe("timerModel", () => {
     expect(chooseFocusActivity(running).id).toBe("build");
   });
 
+  it("supports pause and completion as separate session states", () => {
+    const started = startActivity(activities, "build");
+    const ticked = tickActivities(started, 75);
+    const paused = pauseActivity(ticked, "build");
+    expect(paused[0]).toMatchObject({ running: false, sessionSeconds: 75, todaySeconds: 1200 });
+
+    const completed = completeActivity(paused, "build");
+    expect(completed[0]).toMatchObject({ running: false, sessionSeconds: 0, todaySeconds: 1275 });
+  });
+
+  it("starts only one activity and preserves an interrupted session", () => {
+    const current = [
+      { ...activities[0], running: true, sessionSeconds: 15 },
+      { ...activities[1], sessionSeconds: 20 }
+    ];
+
+    const started = startActivity(current, "walk");
+    expect(started[0]).toMatchObject({ running: false, sessionSeconds: 15 });
+    expect(started[1]).toMatchObject({ running: true, sessionSeconds: 20 });
+  });
+
+  it("can ignore a recommendation or honor a manual choice", () => {
+    expect(chooseFocusActivity(activities, { ignoredIds: ["build"] }).id).toBe("walk");
+    expect(chooseFocusActivity(activities, { preferredId: "walk" }).id).toBe("walk");
+  });
+
   it("formats a session clock from zero", () => {
     expect(formatClock(42)).toBe("00:00:42");
+    expect(formatCompactClock(42)).toBe("00:42");
+    expect(formatCompactClock(3661)).toBe("61:01");
   });
 });

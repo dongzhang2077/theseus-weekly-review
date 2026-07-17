@@ -9,16 +9,16 @@ Read in this order:
 3. `docs/design/app-component-contract.md`
 4. `docs/design/app-visual-system.md`
 5. `docs/design/style-reference.md`
+6. `docs/design/frontend-design-governance.md`
 
 This document does not define colors, typography, or decoration. Visual styling lives in `docs/design/app-visual-system.md` and `docs/design/style-reference.md`.
 
 ## 1. Global Component Rules
 
 - Components must support mobile app layouts first.
-- Level 1 entry points are icon-only by default. Evidence summary rows such as
-  Signals are the exception because their identity and written status are
-  decision content.
-- Compact visible labels are fallback only after manual review shows the icon is unclear.
+- Primary navigation always pairs its icon with a one-word visible label.
+- Other Level 1 entries are icon-first; add a compact visible label whenever
+  the action is primary or its icon is ambiguous.
 - Every icon-only control must have an accessible name.
 - Do not use emoji.
 - Do not use traditional forms on the Track Level 1 screen.
@@ -36,7 +36,7 @@ Used in:
 
 - Review.
 - Signals.
-- Track.
+- Focus.
 - Plan.
 
 Level allowed:
@@ -128,10 +128,9 @@ Entries:
 
 Content rules:
 
-- Icon-only by default.
+- Icon plus a one-word visible label.
 - Selected item has a clear selected state.
 - Each item has an accessible name.
-- Fallback visible labels are allowed only after review shows icon confusion.
 
 States:
 
@@ -731,12 +730,12 @@ Do not:
 Before implementation or HTML prototype approval:
 
 - Level 1 screens use the allowed component budget.
-- Icon-only Level 1 entry points have an explicit exception only when visible
-  text is decision content, as in Signals.
+- Primary navigation uses icon-plus-label entries; other Level 1 actions expose
+  visible text when the action is primary or ambiguous.
 - Every icon-only control has an accessible name.
 - Section and detail sheets do not create Level 4 navigation.
 - Track does not use traditional forms.
-- Timer stop opens save confirmation.
+- Timer end opens explicit outcome and result capture.
 - Plan suggestion is deduplicated with restart.
 - Signals shows one evidence-ranked priority signal, then Plan, Stage, Goal,
   and Energy in stable order.

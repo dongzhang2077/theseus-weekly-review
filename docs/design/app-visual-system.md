@@ -249,7 +249,7 @@ Rules:
 - Do not use emoji.
 - Do not use highly detailed illustrations as icons.
 - Do not mix filled cartoon icons with line icons.
-- Level 1 icons are icon-only by default.
+- Primary navigation pairs icons with one-word labels; other Level 1 entries are icon-first.
 - Icons must be stable enough to understand in manual review.
 
 ## 10. Status Character Style
@@ -314,7 +314,7 @@ Bottom navigation:
 - Fixed bottom area.
 - Warm paper surface.
 - Thin top border.
-- Icon-only by default.
+- Icon plus a one-word visible label.
 - Selected state uses muted green mark, underline, or soft filled circle.
 
 Icon entry:

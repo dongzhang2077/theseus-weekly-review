@@ -9,16 +9,24 @@ interface BottomNavProps {
 
 export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
   return (
-    <nav className="bottom-nav" aria-label="App sections">
+    <nav
+      className="absolute inset-x-0 bottom-0 z-20 grid h-[66px] grid-cols-4 border-t border-desk-line bg-desk-raised/95 px-2 pb-2 pt-1.5 backdrop-blur-sm lg:inset-y-0 lg:left-0 lg:right-auto lg:h-full lg:w-[72px] lg:grid-cols-1 lg:grid-rows-4 lg:border-r lg:border-t-0 lg:px-2 lg:py-4"
+      aria-label="App sections"
+    >
       {tabs.map((tab) => (
         <button
           key={tab.id}
-          className={`nav-item ${activeTab === tab.id ? "selected" : ""}`}
+          className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-paper border-0 px-1 text-[11px] font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-desk-accent ${
+            activeTab === tab.id
+              ? "bg-desk-accent-soft text-desk-accent"
+              : "bg-transparent text-desk-muted hover:bg-desk-sunk hover:text-desk-ink"
+          }`}
           aria-label={tab.label}
           aria-current={activeTab === tab.id ? "page" : undefined}
           onClick={() => onTabChange(tab.id)}
         >
-          <Icon name={tab.icon} />
+          <Icon name={tab.icon} className="size-5" />
+          <span>{tab.label}</span>
         </button>
       ))}
     </nav>
