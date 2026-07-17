@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import type { AppWeekSource, FetchLike } from "../../shared/api/loadAppWeek";
 import {
   deletePlan,
@@ -18,14 +19,20 @@ import {
   dismissPlanSuggestion,
   formatPlanWeek,
   type PlanDraft,
+  type PlanItem,
   type PlanMetrics,
   type PlanWorkspace
 } from "./planModel";
 
-export type PlanDetail = "suggestion" | "focus" | "slack" | "projects";
+const characterLoadingUrl = new URL("../../assets/character-loading.png", import.meta.url).href;
+const characterSteadyUrl = new URL("../../assets/character-steady.png", import.meta.url).href;
+const characterWaitingUrl = new URL("../../assets/character-waiting.png", import.meta.url).href;
+const durationOptions = [15, 25, 30, 45, 60, 90, 120];
+
+export type PlanDetail = "edit" | "suggestion" | "focus" | "slack" | "projects";
 type LoadPhase = "loading" | "ready" | "error";
 type OperationPhase = "idle" | "saving" | "saved" | "conflict" | "error" | "undoing" | "undone";
-type OperationAction = "apply" | "undo" | null;
+type OperationAction = "apply" | "manual" | "undo" | null;
 
 interface OperationState {
   phase: OperationPhase;
@@ -50,6 +57,7 @@ interface PlanScreenProps {
     detail: PlanDetail;
   } | null;
   onReview: () => void;
+  onFocusItem?: (item: PlanItem, projectTitle: string | null) => void;
   fetchImpl?: FetchLike;
 }
 
@@ -67,6 +75,7 @@ export function PlanScreen({
   reviewSource,
   entryRequest,
   onReview,
+  onFocusItem,
   fetchImpl
 }: PlanScreenProps) {
   const hasLiveApi = Boolean(apiBaseUrl && userId);
@@ -215,6 +224,49 @@ export function PlanScreen({
     restoreSnapshot(undoSnapshot);
   }
 
+  async function saveManualPlan(nextDraft: PlanDraft): Promise<boolean> {
+    if (operation.phase === "saving" || operation.phase === "undoing") return false;
+    const snapshot: UndoSnapshot = {
+      before: workspace.persistedPlan ? copyPlan(workspace.persistedPlan) : null,
+      baseline: copyPlan(workspace.draft),
+      appliedPlanId: null
+    };
+    setOperation({ phase: "saving", action: "manual", message: "Saving plan", detail: null });
+
+    if (!hasLiveApi) {
+      setWorkspace((current) => ({
+        ...current,
+        draft: copyPlan(nextDraft),
+        persistedPlan: copyPlan(nextDraft)
+      }));
+      setUndoSnapshot(snapshot);
+      setOperation({ phase: "saved", action: "manual", message: "Plan updated", detail: null });
+      setDetail(null);
+      return true;
+    }
+
+    const result = await savePlanDraft({
+      apiBaseUrl,
+      userId,
+      draft: nextDraft,
+      fetchImpl
+    });
+    if (result.status !== "ok" || !result.data) {
+      setOperation(operationFailure("manual", result.status, result.error));
+      return false;
+    }
+    snapshot.appliedPlanId = result.data.id;
+    setWorkspace((current) => ({
+      ...current,
+      draft: result.data as PlanDraft,
+      persistedPlan: result.data as PlanDraft
+    }));
+    setUndoSnapshot(snapshot);
+    setOperation({ phase: "saved", action: "manual", message: "Plan saved", detail: null });
+    setDetail(null);
+    return true;
+  }
+
   function restoreSnapshot(snapshot: UndoSnapshot) {
     setWorkspace((current) => ({
       ...current,
@@ -229,7 +281,7 @@ export function PlanScreen({
 
   function retryOperation() {
     if (operation.action === "undo") void undoAdjustment();
-    else void applySuggestion();
+    else if (operation.action === "apply") void applySuggestion();
   }
 
   return (
@@ -258,6 +310,19 @@ export function PlanScreen({
 
       {loadPhase === "ready" ? (
         <div className="plan-workspace">
+          <div className={`plan-companion status-${metrics.status}`}>
+            <span className="plan-companion-mark" aria-hidden="true">
+              <Icon name="calendar" />
+            </span>
+            <span className="plan-companion-copy">
+              <small>Week plan</small>
+              <strong>{balanceLabel(metrics.status)}</strong>
+            </span>
+            <img src={planCharacter(metrics.status)} alt="" aria-hidden="true" />
+            <span className="plan-companion-line one" aria-hidden="true" />
+            <span className="plan-companion-line two" aria-hidden="true" />
+          </div>
+
           <button
             className={`plan-balance-summary status-${metrics.status}`}
             type="button"
@@ -293,7 +358,7 @@ export function PlanScreen({
               {operation.phase === "saved" && undoSnapshot && detail !== "suggestion" ? (
                 <button type="button" onClick={() => void undoAdjustment()}>Undo</button>
               ) : null}
-              {operation.phase === "error" ? (
+              {operation.phase === "error" && operation.action !== "manual" ? (
                 <button type="button" onClick={retryOperation}>Retry</button>
               ) : null}
               {operation.phase === "conflict" ? (
@@ -346,6 +411,9 @@ export function PlanScreen({
           )}
 
           <div className="plan-action-grid" aria-label="Plan details">
+            <button type="button" aria-label="Edit plan" onClick={() => setDetail("edit")}>
+              <Icon name="plus" />
+            </button>
             <button type="button" aria-label="Focus" onClick={() => setDetail("focus")}>
               <Icon name="target" />
             </button>
@@ -360,6 +428,14 @@ export function PlanScreen({
       ) : null}
 
       <DetailPanel title={detailTitle(detail)} open={detail !== null && loadPhase === "ready"} onBack={() => setDetail(null)}>
+        {detail === "edit" ? (
+          <PlanEditor
+            draft={workspace.draft}
+            projects={workspace.projects}
+            operation={operation}
+            onSave={saveManualPlan}
+          />
+        ) : null}
         {detail === "suggestion" ? (
           <SuggestionDetail
             workspace={workspace}
@@ -372,12 +448,218 @@ export function PlanScreen({
           />
         ) : null}
         {detail === "focus" ? (
-          <FocusDetail workspace={workspace} projectNames={projectNames} onReview={onReview} />
+          <FocusDetail
+            workspace={workspace}
+            projectNames={projectNames}
+            onReview={onReview}
+            onFocusItem={onFocusItem}
+          />
         ) : null}
-        {detail === "slack" ? <SlackDetail metrics={metrics} /> : null}
+        {detail === "slack" ? <SlackDetail metrics={metrics} onEdit={() => setDetail("edit")} /> : null}
         {detail === "projects" ? <ProjectsDetail workspace={workspace} /> : null}
       </DetailPanel>
     </section>
+  );
+}
+
+function PlanEditor({
+  draft,
+  projects,
+  operation,
+  onSave
+}: {
+  draft: PlanDraft;
+  projects: PlanWorkspace["projects"];
+  operation: OperationState;
+  onSave: (draft: PlanDraft) => Promise<boolean>;
+}) {
+  const [editor, setEditor] = useState<PlanDraft>(() => copyPlan(draft));
+  const orderedProjects = [...projects].sort((left, right) => {
+    const statusDelta = Number(right.status === "active") - Number(left.status === "active");
+    return statusDelta || left.title.localeCompare(right.title);
+  });
+  const invalidItems = editor.items.some((item) => !item.title.trim() || item.plannedMinutes <= 0);
+  const canSave = editor.capacityMinutes > 0 && !invalidItems && operation.phase !== "saving";
+  const plannedMinutes = editor.items.reduce((sum, item) => sum + item.plannedMinutes, 0);
+
+  function updateItem(index: number, patch: Partial<PlanItem>) {
+    setEditor((current) => ({
+      ...current,
+      items: current.items.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item)
+    }));
+  }
+
+  function addItem() {
+    const project = orderedProjects.find((item) => item.status === "active") ?? null;
+    setEditor((current) => ({
+      ...current,
+      items: [
+        ...current.items,
+        {
+          projectId: project?.id ?? null,
+          title: project ? `${project.title} block` : "New focus block",
+          plannedMinutes: 30,
+          priority: current.items.length + 1,
+          isCompleted: false
+        }
+      ]
+    }));
+  }
+
+  function removeItem(index: number) {
+    setEditor((current) => ({
+      ...current,
+      items: current.items
+        .filter((_, itemIndex) => itemIndex !== index)
+        .map((item, itemIndex) => ({ ...item, priority: itemIndex + 1 }))
+    }));
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSave) return;
+    void onSave({
+      ...editor,
+      items: editor.items.map((item, index) => ({
+        ...item,
+        title: item.title.trim(),
+        priority: index + 1
+      }))
+    });
+  }
+
+  return (
+    <form className="plan-editor" onSubmit={submit}>
+      <div className="plan-editor-summary">
+        <span aria-hidden="true"><Icon name="calendar" /></span>
+        <div>
+          <strong>{editor.items.length} focus blocks</strong>
+          <small>{formatMinutes(plannedMinutes)} planned</small>
+        </div>
+      </div>
+
+      <div className="plan-editor-settings">
+        <label>
+          <span>Capacity</span>
+          <div className="plan-number-field">
+            <input
+              aria-label="Weekly capacity hours"
+              min="0.5"
+              step="0.5"
+              type="number"
+              value={editor.capacityMinutes / 60}
+              onChange={(event) => setEditor((current) => ({
+                ...current,
+                capacityMinutes: Math.max(0, Math.round(Number(event.currentTarget.value) * 60))
+              }))}
+            />
+            <span>hours</span>
+          </div>
+        </label>
+        <div className="plan-editor-capacity-result">
+          <span>Remaining</span>
+          <strong>{formatMinutes(Math.max(0, editor.capacityMinutes - plannedMinutes))}</strong>
+        </div>
+      </div>
+
+      <div className="plan-editor-section-head">
+        <div>
+          <strong>Plan blocks</strong>
+          <small>Task, project, duration</small>
+        </div>
+        <button type="button" onClick={addItem}>
+          <Icon name="plus" />
+          <span>Add block</span>
+        </button>
+      </div>
+
+      <div className="plan-editor-list">
+        {editor.items.map((item, index) => (
+          <section className="plan-editor-item" key={item.id ?? `new-${index}`}>
+            <div className="plan-editor-item-head">
+              <span>{index + 1}</span>
+              <strong>{item.title.trim() || "Untitled block"}</strong>
+              <div className="plan-editor-item-actions">
+                <button
+                  className="remove"
+                  type="button"
+                  aria-label={`Remove ${item.title || "block"}`}
+                  onClick={() => removeItem(index)}
+                >
+                  <Icon name="trash" />
+                </button>
+              </div>
+            </div>
+            <label className="plan-editor-title-field">
+              <span>Title</span>
+              <input
+                aria-label={`Plan block ${index + 1} title`}
+                maxLength={100}
+                type="text"
+                value={item.title}
+                onChange={(event) => updateItem(index, { title: event.currentTarget.value })}
+              />
+            </label>
+            <div className="plan-editor-item-fields">
+              <label>
+                <span>Project</span>
+                <select
+                  aria-label={`Plan block ${index + 1} project`}
+                  value={item.projectId ?? ""}
+                  onChange={(event) => updateItem(index, {
+                    projectId: event.currentTarget.value ? Number(event.currentTarget.value) : null
+                  })}
+                >
+                  <option value="">Flexible</option>
+                  {orderedProjects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.title}{project.status === "active" ? "" : ` (${project.status})`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Duration</span>
+                <select
+                  aria-label={`Plan block ${index + 1} duration`}
+                  value={item.plannedMinutes}
+                  onChange={(event) => updateItem(index, {
+                    plannedMinutes: Number(event.currentTarget.value)
+                  })}
+                >
+                  {!durationOptions.includes(item.plannedMinutes) ? (
+                    <option value={item.plannedMinutes}>{formatMinutes(item.plannedMinutes)}</option>
+                  ) : null}
+                  {durationOptions.map((minutes) => (
+                    <option key={minutes} value={minutes}>{formatMinutes(minutes)}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {editor.items.length === 0 ? (
+        <div className="plan-editor-empty">
+          <Icon name="target" />
+          <span>No blocks planned</span>
+        </div>
+      ) : null}
+
+      {operation.phase === "error" || operation.phase === "conflict" ? (
+        <div className="plan-editor-error" role="alert">
+          <Icon name="info" />
+          <span>{operation.message}</span>
+        </div>
+      ) : null}
+
+      <button className="plan-editor-save" type="submit" disabled={!canSave}>
+        <Icon name="check" />
+        <span>{operation.phase === "saving" ? "Saving" : "Save plan"}</span>
+        <Icon name="chevronRight" />
+      </button>
+    </form>
   );
 }
 
@@ -482,11 +764,13 @@ function DiffRow({ label, before, after }: { label: string; before: string; afte
 function FocusDetail({
   workspace,
   projectNames,
-  onReview
+  onReview,
+  onFocusItem
 }: {
   workspace: PlanWorkspace;
   projectNames: Map<number, string>;
   onReview: () => void;
+  onFocusItem?: (item: PlanItem, projectTitle: string | null) => void;
 }) {
   const items = [...workspace.draft.items].sort((a, b) => a.priority - b.priority);
   if (items.length === 0) {
@@ -500,29 +784,59 @@ function FocusDetail({
       />
     );
   }
+  const totalMinutes = items.reduce((sum, item) => sum + item.plannedMinutes, 0);
   return (
-    <div className="plan-item-list">
-      {items.map((item, index) => (
-        <div className="plan-item-row" key={item.id ?? `${item.title}-${index}`}>
-          <span className="plan-item-priority">{item.priority}</span>
-          <span><strong>{item.title}</strong><small>{item.projectId ? projectNames.get(item.projectId) ?? "Project" : "Flexible"}</small></span>
-          <strong>{formatMinutes(item.plannedMinutes)}</strong>
-        </div>
-      ))}
+    <div className="plan-focus-detail">
+      <div className="plan-detail-summary">
+        <span aria-hidden="true"><Icon name="target" /></span>
+        <div><strong>{items.length} blocks ready</strong><small>{formatMinutes(totalMinutes)} planned</small></div>
+      </div>
+      <div className="plan-item-list">
+        {items.map((item, index) => (
+          <button
+            className="plan-item-row"
+            type="button"
+            aria-label={`Focus ${item.title}`}
+            key={item.id ?? `${item.title}-${index}`}
+            onClick={() => onFocusItem?.(item, item.projectId ? projectNames.get(item.projectId) ?? null : null)}
+          >
+            <span className="plan-item-priority">{item.priority}</span>
+            <span><strong>{item.title}</strong><small>{item.projectId ? projectNames.get(item.projectId) ?? "Project" : "Flexible"}</small></span>
+            <span className="plan-item-focus-action">
+              <strong>{formatMinutes(item.plannedMinutes)}</strong>
+              <Icon name="play" />
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
-function SlackDetail({ metrics }: { metrics: PlanMetrics }) {
+function SlackDetail({ metrics, onEdit }: { metrics: PlanMetrics; onEdit: () => void }) {
   return (
-    <div className="detail-stack">
-      <span className={`status-chip plan-status-${metrics.status}`}>{balanceLabel(metrics.status)}</span>
-      <h2>{formatNullableMinutes(metrics.slackMinutes)} slack</h2>
-      <dl className="evidence-list">
+    <div className="detail-stack plan-slack-detail">
+      <div
+        className={`plan-slack-visual plan-status-${metrics.status}`}
+        style={{ "--plan-load": `${loadPercent(metrics) * 3.6}deg` } as CSSProperties}
+      >
+        <span aria-hidden="true"><Icon name="gauge" /></span>
+        <strong>{formatNullableMinutes(metrics.slackMinutes)}</strong>
+        <small>Slack</small>
+      </div>
+      <div className="plan-slack-status">
+        <span className={`status-chip plan-status-${metrics.status}`}>{balanceLabel(metrics.status)}</span>
+        <strong>{slackGuidance(metrics.status)}</strong>
+      </div>
+      <dl className="plan-metric-grid">
         <div><dt>Planned</dt><dd>{formatMinutes(metrics.plannedMinutes)}</dd></div>
         <div><dt>Capacity</dt><dd>{formatMinutesOrDash(metrics.capacityMinutes)}</dd></div>
         <div><dt>Target buffer</dt><dd>{formatNullableMinutes(metrics.requiredSlackMinutes)}</dd></div>
       </dl>
+      <button className="paper-action plan-slack-edit" type="button" onClick={onEdit}>
+        <Icon name="calendar" />
+        <span>Adjust plan</span>
+      </button>
     </div>
   );
 }
@@ -531,15 +845,35 @@ function ProjectsDetail({ workspace }: { workspace: PlanWorkspace }) {
   if (workspace.projects.length === 0) {
     return <StateSurface icon="folder" title="No projects linked yet" />;
   }
+  const totalMinutes = workspace.projects.reduce(
+    (total, project) => total + projectMinutes(workspace.draft, project.id),
+    0
+  );
   return (
-    <div className="plan-project-list">
-      {workspace.projects.map((project) => (
-        <div className="plan-project-row" key={project.id}>
-          <span className={`project-stage-mark stage-${project.stage}`} aria-hidden="true" />
-          <span><strong>{project.title}</strong><small>{stageLabel(project.stage)}</small></span>
-          <strong>{formatMinutes(projectMinutes(workspace.draft, project.id))}</strong>
-        </div>
-      ))}
+    <div className="plan-project-detail">
+      <div className="plan-detail-summary">
+        <span aria-hidden="true"><Icon name="folder" /></span>
+        <div><strong>{workspace.projects.length} projects</strong><small>{formatMinutes(totalMinutes)} allocated</small></div>
+      </div>
+      <div className="plan-project-list">
+        {workspace.projects.map((project) => {
+          const planned = projectMinutes(workspace.draft, project.id);
+          const progress = project.weeklyTargetMinutes > 0
+            ? Math.min(100, Math.round(planned / project.weeklyTargetMinutes * 100))
+            : 0;
+          return (
+            <div className="plan-project-row" key={project.id}>
+              <span className={`project-stage-mark stage-${project.stage}`} aria-hidden="true" />
+              <span>
+                <strong>{project.title}</strong>
+                <small>{stageLabel(project.stage)} · {formatMinutes(planned)} of {formatMinutes(project.weeklyTargetMinutes)}</small>
+                <i aria-hidden="true"><b style={{ width: `${progress}%` }} /></i>
+              </span>
+              <strong>{progress}%</strong>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -580,6 +914,19 @@ function balanceLabel(status: PlanMetrics["status"]): string {
   return "Capacity needed";
 }
 
+function slackGuidance(status: PlanMetrics["status"]): string {
+  if (status === "balanced") return "Buffer protected";
+  if (status === "tight") return "Reduce one block";
+  if (status === "overloaded") return "Plan exceeds capacity";
+  return "Set weekly capacity";
+}
+
+function planCharacter(status: PlanMetrics["status"]): string {
+  if (status === "balanced") return characterSteadyUrl;
+  if (status === "unknown") return characterLoadingUrl;
+  return characterWaitingUrl;
+}
+
 function operationIcon(phase: OperationPhase): "check" | "info" | "activity" {
   if (phase === "saved" || phase === "undone") return "check";
   if (phase === "saving" || phase === "undoing") return "activity";
@@ -613,6 +960,7 @@ function stageLabel(stage: PlanWorkspace["projects"][number]["stage"]): string {
 }
 
 function detailTitle(detail: PlanDetail | null): string {
+  if (detail === "edit") return "Edit plan";
   if (detail === "suggestion") return "Adjustment";
   if (detail === "focus") return "Focus";
   if (detail === "slack") return "Slack";

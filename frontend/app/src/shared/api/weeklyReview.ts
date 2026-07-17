@@ -127,7 +127,16 @@ export interface AppReviewItem {
     label: string;
     value: string;
   }>;
+  trace?: EvidenceTrace;
   action?: "Plan";
+}
+
+export interface EvidenceTrace {
+  range: string;
+  source: string;
+  relatedTo?: string;
+  records?: string;
+  judgement: string;
 }
 
 export interface AppSignalSummary {
@@ -150,6 +159,7 @@ export interface AppSignalEvidence {
     label: string;
     value: string;
   }>;
+  trace?: EvidenceTrace;
   action?: "Plan";
 }
 
@@ -191,7 +201,12 @@ export function mapWeeklyReviewToAppWeek(response: WeeklyReviewApiResponse, fall
         id: `win-${index + 1}`,
         title: win.title,
         reason: win.evidence,
-        evidence: evidenceRowsFromText(win.evidence)
+        evidence: evidenceRowsFromText(win.evidence),
+        trace: buildEvidenceTrace(response, {
+          source: "Weekly review",
+          relatedTo: "Win",
+          judgement: "Generated from positive finding evidence."
+        })
       })),
       risks: response.risk_flags.map((risk, index) => ({
         id: `risk-${risk.type}-${index + 1}`,
@@ -199,6 +214,11 @@ export function mapWeeklyReviewToAppWeek(response: WeeklyReviewApiResponse, fall
         severity: mapRiskSeverity(risk.severity),
         reason: risk.evidence,
         evidence: evidenceRowsFromText(risk.evidence),
+        trace: buildEvidenceTrace(response, {
+          source: risk.type,
+          relatedTo: titleFromRiskType(risk.type),
+          judgement: "Generated from deterministic risk checks."
+        }),
         action: "Plan"
       }))
     },
@@ -518,6 +538,11 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
         { label: "Actual", value: formatMinutes(drift.actual_minutes) },
         { label: "Delta", value: formatSignedMinutes(drift.difference_minutes) }
       ],
+      trace: buildEvidenceTrace(response, {
+        source: "Weekly plan",
+        relatedTo: drift.project_title ?? "Planned work",
+        judgement: hasDrift ? "Plan and actual time differ enough to need attention." : "Plan and actual time stayed within range."
+      }),
       action: hasDrift ? "Plan" : undefined
     });
   }
@@ -537,6 +562,11 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
         { label: "Actual", value: formatMinutes(response.evidence.summary?.actual_total_minutes) },
         { label: "Slack", value: formatMinutes(plan.planned_slack_minutes) }
       ],
+      trace: buildEvidenceTrace(response, {
+        source: "Weekly plan",
+        relatedTo: "Week",
+        judgement: planRisk ? "Weekly plan crossed a risk threshold." : "Weekly plan stayed inside the current threshold."
+      }),
       action: severity === "severe" || severity === "attention" ? "Plan" : undefined
     });
   }
@@ -557,6 +587,11 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
         { label: "Target", value: formatMinutes(project.target_minutes) },
         { label: "Inactive", value: formatDays(project.inactive_days) }
       ],
+      trace: buildEvidenceTrace(response, {
+        source: "Project stage",
+        relatedTo: project.project_title ?? "Project",
+        judgement: project.reason ?? stageReason(project)
+      }),
       action: severity === "severe" || severity === "attention" ? "Plan" : undefined
     });
   }
@@ -579,6 +614,11 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
           { label: "Actual", value: formatMinutes(project.actual_minutes) },
           { label: "Inactive", value: formatDays(project.inactive_days) }
         ],
+        trace: buildEvidenceTrace(response, {
+          source: "Dormancy",
+          relatedTo: project.project_title ?? "Project",
+          judgement: dormancyReason(project)
+        }),
         action: "Plan"
       });
     }
@@ -605,6 +645,11 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
         { label: "Actual", value: formatMinutes(goal.actual_minutes) },
         { label: "Projects", value: String(goal.active_project_count ?? 0) }
       ],
+      trace: buildEvidenceTrace(response, {
+        source: "Goal alignment",
+        relatedTo: goal.title ?? "Goal",
+        judgement: hasGap ? "Active goal received no linked time." : "Active goal has linked work this week."
+      }),
       action: hasGap ? "Plan" : undefined
     });
   }
@@ -621,6 +666,11 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
         { label: "Actual", value: formatMinutes(response.evidence.summary?.actual_total_minutes) },
         { label: "Logs", value: String(response.evidence.summary?.time_log_count ?? 0) }
       ],
+      trace: buildEvidenceTrace(response, {
+        source: "Goal alignment",
+        relatedTo: "Goals",
+        judgement: goalRisk.evidence
+      }),
       action: "Plan"
     });
   }
@@ -650,7 +700,12 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
         { label: "Focus", value: formatMinutes(consuming) },
         { label: "Restore", value: formatMinutes(restore) },
         { label: "Drain", value: formatMinutes(destroy) }
-      ]
+      ],
+      trace: buildEvidenceTrace(response, {
+        source: "Activity mix",
+        relatedTo: "Week",
+        judgement: "Energy signal is based on activity type minutes."
+      })
     });
   }
 
@@ -779,6 +834,25 @@ function titleFromRiskType(type: RiskType): string {
 
 function evidenceRowsFromText(text: string): Array<{ label: string; value: string }> {
   return [{ label: "Evidence", value: text }];
+}
+
+function buildEvidenceTrace(
+  response: WeeklyReviewApiResponse,
+  options: {
+    source: string;
+    judgement: string;
+    relatedTo?: string;
+  }
+): EvidenceTrace {
+  const summary = response.evidence.summary;
+  const recordCount = summary?.time_log_count;
+  return {
+    range: formatWeekLabel(response.week_start, response.week_end),
+    source: options.source,
+    relatedTo: options.relatedTo,
+    records: typeof recordCount === "number" ? `${recordCount} time logs` : undefined,
+    judgement: options.judgement
+  };
 }
 
 function formatWeekLabel(start: string, end: string): string {

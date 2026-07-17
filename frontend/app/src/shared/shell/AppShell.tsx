@@ -23,7 +23,7 @@ export function AppShell({
 }: AppShellProps) {
   return (
     <div className="app-viewport">
-      <div className="phone-frame">
+      <div className={`phone-frame app-tab-${activeTab}`}>
         <main className="app-content">{children}</main>
         {profileName && onProfileChange ? (
           <button
@@ -33,7 +33,10 @@ export function AppShell({
             title="Switch profile"
             onClick={onProfileChange}
           >
-            {profileInitial(profileName)}
+            <span className="profile-switch-initial" aria-hidden="true">
+              {profileInitial(profileName)}
+            </span>
+            <span className="profile-switch-label">{profileName}</span>
           </button>
         ) : null}
         {notice ? (

@@ -19,6 +19,7 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
           onClick={() => onTabChange(tab.id)}
         >
           <Icon name={tab.icon} />
+          <span className="nav-label">{tab.label}</span>
         </button>
       ))}
     </nav>

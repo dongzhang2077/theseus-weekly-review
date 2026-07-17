@@ -12,4 +12,7 @@ export interface ActivityTimer {
   sessionSeconds: number;
   running: boolean;
   recommended?: boolean;
+  recommendationReason?: string;
+  completionStandard?: string;
+  suggestedMinutes?: number;
 }

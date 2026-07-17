@@ -13,6 +13,7 @@ export type IconName =
   | "fileText"
   | "folder"
   | "gauge"
+  | "globe"
   | "info"
   | "layers"
   | "leaf"
@@ -27,6 +28,7 @@ export type IconName =
   | "timer"
   | "trash"
   | "trophy"
+  | "user"
   | "x";
 
 interface IconProps {
@@ -97,6 +99,12 @@ const paths: Record<IconName, ReactElement> = {
       <path {...strokeProps} d="M4 14a8 8 0 0 1 16 0" />
       <path {...strokeProps} d="m12 14 4-4" />
       <path {...strokeProps} d="M5 19h14" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle {...strokeProps} cx="12" cy="12" r="9" />
+      <path {...strokeProps} d="M3 12h18M12 3a14.5 14.5 0 0 1 0 18M12 3a14.5 14.5 0 0 0 0 18" />
     </>
   ),
   info: (
@@ -172,6 +180,12 @@ const paths: Record<IconName, ReactElement> = {
       <path {...strokeProps} d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16" />
       <path {...strokeProps} d="M10 14.66V17c0 .55-.47.98-.97 1.16C7.85 18.5 7 20.06 7 22M14 14.66V17c0 .55.47.98.97 1.16C16.15 18.5 17 20.06 17 22" />
       <path {...strokeProps} d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+    </>
+  ),
+  user: (
+    <>
+      <circle {...strokeProps} cx="12" cy="8" r="4" />
+      <path {...strokeProps} d="M4.5 21a7.5 7.5 0 0 1 15 0" />
     </>
   ),
   x: (
