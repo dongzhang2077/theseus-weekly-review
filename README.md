@@ -139,7 +139,8 @@ Prepare a fresh, sanitized database for the July 18 integrated demo:
 .venv/bin/python scripts/prepare_midterm_demo.py
 ```
 
-The command prints the temporary database path and local demo-user ID. Follow
+The command prints the temporary database path, login email, and the path to a
+permission-restricted local credentials file. Follow
 the [Midterm Demo Runbook](docs/14_midterm_demo_runbook.md) for startup,
 preflight, the five-minute flow, screenshots, fallback behavior, and known
 limitations.
@@ -160,9 +161,10 @@ python3 scripts/load_sample_data.py --database /tmp/theseus-demo.db --user-name 
 python3 scripts/run_persisted_review.py --database /tmp/theseus-demo.db --user-id 1 --week-start 2026-06-08 --week-end 2026-06-14
 ```
 
-The first command prints the selected `user_id`; use that value in the second
-command if the database already contains profiles. Personal API routes use the
-same ID through `X-Theseus-User-Id`.
+These are low-level data-loader and review-engine utilities. Browser and HTTP
+use should start with `prepare_midterm_demo.py` or `/auth/register`; all
+personal API routes require a Bearer access token and do not accept a selected
+user ID.
 
 Run the React app against the local API:
 

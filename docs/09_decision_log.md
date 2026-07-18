@@ -89,7 +89,41 @@ Consequences:
 - Cross-user references and unscoped list/review operations are invalid.
 - Schema version 1 data migrates to a generated `Local User` instead of being
   silently discarded.
-- Production auth, cloud sync, and multi-tenant security remain deferred.
+- At this checkpoint, production auth, cloud sync, and multi-tenant security
+  remained deferred. The local HTTP identity mechanism is superseded by the
+  following 2026-07-17 decision.
+
+## 2026-07-17: Replace Selectable Profiles with Formal Local Accounts
+
+Decision:
+
+Keep SQLite and local-only deployment, but replace public profile discovery and
+`X-Theseus-User-Id` selection with email/password accounts, JWT sessions, and
+authenticated ownership resolution.
+
+Reason:
+
+The product owner chose durable user identity and isolation as a P0 capability,
+not a disposable demo shortcut. A selectable integer header permits trivial
+impersonation and cannot safely support long-lived personal data or future
+agent tools.
+
+Consequences:
+
+- Passwords are hashed with Argon2id; plaintext passwords are never stored.
+- Short-lived access JWTs stay in browser memory. Rotating refresh JWTs use an
+  HttpOnly SameSite cookie plus a readable, hashed CSRF token.
+- Session rows support logout, password-change revocation, expiry, and refresh
+  reuse detection; access requests also require an active session.
+- Registration, login, profile/email/password changes, logout, and
+  account deletion are first-class API and mobile UI flows.
+- Public `/users` routes are removed. Personal routes ignore the old user-ID
+  header and derive ownership only from authenticated context.
+- Schema v3 adds credentials and sessions without deleting v2 profile data;
+  v4 removes the unused recovery-code column while preserving accounts.
+- Cloud sync, third-party login, email delivery, and multi-device conflict
+  handling are still deferred; this decision is formal local auth, not a cloud
+  identity service.
 
 ## 2026-07-15: Simplify Signals and Plan Before Adding More Features
 

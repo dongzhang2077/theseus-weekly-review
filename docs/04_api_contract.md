@@ -1,22 +1,28 @@
 # API Contract
 
-The API uses JSON over HTTP. Production authentication is deferred, but every
-persisted personal-data operation runs under an explicit local profile.
-
-Send the selected profile ID in this header:
+The API uses JSON over HTTP. Every persisted personal-data operation requires a
+short-lived access JWT:
 
 ```http
-X-Theseus-User-Id: 1
+Authorization: Bearer <access-token>
 ```
 
-The header is required for goals, projects, weekly plans, time logs, mobile
-imports, and persisted weekly-review generation. It is not required for
-health, local-user creation/list/get, or the pure in-memory
-`POST /reviews/weekly/analyze` endpoint. The header selects an ownership scope;
-it is not an authentication credential.
+The token is required for goals, projects, weekly plans, time logs, mobile
+imports, persisted weekly-review generation, and account-management routes.
+It is not required for health, register, login, refresh, or the pure
+in-memory `POST /reviews/weekly/analyze` endpoint. The backend validates the
+token and its active server-side session, then derives the ownership scope from
+the opaque subject. `X-Theseus-User-Id` is ignored and cannot select a user.
 
 Persisted personal records include `user_id` in read responses. Clients cannot
-override it in request bodies.
+override it in request bodies or headers.
+
+The access token expires after 15 minutes by default and should remain only in
+browser memory. Registration/login/refresh also set a rotating refresh JWT in
+the HttpOnly `theseus_rt` cookie and a readable `theseus_csrf` cookie. The
+refresh request must echo the CSRF value in `X-CSRF-Token`. Cookie lifetime,
+access lifetime, issuer, audience, allowed origins, and local HTTPS behavior are
+configurable through `THESEUS_*` environment variables.
 
 For the local browser demo, the backend allows `http://127.0.0.1:5173` and
 `http://localhost:5173` as CORS origins by default. Override this with the
@@ -35,14 +41,16 @@ Response:
 }
 ```
 
-## 2. Local Users
+## 2. Authentication and Account
 
-### POST /users
+### POST /auth/register
 
 Request:
 
 ```json
 {
+  "email": "douglas@example.com",
+  "password": "a passphrase with 15+ characters",
   "display_name": "Douglas",
   "timezone": "America/Los_Angeles",
   "locale": "en-US"
@@ -53,25 +61,74 @@ Response:
 
 ```json
 {
-  "id": 1,
-  "display_name": "Douglas",
-  "timezone": "America/Los_Angeles",
-  "locale": "en-US",
-  "created_at": "2026-07-15T12:00:00",
-  "updated_at": "2026-07-15T12:00:00"
+  "access_token": "<jwt>",
+  "token_type": "bearer",
+  "expires_in": 900,
+  "user": {
+    "id": 1,
+    "email": "douglas@example.com",
+    "display_name": "Douglas",
+    "timezone": "America/Los_Angeles",
+    "locale": "en-US",
+    "created_at": "2026-07-17T12:00:00",
+    "updated_at": "2026-07-17T12:00:00"
+  }
 }
 ```
 
-Status: `201 Created`. This endpoint does not require an existing user header.
+Status: `201 Created`. Email is normalized case-insensitively. Passwords must be
+15-256 characters. Duplicate email returns `409`.
 
-### GET /users
+### POST /auth/login
 
-Returns all local profiles ordered by ID. It does not return records owned by
-those profiles.
+Request: `email` and `password`. Response uses the same token/account shape as
+registration. Invalid credentials return the same
+generic `401` response. Five consecutive failures temporarily lock the account
+and return `429` with `Retry-After`.
 
-### GET /users/{user_id}
+### POST /auth/refresh
 
-Returns one local profile or `404 Not Found`.
+Requires the `theseus_rt` and `theseus_csrf` cookies plus:
+
+```http
+X-CSRF-Token: <value from theseus_csrf>
+```
+
+Returns a new access token and rotates both cookie values. Reuse of a replaced
+refresh token revokes all sessions for the account and returns `401`.
+
+### POST /auth/logout
+
+Requires Bearer authentication. Revokes the active session, clears both auth
+cookies, and returns `204`.
+
+### GET /auth/me
+
+Returns the authenticated account. No credentials or session token hashes are
+ever returned.
+
+### PATCH /auth/me
+
+Accepts one or more of `display_name`, `timezone`, and `locale`; returns the
+updated account.
+
+### POST /auth/change-email
+
+Accepts `email` and `current_password`; returns the updated account. A duplicate
+email returns `409`.
+
+### POST /auth/change-password
+
+Accepts `current_password` and `new_password`. Revokes every old session and
+creates one replacement session.
+
+### DELETE /auth/account
+
+Requires Bearer authentication plus `current_password` and literal confirmation
+`DELETE`. Returns `204` and cascades deletion through credentials, sessions,
+and all locally owned domain records.
+
+There are no public `/users` list, create, or lookup routes.
 
 ## 3. Goals
 
@@ -393,7 +450,7 @@ defined by the Sprint 2 evidence contract.
 }
 ```
 
-If no matching weekly plan exists for the selected user, the endpoint returns
+If no matching weekly plan exists for the authenticated account, the endpoint returns
 `404`. The endpoint reads only that user's normalized evidence from SQLite,
 calls the framework-independent review engine, and stores the structured result
 under the same user before responding.
@@ -401,8 +458,10 @@ under the same user before responding.
 ## 9. Validation and Errors
 
 - Invalid request data returns `422`.
-- A missing or invalid `X-Theseus-User-Id` on a user-owned endpoint returns
-  `422`; an unknown positive user ID returns `404`.
+- A missing, invalid, expired, forged, or revoked Bearer token on a user-owned
+  endpoint returns controlled `401` JSON with `WWW-Authenticate: Bearer`.
+- Refresh without a matching CSRF cookie/header returns `403`; an expired or
+  reused refresh session returns `401` and clears cookies.
 - Missing referenced entities return `404` or `409`, depending on whether the operation is a lookup or a conflicting write.
 - Weekly-plan replacement is whole-resource and atomic; it never leaves a
   partially replaced item collection.
@@ -410,7 +469,7 @@ under the same user before responding.
   `409`; APIs never fall back to an unscoped lookup.
 - Create requests never accept database-managed IDs or timestamps.
 - User-owned create bodies never accept `user_id`; ownership comes only from
-  the request header.
+  authenticated server context.
 - Empty optional strings are accepted; required names and titles must not be empty.
 - `start_time` and `end_time` must be supplied together.
 - Batch mobile imports report unresolved `activity_id` or `project_id` as record-level `skipped` and `needs_mapping` counts instead of failing the whole request.

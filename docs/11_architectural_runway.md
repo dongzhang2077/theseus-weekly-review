@@ -20,7 +20,8 @@ This avoids rewriting core logic when the project later adds a mobile app, histo
 
 These concepts should remain stable:
 
-- LocalUser as a local data-ownership root
+- User/Account as a local data-ownership and authentication root
+- AuthCredential and revocable AuthSession
 - Goal
 - Project
 - WeeklyPlan
@@ -107,10 +108,16 @@ Sprint 1 schema should include long-term extension points now:
 - Scope personal records, date uniqueness, repository reads, imports, and
   review generation by a stable local `user_id`.
 - Reject references that cross local-user ownership boundaries.
+- Resolve ownership exclusively from a validated access JWT at the HTTP
+  boundary; request bodies and legacy user-ID headers never select an owner.
+- Keep short-lived access tokens in browser memory. Rotate refresh tokens in an
+  HttpOnly, SameSite cookie and persist only token/CSRF digests.
+- Keep credentials, generated auth keys, demo credential files, databases, and
+  personal exports outside Git.
 
-The local user is an explicit persistence scope required by the course demo;
-it is not production-grade authentication or cloud multi-tenancy. Keep
-production auth and sync deferred.
+The account is an authenticated local persistence scope required by the course
+demo. It is not cloud identity or cloud multi-tenancy. Keep third-party login,
+email delivery, remote account recovery, and sync deferred.
 
 ## 6. Review Engine Design Rules
 

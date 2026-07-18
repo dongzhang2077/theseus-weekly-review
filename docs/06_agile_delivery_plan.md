@@ -131,14 +131,15 @@ approve a realistic next-week adjustment.
 Critical path:
 
 ```text
-Local-user contract -> SQLite/API ownership -> frontend user context
+Local-account contract -> SQLite/JWT ownership -> frontend auth context
 -> restart persistence -> Signals/Plan integration -> verification
 -> demo rehearsal
 ```
 
 Required scope:
 
-- Local user creation and selection without production authentication.
+- Formal local registration, login, session restore, and account
+  management without cloud identity.
 - User-scoped goals, projects, plans, logs, reflections, and stored reviews on
   the demonstrated path.
 - A restart test proving local persistence.
@@ -150,7 +151,8 @@ Deferred from this sprint:
 
 - LangGraph runtime integration.
 - OpenClaw integration.
-- Production auth, cloud sync, and broad external tool execution.
+- Cloud identity, third-party login, cloud sync, and broad external tool
+  execution.
 - Learned personalization or custom model training.
 
 Owners, dependencies, acceptance criteria, verification commands, and demo
