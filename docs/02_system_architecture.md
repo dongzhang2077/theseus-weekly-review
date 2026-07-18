@@ -40,8 +40,8 @@ The architecture separates user input, data persistence, deterministic review lo
 Responsibilities:
 
 - Collect goals, projects, plans, time logs, and reflection notes.
-- Create/select a local profile, retain its ID, and send it with personal API
-  requests.
+- Register or sign in locally; keep the short-lived access token in memory and
+  restore through the rotating refresh-cookie session.
 - Display weekly review output.
 - Display a simple dashboard for time distribution and risk flags.
 
@@ -56,7 +56,8 @@ Expected technology:
 Responsibilities:
 
 - Validate all incoming data.
-- Resolve `X-Theseus-User-Id` and bind personal operations to that local owner.
+- Validate the access JWT and active session, then bind personal operations to
+  that account owner.
 - Store data in SQLite.
 - Prepare structured review state.
 - Call the review engine.
@@ -72,8 +73,8 @@ Expected technology:
 
 Responsibilities:
 
-- Persist local users plus user-owned goals, projects, plans, logs,
-  reflections, reviews, and evaluation records.
+- Persist accounts, hashed credentials, revocable sessions, and user-owned
+  goals, projects, plans, logs, reflections, reviews, and evaluation records.
 - Enforce user-scoped uniqueness and reject cross-user references.
 - Preserve raw activity names and user-corrected activity labels.
 
@@ -136,7 +137,7 @@ Load weekly context
 |---|---|---|
 | Backend | FastAPI | Fits Python AI workflow and Pydantic validation. |
 | Database | SQLite | Enough for local MVP and simple demos. |
-| Local identity | Explicit user ID header; no production auth | Gives persistent ownership without expanding into cloud identity. |
+| Local identity | Email/password account, short JWT, rotating refresh session | Gives enforceable local ownership without expanding into cloud sync or third-party identity. |
 | Review workflow | Rule pipeline first, LangGraph later | Reduces risk and improves explainability. |
 | Frontend | React or Next.js | Familiar, fast to prototype, easy to deploy. |
 | AI provider | Adapter interface | Avoids locking the project to one provider. |

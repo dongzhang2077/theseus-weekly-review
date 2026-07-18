@@ -3,7 +3,8 @@
 ## 1. Core Entities
 
 ```text
-LocalUser
+Account (users + auth_credentials)
+  ├── AuthSession
   ├── Goal
   │     └── Project
   │           ├── Activity
@@ -17,9 +18,13 @@ LocalUser
         └── ReviewRecommendation
 ```
 
-`LocalUser` is an ownership root for the local MVP, not a production
-authentication identity. `PlannedItem` inherits ownership from its
+`users` remains the stable ownership root. A browser-visible account is the
+one-to-one combination of `users` and `auth_credentials`; credentials are never
+returned with domain records. `PlannedItem` inherits ownership from its
 `WeeklyPlan`; every other persisted personal table stores `user_id` directly.
+Legacy version-2 profiles remain intact after migration but cannot be
+enumerated or impersonated through the HTTP API until they are deliberately
+migrated to an account.
 
 ## 2. Enumerations
 
@@ -67,12 +72,41 @@ authentication identity. `PlannedItem` inherits ownership from its
 
 | Field | Type | Notes |
 |---|---|---|
-| id | integer pk | Stable local profile ID |
+| id | integer pk | Stable account and ownership ID |
 | display_name | text | Required |
 | timezone | text | Required; defaults to `UTC` |
 | locale | text | Required; defaults to `en` |
 | created_at | datetime | System timestamp |
 | updated_at | datetime | System timestamp |
+
+### auth_credentials
+
+| Field | Type | Notes |
+|---|---|---|
+| user_id | integer pk/fk | One-to-one with `users`; cascades on account deletion |
+| subject | text unique | Opaque JWT subject; never derived from email |
+| email | text unique | Case-insensitive normalized sign-in identifier |
+| password_hash | text | Argon2id hash; plaintext is never persisted |
+| failed_attempts | integer | Login throttling state |
+| locked_until | datetime | Temporary lock deadline when present |
+| password_changed_at | datetime | Credential rotation timestamp |
+| created_at | datetime | System timestamp |
+| updated_at | datetime | System timestamp |
+
+### auth_sessions
+
+| Field | Type | Notes |
+|---|---|---|
+| id | text pk | Opaque refresh-session ID and refresh JWT `jti` |
+| user_id | integer fk | Account owner; cascades on deletion |
+| token_hash | text unique | SHA-256 digest of the refresh JWT |
+| csrf_hash | text | SHA-256 digest of the double-submit CSRF value |
+| expires_at | datetime | Absolute refresh expiry |
+| user_agent | text | Bounded diagnostic context |
+| created_at | datetime | System timestamp |
+| last_used_at | datetime | Last authenticated use |
+| revoked_at | datetime | Revocation marker |
+| replaced_by_id | text fk | Rotation chain; reuse revokes all account sessions |
 
 ### goals
 
@@ -214,7 +248,9 @@ the project must belong to the same user as the plan.
   replaces that user's stored structured result while preserving its ID.
 - Foreign keys and database triggers reject cross-user goal, project, activity,
   planned-item, and time-log references.
-- Schema version 2 adds local ownership. Initializing a version 1 database
+- Schema version 2 adds local ownership; version 3 adds formal credentials and
+  sessions; version 4 removes the unused recovery-code column without changing
+  accounts or personal records. Initializing a version 1 database
   migrates existing records to a generated `Local User` profile with ID `1`.
 
 ## 5. Reference Mapping Notes

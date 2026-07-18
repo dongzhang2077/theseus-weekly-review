@@ -8,14 +8,14 @@ from review_engine.rules import analyze_week
 
 from ..schemas import (
     WeeklyReviewGenerateRequest,
-    LocalUserRead,
+    AccountRead,
     WeeklyReviewRead,
     WeeklyReviewRequest,
     WeeklyReviewResult,
 )
 from ..services import ReviewService, WeeklyPlanNotFound
 from ..services.review_writer import ReviewWriterError
-from .dependencies import get_connection, get_local_user
+from .dependencies import get_connection, get_current_user
 
 
 router = APIRouter(prefix="/reviews/weekly", tags=["weekly-reviews"])
@@ -30,7 +30,7 @@ async def analyze_weekly_review(request: WeeklyReviewRequest) -> WeeklyReviewRes
 @router.post("/generate", response_model=WeeklyReviewRead)
 async def generate_weekly_review(
     request: WeeklyReviewGenerateRequest,
-    user: LocalUserRead = Depends(get_local_user),
+    user: AccountRead = Depends(get_current_user),
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> WeeklyReviewRead:
     try:

@@ -1,3 +1,13 @@
+from .auth_service import (
+    AccountLocked,
+    AuthContext,
+    AuthService,
+    AuthSettings,
+    InvalidAuthToken,
+    InvalidCredentials,
+    InvalidCSRFToken,
+    RefreshTokenReuse,
+)
 from .review_service import ReviewService, WeeklyPlanNotFound
 from .review_writer import (
     OpenCodeGoReviewWriter,
@@ -10,7 +20,15 @@ from .review_writer import (
 from .sample_import import SampleImportResult, import_sample_week, load_sample_payload
 
 __all__ = [
+    "AccountLocked",
+    "AuthContext",
+    "AuthService",
+    "AuthSettings",
+    "InvalidAuthToken",
+    "InvalidCredentials",
+    "InvalidCSRFToken",
     "ReviewService",
+    "RefreshTokenReuse",
     "OpenCodeGoReviewWriter",
     "OpenAIReviewWriter",
     "ReviewWriterError",

@@ -7,6 +7,8 @@ from backend.app.db import Database
 
 EXPECTED_TABLES = {
     "activities",
+    "auth_credentials",
+    "auth_sessions",
     "daily_reflections",
     "goals",
     "planned_items",

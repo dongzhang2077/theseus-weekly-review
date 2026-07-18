@@ -12,6 +12,8 @@ The backend is responsible for validation, persistence, and review orchestration
 ## MVP Endpoints
 
 - `GET /health`
+- account registration, login, refresh, profile/password/email
+  management, logout, and deletion under `/auth`
 - `POST /reviews/weekly/analyze`
 - `POST /reviews/weekly/generate`
 - CRUD endpoints for goals, projects, weekly plans, and time logs
@@ -32,6 +34,13 @@ uvicorn backend.app.main:app --reload
 The default local database is `data/local/theseus.db`. Override it with `THESEUS_DB_PATH`.
 The local frontend demo origin is allowed by default. Override browser origins with
 `THESEUS_CORS_ORIGINS`, using a comma-separated list.
+
+Personal endpoints require the short-lived Bearer access JWT returned by
+`/auth/register`, `/auth/login`, or `/auth/refresh`. The refresh JWT is a
+rotating HttpOnly cookie and refresh also requires the matching
+`X-CSRF-Token`. When `THESEUS_JWT_SECRET` is not set, the backend generates a
+permission-restricted key beside the SQLite database; both are Git-ignored.
+`THESEUS_COOKIE_SECURE=true` is required when serving the app over HTTPS.
 
 `supportive_text` review generation uses the local evidence-bound writer by
 default. To use the OpenAI Responses API adapter, set:

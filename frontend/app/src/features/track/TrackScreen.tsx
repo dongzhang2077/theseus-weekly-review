@@ -16,6 +16,7 @@ import {
   type ActivityTimer
 } from "./timerModel";
 import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
+import type { FetchLike } from "../../shared/api/loadAppWeek";
 import { saveActivitySession } from "../../shared/api/timeLogs";
 
 const categories = ["Project", "Study", "Health"];
@@ -33,7 +34,7 @@ type SessionOutcome = "done" | "progress" | "stuck";
 interface TrackScreenProps {
   track: AppWeekViewModel["track"];
   apiBaseUrl?: string;
-  userId?: number;
+  fetchImpl?: FetchLike;
   activities?: ActivityTimer[];
   onActivitiesChange?: Dispatch<SetStateAction<ActivityTimer[]>>;
   onSessionSaved?: () => void;
@@ -41,7 +42,7 @@ interface TrackScreenProps {
 
 export function TrackScreen({
   apiBaseUrl,
-  userId,
+  fetchImpl,
   track,
   activities: controlledActivities,
   onActivitiesChange,
@@ -149,9 +150,9 @@ export function TrackScreen({
     if (apiBaseUrl) {
       const result = await saveActivitySession({
         apiBaseUrl,
-        userId,
         activity: pendingSession,
-        note: buildSessionNote(sessionOutcome, sessionNote)
+        note: buildSessionNote(sessionOutcome, sessionNote),
+        fetchImpl
       });
       if (!result.saved) {
         setSessionSaveState("error");

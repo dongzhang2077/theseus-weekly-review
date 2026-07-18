@@ -203,6 +203,7 @@ async def test_weekly_plan_replace_and_delete_hide_other_users_records(database)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         first = await create_and_select_api_user(client, "First")
+        first_authorization = client.headers["Authorization"]
         created = await client.post(
             "/weekly-plans",
             json={
@@ -222,7 +223,7 @@ async def test_weekly_plan_replace_and_delete_hide_other_users_records(database)
             },
         )
         delete = await client.delete(f"/weekly-plans/{plan_id}")
-        client.headers["X-Theseus-User-Id"] = str(first["id"])
+        client.headers["Authorization"] = first_authorization
         first_plans = await client.get("/weekly-plans")
 
     assert second["id"] != first["id"]

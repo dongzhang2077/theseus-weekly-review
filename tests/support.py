@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -26,7 +27,7 @@ from backend.app.schemas import (
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLE_PATH = ROOT / "data" / "sample" / "sample_week.json"
-LOCAL_USER_HEADER = "X-Theseus-User-Id"
+DEFAULT_TEST_PASSWORD = "correct horse battery staple"
 
 
 def load_sample_payload() -> dict:
@@ -36,12 +37,24 @@ def load_sample_payload() -> dict:
 async def create_and_select_api_user(
     client: Any,
     display_name: str = "API Test User",
+    *,
+    email: str | None = None,
+    password: str = DEFAULT_TEST_PASSWORD,
 ) -> dict[str, Any]:
-    response = await client.post("/users", json={"display_name": display_name})
+    identifier = re.sub(r"[^a-z0-9]+", "-", display_name.casefold()).strip("-")
+    response = await client.post(
+        "/auth/register",
+        json={
+            "email": email or f"{identifier or 'user'}@example.com",
+            "password": password,
+            "display_name": display_name,
+        },
+    )
     if response.status_code != 201:
         raise AssertionError(f"Could not create API test user: {response.text}")
-    user = response.json()
-    client.headers[LOCAL_USER_HEADER] = str(user["id"])
+    payload = response.json()
+    user = payload["user"]
+    client.headers["Authorization"] = f"Bearer {payload['access_token']}"
     return user
 
 

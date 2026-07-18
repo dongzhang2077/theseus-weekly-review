@@ -52,17 +52,17 @@ automation, and machine learning extend that kernel; they do not replace it.
 
 ## 3. Current Reality
 
-As of 2026-07-15, Theseus is a working weekly-review MVP foundation rather than
+As of 2026-07-18, Theseus is a working weekly-review MVP foundation rather than
 a general life assistant.
 
 | Capability | Current state | Direction |
 |---|---|---|
-| Stable review entities | Implemented in SQLite; schema v2 local ownership is merged to `main` through PR #64 | Keep the core model stable while Signals and Plan consume it |
+| Stable review entities | Schema v4 ownership, credentials, and sessions are implemented and verified in STORY-030 | Keep the core model stable while Signals and Plan consume it |
 | Persistent review path | User-scoped sample data flows through SQLite, the review engine, and stored review; v1 migration and restart coverage are merged | Rehearse the browser-to-API restart path |
 | Review reasoning | Deterministic, evidence-first rules | Keep framework-independent |
 | AI wording | Evidence-bound writer adapters exist | Keep AI wording downstream of computed facts |
-| React app | Review, Track, evidence-first Signals, actionable Plan, and the Warm Stationery local-profile gate are merged to `main` | Preserve the current hierarchy while validating the complete demo loop |
-| Personal identity | Local user create/list/select, retained selection, scoped API requests, and explicit sample-data status are on `main` | Keep this separate from production authentication |
+| React app | Review, Track, evidence-first Signals, and actionable Plan are on `main`; the Warm Stationery registration/login/account gate is a visually approved release candidate | Preserve the mobile hierarchy through screenshot and interaction gates |
+| Personal identity | Argon2id local accounts, JWT/session rotation, account management, and authenticated isolation are implemented and verified in STORY-030 | Keep this separate from cloud identity and sync |
 | Long-term preferences | Not represented | Add explicit, provenance-bearing preferences after user ownership |
 | Agent orchestration | Not implemented | Pilot one LangGraph workflow after the domain foundation is stable |
 | External execution | Not implemented | Add OpenClaw as an optional, policy-gated adapter later |
@@ -77,7 +77,7 @@ sprint plan; documents must not describe later local work as released behavior.
 
 Keep the course MVP focused on:
 
-- local user creation and selection;
+- formal local registration, login, and account management;
 - goals, projects, weekly plans, time logs, reflections, and stored reviews;
 - evidence-backed Signals;
 - a realistic next-week adjustment in Plan;
@@ -88,7 +88,7 @@ Keep the course MVP focused on:
 
 Do not put these on the 2026-07-18 critical path:
 
-- production authentication;
+- cloud identity, email-based recovery, and third-party login;
 - cloud sync or multi-device conflict resolution;
 - automatic calendar rewriting;
 - unrestricted shell, browser, email, or messaging actions;
@@ -212,14 +212,16 @@ There must be one source of truth for user and domain data: Theseus. LangGraph
 checkpoints and OpenClaw memory are supporting runtime stores, not replacements
 for the domain database.
 
-## 7. Local User and Persistent Ownership
+## 7. Local Account and Persistent Ownership
 
-The immediate persistence extension is a local profile, not production auth.
+Theseus remains local-first, but the accepted HTTP boundary is now formal
+local authentication rather than a selectable profile header. Cloud identity
+and sync remain later work.
 
 Minimum model direction:
 
-- add a `users` table with a stable ID, display name, locale/time zone, and
-  timestamps;
+- retain `users` as a stable ownership root and add one-to-one hashed
+  credentials plus revocable session records;
 - associate all user-owned top-level records with `user_id`;
 - reject cross-user references between goals, projects, plans, items, and logs;
 - scope weekly-plan, daily-reflection, and weekly-review uniqueness by user;
@@ -228,17 +230,20 @@ Minimum model direction:
 - enable SQLite foreign keys for every connection;
 - keep local databases, raw exports, and personal records out of Git.
 
-The accepted local-user context mechanism is:
+The accepted local-account mechanism is:
 
-- `POST/GET /users` creates and discovers local profiles without requiring an
-  existing profile;
-- the frontend retains the selected integer ID in local browser storage;
-- every persisted personal request sends `X-Theseus-User-Id`;
-- the API validates that user, then binds repositories and domain services to
-  that ID;
+- register and sign in through `/auth`; public user enumeration is absent;
+- hash passwords with Argon2id and never persist plaintext credentials;
+- keep access JWTs in browser memory and rotate refresh JWTs through an
+  HttpOnly SameSite cookie plus CSRF validation;
+- every persisted personal request sends Bearer authentication;
+- the API validates both JWT claims and active session state, then binds
+  repositories and domain services to that account ID;
 - request bodies cannot provide or override `user_id`;
-- schema version 2 migrates version 1 records to a generated `Local User`
-  profile so existing local work is not discarded.
+- schema version 4 keeps auth tables while removing the unused recovery-code
+  column without deleting existing
+  profile-owned work; legacy profiles are not publicly enumerable or
+  impersonable.
 
 This mechanism is documented in `docs/03_data_model.md` and
 `docs/04_api_contract.md`. Endpoints may not silently read or return records
@@ -247,8 +252,8 @@ belonging to every user.
 The demo proof is behavioral:
 
 ```text
-Create user -> save user-owned records -> stop app -> restart app
--> select the same user -> regenerate review -> retrieve stored review
+Register -> save account-owned records -> stop app -> restart app
+-> restore/login -> regenerate review -> retrieve stored review
 ```
 
 ## 8. Long-Term Personalization and Memory
@@ -379,6 +384,8 @@ approve a realistic next-week adjustment.
 ### Task A: Lock the local-user contract
 
 Delivery status: completed and merged through PR #64 on 2026-07-15 PDT.
+Historical note: its selectable-header identity mechanism is superseded by
+Task G; the stable `user_id` ownership model remains valid.
 
 - Owner: Dong Zhang
 - Depends on: teacher feedback; current data model and API contract
@@ -389,7 +396,7 @@ Acceptance criteria:
 
 - ownership and user-scoped uniqueness rules are documented;
 - the local-user context mechanism is explicit;
-- production auth and cloud sync remain deferred;
+- at that checkpoint, authentication and cloud sync were deferred;
 - cross-user references and unscoped list operations are rejected by design.
 
 Verification: run the `api-contract-review` and `sqlite-persistence` review
@@ -434,7 +441,7 @@ records and stored weekly review.
 
 Delivery status: completed and merged through PR #64 on 2026-07-15 PDT; the
 production frontend build is verified and the integrated demo rehearsal remains
-in Task F.
+in Task F. The profile chooser itself is superseded by Task G.
 
 - Owner: Zhi Kang
 - Depends on: Task A and the accepted user endpoint contract; may use a typed
@@ -444,11 +451,12 @@ in Task F.
 
 Acceptance criteria:
 
-- first run offers one short local-profile creation flow;
-- an existing local user can be selected without production login UI;
-- the selected user ID is retained as a client preference and included in
-  every user-owned API operation;
-- restart restores the same user context and reloads that user's data;
+- first run offers formal account registration and an existing user can sign
+  in without cloud connectivity;
+- access identity is held in memory, refresh rotation restores the session, and
+  no client-selected user ID enters personal API requests;
+- restart restores a valid authenticated context and reloads that account's
+  data;
 - API, sample, loading, empty, and error states cannot be mistaken for each
   other;
 - the focused profile surface uses the existing Warm Stationery tokens and is
@@ -461,8 +469,55 @@ npm --prefix frontend/app test
 npm --prefix frontend/app run build
 ```
 
-Demo evidence: create a local profile on first run, restart the app, and show
-the same selected profile and user-owned records.
+Demo evidence: sign in, restart the app, and show the restored account and its
+persisted records.
+
+### Task G: Replace selectable profiles with formal local authentication
+
+Delivery status: implementation, full verification, independent contract and
+security review, and product-owner browser approval completed on 2026-07-18
+PDT. Release history is tracked by the focused STORY-030 GitHub PR #69.
+
+- Owner: Dong Zhang
+- Depends on: Tasks A-C, schema v2 ownership, accepted mobile shell
+- Files/modules: auth schema/repository/service/routes, all protected route
+  dependencies, frontend AuthClient/gate/account sheet, demo preparation, docs
+
+Acceptance criteria:
+
+- Argon2id registration/login does not persist plaintext
+  credentials;
+- access JWTs use fixed issuer/audience/type validation and an active session;
+- rotating HttpOnly refresh cookies use CSRF validation and reuse detection;
+- logout, password rotation, and deletion revoke relevant sessions;
+- every personal repository is bound to the authenticated account and cross-
+  account references remain rejected;
+- registration, login, profile/email/password changes, logout,
+  and deletion are operable in the 430px mobile shell;
+- v2-to-v4 migration and authenticated demo restart are covered without
+  discarding legacy data.
+
+Post-demo hardening boundary: multi-tab refresh coordination is tracked as
+STORY-031. The July 18 demo uses one browser tab; cloud identity and
+multi-device sync remain outside STORY-030.
+
+Verification:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -p no:cacheprovider -q
+python3 -m compileall backend review_engine scripts
+python3 scripts/run_sample_review.py
+npm --prefix frontend/app test
+npm --prefix frontend/app run build
+```
+
+Verification checkpoint (2026-07-18 PDT): 102 Python tests and 71 frontend
+tests pass; TypeScript and the production build pass; Python compilation, the
+deterministic sample review, and authenticated demo preparation pass. The
+focused auth suite covers 12 API cases, including CSRF failure recovery,
+expired/type-confused JWT rejection, lockout, session-scoped logout, email
+change, restart restore, deletion, and cookie clearing. Migration tests also
+prove a failed v3-to-v4 upgrade rolls back account data and schema changes.
 
 Verification checkpoint (2026-07-15): the merged Issue #63 delivery passes 91
 Python tests, 64 frontend tests, Python compilation, the frontend production build,
@@ -558,8 +613,9 @@ Demo evidence: review recommendation to Plan diff to approved saved plan.
 Delivery checkpoint (2026-07-15 PDT): engineering-complete, merged through PR
 #64 as `306061c`, and tracked as Done by GitHub Issue #63. A secret-free
 `prepare_midterm_demo.py` entry point now creates a fresh temporary SQLite
-database, imports the sanitized user week, and stores local supportive wording.
-A restart integration test covers the prepared profile, records, and review.
+database, a formal demo account with credentials in a Git-ignored local file,
+imports the sanitized user week, and stores local supportive wording. A restart
+integration test covers authenticated login, records, and review.
 The four app tabs have sanitized mobile screenshots, with desktop composition
 shots for Review and Plan, and a five-minute runbook now records preflight,
 fallback, limitations, and the recording checklist. Scenario review exposed

@@ -1,6 +1,6 @@
 # Midterm Demo Runbook
 
-Checkpoint: 2026-07-15
+Checkpoint: 2026-07-17
 
 Demo date: 2026-07-18
 
@@ -9,13 +9,13 @@ Integration and review owners: both teammates
 
 ## 1. Demo Goal
 
-In five minutes, show that one local user can retain evidence-backed weekly
+In five minutes, show that one authenticated local account can retain evidence-backed weekly
 review data, inspect the most important signal, and approve a reversible
 next-week plan adjustment. The path must work without an external model key.
 
 Dependencies:
 
-- local-user ownership and restart persistence;
+- local account registration/login, JWT ownership, and restart persistence;
 - deterministic review evidence and the local supportive template;
 - Review, Signals, Focus, and Plan app surfaces;
 - sanitized sample data under `data/sample/`.
@@ -23,7 +23,7 @@ Dependencies:
 Demo evidence:
 
 ```text
-Local profile -> persisted review -> inspectable signal
+Local sign-in -> persisted review -> inspectable signal
 -> before/after Plan diff -> Apply -> reload -> Undo
 ```
 
@@ -35,13 +35,17 @@ From the repository root, run:
 .venv/bin/python scripts/prepare_midterm_demo.py
 ```
 
-The command creates a new SQLite file under `/tmp`, creates one `Theseus Demo`
-profile, imports the sanitized sample week, and stores supportive wording with
-`template-supportive-v1`. It does not read an `.env`, require a provider key, or
+The command creates a new SQLite file under `/tmp`, creates one formal
+`Theseus Demo` account and generates a strong password in a
+permission-restricted local JSON file, imports the sanitized sample week, and
+stores supportive wording with `template-supportive-v1`. The database, auth key,
+and credentials file are ignored by Git. It does not require a provider key or
 load a personal database.
 
-Copy the printed `database` and `user_id` values. Start the backend in terminal
-A, replacing the example database path:
+Copy the printed `database`, `credentials_file`, and `login_email` values. Open
+the credentials file locally to obtain the generated password; do not show it
+on screen or copy it into documentation. Start the backend in terminal A,
+replacing the example database path:
 
 ```bash
 THESEUS_DB_PATH=/tmp/theseus-midterm-demo-EXAMPLE.db \
@@ -60,31 +64,29 @@ Open `http://127.0.0.1:5173`. Leave `THESEUS_REVIEW_WRITER`,
 
 ## 3. Two-Minute Preflight
 
-Use the `user_id` printed by the preparation command:
+Confirm the service first:
 
 ```bash
 curl -s http://127.0.0.1:8000/health
-curl -s http://127.0.0.1:8000/users
-curl -s -X POST http://127.0.0.1:8000/reviews/weekly/generate \
-  -H 'Content-Type: application/json' \
-  -H 'X-Theseus-User-Id: 1' \
-  -d '{"week_start":"2026-06-08","week_end":"2026-06-14","mode":"supportive_text"}'
 ```
 
 Pass conditions:
 
 - health returns `status: ok`;
-- `Theseus Demo` is listed;
-- the review returns `model_name: template-supportive-v1`;
-- the browser opens the local-profile chooser without console-visible failure;
-- selecting `Theseus Demo` loads Review without a `Sample data` badge.
+- the browser opens the sign-in screen without console-visible failure;
+- the generated demo email/password signs in successfully;
+- reload restores the session through the refresh cookie;
+- Review loads without a `Sample data` badge and its stored review uses
+  `template-supportive-v1`;
+- `GET /users`, a missing Bearer token, and a legacy
+  `X-Theseus-User-Id` header cannot enumerate or read personal data.
 
 ## 4. Rehearsed Five-Minute Flow
 
 | Time | Action | Claim supported |
 |---|---|---|
 | 0:00-0:25 | State the problem: weekly evidence exists, but turning it into one realistic adjustment is still manual. | Narrow product scope. |
-| 0:25-0:55 | On Local profile, create `Rehearsal User`; show its honest no-review state, then switch to `Theseus Demo`. | Local user creation, isolation, and explicit ownership. |
+| 0:25-0:55 | Sign in as `Theseus Demo`; briefly point out that registration is available but data ownership comes from JWT, not a selectable ID. | Formal local identity, isolation, and explicit ownership. |
 | 0:55-1:45 | On Review, show the week, the win-first summary, the attention state, and one evidence detail. | Evidence first; supportive wording second. |
 | 1:45-2:30 | Open Signals; inspect the dormant priority signal and its matching evidence. | Severity is evidence-derived, not decorative. |
 | 2:30-3:45 | Open Plan from the recommendation; show week balance and the project/planned/slack before-and-after diff, then Apply. | One bounded, user-approved next-week adjustment. |
@@ -105,14 +107,16 @@ flow; do not hide the fallback.
 
 ### Backend failure
 
-Restart terminal A. If local recovery would take too long, start the frontend
-without `VITE_THESEUS_API_BASE_URL` and use the sanitized `Sample data` path.
-State clearly that this is the visual fallback, not persistence proof.
+Restart terminal A. If restoring the local service would take too long, use the rehearsed
+sanitized recording and committed screenshots. The authenticated build does
+not silently enter sample mode when the API is absent; it shows `Local service
+unavailable`, which prevents a demo fixture from being mistaken for persisted
+personal data.
 
 ### Fallback recording checklist
 
 - record at 1920x1080 or the native presentation resolution;
-- capture the local-profile chooser, Review, Signals, Plan diff, Apply, reload,
+- capture sign-in, Review, Signals, Plan diff, Apply, reload,
   and Undo;
 - keep the browser address bar or a short opening slate visible so the local
   app source is clear;
@@ -134,7 +138,7 @@ All committed screenshots use the sanitized, explicit `Sample data` mode.
 | Plan | [plan-mobile.png](demo/screenshots/plan-mobile.png) | [plan-desktop.png](demo/screenshots/plan-desktop.png) |
 
 Visual review was repeated on 2026-07-17 after the Focus and Plan Tailwind
-recovery. The refreshed 500x932 mobile and 1440x1000 desktop evidence has no
+restoration. The refreshed 500x932 mobile and 1440x1000 desktop evidence has no
 horizontal clipping, overlapping utility badges, emoji, missing accessible
 labels, or cross-screen style break. A 500x844 short-viewport check also keeps
 all three Plan actions visible. Focus and Plan use the same warm paper surface,
@@ -142,7 +146,14 @@ restrained borders, semantic colors, and icon-plus-label navigation.
 
 ## 7. Known Limitations
 
-- `X-Theseus-User-Id` is a local ownership scope, not authentication.
+- Accounts, passwords, JWT sessions, and isolation are local-only;
+  there is no email delivery, cloud backup, third-party login, or multi-device
+  sync yet.
+- Access tokens remain in browser memory; refresh tokens rotate in an HttpOnly
+  SameSite cookie and server-side session revocation is enforced.
+- The rehearsed local demo uses one browser tab. Safe cross-tab refresh
+  coordination is tracked as STORY-031; opening the same account concurrently
+  in multiple tabs is outside this checkpoint.
 - The rehearsed fixture uses June 8-14 evidence so every run is deterministic.
 - Calendar automation, cloud sync, wearable integration, LangGraph, OpenClaw,
   and learned personalization are outside this checkpoint.
@@ -176,13 +187,23 @@ Engineering review on 2026-07-15:
 Release status:
 
 - PR #64 was squash-merged to `main` as `306061c` on 2026-07-15 PDT;
+- PR #68 removed the wide-screen iPad-like shell and kept the demo workspace
+  phone-sized before the authentication release;
 - the project owner explicitly approved direct merge and waived the separate
   teammate-review gate for this checkpoint;
+- STORY-030 formal local auth completed implementation, full automated
+  verification, independent contract/security review, and product-owner visual
+  verification on 2026-07-18 PDT; release history is recorded in its focused
+  GitHub PR #69;
+- the final STORY-030 gate passes 102 Python tests, 71 frontend tests, the
+  production build, Python compilation, deterministic sample review, and
+  authenticated demo preparation;
 - Issue #63 is closed as completed and its project-board status is `Done`.
 
 Still requires human completion:
 
-- one live five-minute rehearsal and one fallback recording are completed.
+- one live five-minute rehearsal and one fallback recording remain to be
+  completed.
 
 Full verification commands:
 

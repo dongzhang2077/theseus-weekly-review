@@ -72,7 +72,7 @@ describe("PlanScreen", () => {
       if (init.method === "DELETE") return ok({}, 204);
       return failed(500);
     };
-    renderPlan({ apiBaseUrl: "http://127.0.0.1:8000", userId: 7, reviewSource: "api", fetchImpl });
+    renderPlan({ apiBaseUrl: "http://127.0.0.1:8000", reviewSource: "api", fetchImpl });
 
     fireEvent.click(await screen.findByRole("button", { name: "Suggested adjustment: Protect one restart block" }));
     fireEvent.click(within(screen.getByRole("region", { name: "Adjustment" })).getByRole("button", { name: "Apply" }));
@@ -102,7 +102,7 @@ describe("PlanScreen", () => {
       if (init.method === "GET" && input.endsWith("/projects")) return ok(projects);
       return failed(409);
     };
-    renderPlan({ apiBaseUrl: "http://127.0.0.1:8000", userId: 7, reviewSource: "api", fetchImpl });
+    renderPlan({ apiBaseUrl: "http://127.0.0.1:8000", reviewSource: "api", fetchImpl });
 
     fireEvent.click(await screen.findByRole("button", { name: "Suggested adjustment: Protect one restart block" }));
     fireEvent.click(within(screen.getByRole("region", { name: "Adjustment" })).getByRole("button", { name: "Apply" }));
@@ -124,7 +124,7 @@ describe("PlanScreen", () => {
       }
       return ok(projects);
     };
-    renderPlan({ apiBaseUrl: "http://127.0.0.1:8000", userId: 7, reviewSource: "api", fetchImpl });
+    renderPlan({ apiBaseUrl: "http://127.0.0.1:8000", reviewSource: "api", fetchImpl });
 
     expect(await screen.findByText("Plan could not load")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));

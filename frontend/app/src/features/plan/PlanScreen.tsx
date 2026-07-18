@@ -46,7 +46,6 @@ interface PlanScreenProps {
   planData: AppWeekViewModel["plan"];
   reviewSource: AppWeekSource;
   apiBaseUrl?: string;
-  userId?: number;
   entryRequest: {
     id: number;
     detail: PlanDetail;
@@ -65,7 +64,6 @@ const idleOperation: OperationState = {
 
 export function PlanScreen({
   apiBaseUrl,
-  userId,
   planData,
   reviewSource,
   entryRequest,
@@ -73,7 +71,7 @@ export function PlanScreen({
   onFocusItem,
   fetchImpl
 }: PlanScreenProps) {
-  const hasLiveApi = Boolean(apiBaseUrl && userId);
+  const hasLiveApi = Boolean(apiBaseUrl);
   const initialSeed = hasLiveApi && reviewSource !== "api"
     ? createUpcomingPlanSeed()
     : planData;
@@ -106,7 +104,7 @@ export function PlanScreen({
 
     let ignore = false;
     setLoadPhase("loading");
-    loadPlanRecords({ apiBaseUrl, userId, fetchImpl }).then((result) => {
+    loadPlanRecords({ apiBaseUrl, fetchImpl }).then((result) => {
       if (ignore) return;
       if (result.status !== "ok" || !result.data) {
         setLoadPhase("error");
@@ -121,7 +119,7 @@ export function PlanScreen({
     return () => {
       ignore = true;
     };
-  }, [apiBaseUrl, fetchImpl, hasLiveApi, planData, reload, reviewSource, userId]);
+  }, [apiBaseUrl, fetchImpl, hasLiveApi, planData, reload, reviewSource]);
 
   useEffect(() => {
     if (entryRequest) setDetail(entryRequest.detail);
@@ -151,7 +149,6 @@ export function PlanScreen({
 
     const result = await savePlanDraft({
       apiBaseUrl,
-      userId,
       draft: proposal.after,
       fetchImpl
     });
@@ -194,7 +191,7 @@ export function PlanScreen({
       return true;
     }
 
-    const result = await savePlanDraft({ apiBaseUrl, userId, draft: nextDraft, fetchImpl });
+    const result = await savePlanDraft({ apiBaseUrl, draft: nextDraft, fetchImpl });
     if (result.status !== "ok" || !result.data) {
       setOperation(operationFailure("manual", result.status, result.error));
       return false;
@@ -224,7 +221,6 @@ export function PlanScreen({
     if (undoSnapshot.before) {
       const result = await savePlanDraft({
         apiBaseUrl,
-        userId,
         draft: undoSnapshot.before,
         fetchImpl
       });
@@ -250,7 +246,7 @@ export function PlanScreen({
       setOperation({ phase: "error", action: "undo", message: "Plan could not be restored", detail: null });
       return;
     }
-    const result = await deletePlan({ apiBaseUrl, userId, planId, fetchImpl });
+    const result = await deletePlan({ apiBaseUrl, planId, fetchImpl });
     if (result.status !== "ok") {
       setOperation(operationFailure("undo", result.status, result.error));
       setDetail(null);

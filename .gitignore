@@ -22,10 +22,11 @@ coverage/
 *.sqlite3
 data/local/
 data/raw/
+*.auth-key
+*.demo-credentials.json
 
 # OS / editor
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
-

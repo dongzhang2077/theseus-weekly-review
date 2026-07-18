@@ -51,7 +51,6 @@ describe("planApi", () => {
 
     const result = await loadPlanRecords({
       apiBaseUrl: "http://127.0.0.1:8000/",
-      userId: 7,
       fetchImpl
     });
 
@@ -67,7 +66,7 @@ describe("planApi", () => {
       "http://127.0.0.1:8000/weekly-plans",
       "http://127.0.0.1:8000/projects"
     ]);
-    expect(calls[0].init.headers).toMatchObject({ "X-Theseus-User-Id": "7" });
+    expect(calls[0].init.headers).toEqual({});
   });
 
   it("creates a new target week and replaces an existing target week", async () => {
@@ -81,8 +80,8 @@ describe("planApi", () => {
       week: demoWeek.plan.targetWeek
     };
 
-    await savePlanDraft({ apiBaseUrl: "http://127.0.0.1:8000", userId: 7, draft, fetchImpl });
-    await savePlanDraft({ apiBaseUrl: "http://127.0.0.1:8000", userId: 7, draft: { ...draft, id: 4 }, fetchImpl });
+    await savePlanDraft({ apiBaseUrl: "http://127.0.0.1:8000", draft, fetchImpl });
+    await savePlanDraft({ apiBaseUrl: "http://127.0.0.1:8000", draft: { ...draft, id: 4 }, fetchImpl });
 
     expect(calls[0].init.method).toBe("POST");
     expect(calls[0].input).toBe("http://127.0.0.1:8000/weekly-plans");
@@ -98,7 +97,6 @@ describe("planApi", () => {
   it("preserves conflict as a distinct recoverable result", async () => {
     const result = await savePlanDraft({
       apiBaseUrl: "http://127.0.0.1:8000",
-      userId: 7,
       draft: { ...demoWeek.plan.sourcePlan, week: demoWeek.plan.targetWeek },
       fetchImpl: async () => ({ ok: false, status: 409, json: async () => ({}) })
     });
@@ -114,7 +112,6 @@ describe("planApi", () => {
     const calls: Array<{ input: string; init: RequestInit }> = [];
     const result = await deletePlan({
       apiBaseUrl: "http://127.0.0.1:8000",
-      userId: 7,
       planId: 4,
       fetchImpl: async (input, init) => {
         calls.push({ input, init });

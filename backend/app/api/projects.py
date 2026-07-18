@@ -5,8 +5,8 @@ import sqlite3
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..db.repositories import ProjectRepository
-from ..schemas import LocalUserRead, ProjectCreate, ProjectRead
-from .dependencies import get_connection, get_local_user
+from ..schemas import AccountRead, ProjectCreate, ProjectRead
+from .dependencies import get_connection, get_current_user
 
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 @router.post("", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
 async def create_project(
     project: ProjectCreate,
-    user: LocalUserRead = Depends(get_local_user),
+    user: AccountRead = Depends(get_current_user),
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> ProjectRead:
     try:
@@ -29,7 +29,7 @@ async def create_project(
 
 @router.get("", response_model=list[ProjectRead])
 async def list_projects(
-    user: LocalUserRead = Depends(get_local_user),
+    user: AccountRead = Depends(get_current_user),
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> list[ProjectRead]:
     return ProjectRepository(connection, user.id).list()

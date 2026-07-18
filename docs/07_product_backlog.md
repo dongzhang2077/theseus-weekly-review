@@ -252,6 +252,10 @@ Acceptance criteria:
 - Sync API design is preserved as a future reference.
 - Sprint 1 does not depend on cloud deployment or authentication.
 
+Status note (2026-07-17): cloud sync remains deferred. Local authentication is
+no longer deferred because the product owner promoted it into STORY-030; this
+does not authorize cloud deployment or multi-device sync.
+
 ## Epic 7: Local User Ownership and Trustworthy UX
 
 ### STORY-022 Add local user-scoped persistence
@@ -266,6 +270,8 @@ Delivery checkpoint (2026-07-15 PDT): implemented across SQLite schema
 v2/migration, scoped repositories and services, FastAPI local-user context,
 frontend profile selection, and focused isolation/restart tests. Full sprint
 verification passed and the work reached `main` through PR #64 (`306061c`).
+The selectable profile/UI/header portion is historical and superseded by
+STORY-030; stable `user_id` ownership and all domain isolation rules remain.
 
 Acceptance criteria:
 
@@ -362,6 +368,54 @@ Acceptance criteria:
   credentials enter the change.
 - Full frontend tests, TypeScript, production build, diff check, and mobile and
   desktop screenshot review pass.
+
+### STORY-030 Add formal local accounts and JWT data isolation
+
+As a user, I want a real account boundary even when Theseus runs only on my
+computer so that another browser user cannot select or read my data by changing
+an integer profile ID.
+
+Priority: P0 for the 2026-07-18 demo
+
+Delivery checkpoint (2026-07-18 PDT): implementation, automated verification,
+independent contract/security review, and product-owner visual approval are
+complete. Release history is tracked by the focused STORY-030 GitHub PR #69.
+
+Acceptance criteria:
+
+- Registration, sign-in, sign-out, session restore, profile editing, email and
+  password change, and account deletion have mobile UI flows.
+- Passwords use Argon2id; access JWTs are short lived and held only in browser
+  memory; refresh JWTs rotate in an HttpOnly SameSite cookie with CSRF defense.
+- Every persisted personal API resolves `user_id` from the validated JWT and
+  rejects missing, forged, expired, revoked, or legacy user-header identity.
+- Accounts cannot read or link another account's goals, projects, plans, logs,
+  or reviews, and deleting an account cascades through its local records.
+- SQLite schema v2 and v3 each migrate atomically to v4 without deleting
+  accounts or personal data; a failed migration rolls back completely.
+- The demo preparation path creates a real account and stores generated demo
+  credentials only in a permission-restricted, Git-ignored local file.
+- Focused auth, schema, migration, isolation, restart, frontend interaction,
+  full-suite, build, and browser checks pass before merge.
+
+### STORY-031 Coordinate refresh safely across browser tabs
+
+As a local account user, I want two tabs to restore and refresh the same
+session without being mistaken for token theft so that normal browser use does
+not revoke every session.
+
+Priority: P1 after the 2026-07-18 demo
+
+Acceptance criteria:
+
+- Legitimate concurrent refreshes from two browser contexts do not trigger the
+  refresh-reuse account revocation path.
+- Coordination does not persist access JWTs to local storage or expose the
+  HttpOnly refresh token to JavaScript.
+- Genuine reuse outside the narrowly defined concurrency window still revokes
+  the affected account sessions.
+- Two-context restore, 401 recovery, logout, and reuse cases have automated
+  browser/API tests and documented security reasoning.
 
 ## Epic 8: Personal Assistant Evolution
 
