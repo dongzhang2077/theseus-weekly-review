@@ -214,7 +214,7 @@ export function TrackScreen({
         />
       </header>
 
-      <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-4 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.72fr)] lg:gap-6">
+      <div className="mx-auto flex w-full flex-col gap-4 px-4 py-4">
         <div className="flex flex-col gap-4">
           <section className="rounded-paper border border-desk-line bg-desk-raised p-4 shadow-paper" aria-label="Recommended focus">
             <div className="flex items-start gap-3">

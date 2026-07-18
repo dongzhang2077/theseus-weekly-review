@@ -10,7 +10,7 @@ interface BottomNavProps {
 export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
   return (
     <nav
-      className="absolute inset-x-0 bottom-0 z-20 grid h-[66px] grid-cols-4 border-t border-desk-line bg-desk-raised/95 px-2 pb-2 pt-1.5 backdrop-blur-sm lg:inset-y-0 lg:left-0 lg:right-auto lg:h-full lg:w-[72px] lg:grid-cols-1 lg:grid-rows-4 lg:border-r lg:border-t-0 lg:px-2 lg:py-4"
+      className="absolute inset-x-0 bottom-0 z-20 grid h-[66px] grid-cols-4 border-t border-desk-line bg-desk-raised/95 px-2 pb-2 pt-1.5 backdrop-blur-sm"
       aria-label="App sections"
     >
       {tabs.map((tab) => (
