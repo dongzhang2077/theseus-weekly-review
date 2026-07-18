@@ -25,17 +25,17 @@ export function AppShell({
   const hasUtilityBar = hasProfileControl || Boolean(notice);
 
   return (
-    <div className="min-h-dvh bg-desk-canvas sm:grid sm:place-items-center sm:p-6">
-      <div className="relative h-dvh w-full overflow-hidden bg-desk-paper text-desk-ink sm:h-[min(844px,calc(100dvh-48px))] sm:min-h-[720px] sm:max-w-[390px] sm:rounded-[28px] sm:border sm:border-desk-line sm:shadow-[0_18px_48px_rgb(66_58_45/0.16)] lg:max-w-[1024px]">
+    <div className="grid min-h-dvh place-items-center bg-desk-canvas min-[431px]:p-6">
+      <div className="relative h-dvh w-full max-w-[430px] overflow-hidden bg-desk-paper text-desk-ink min-[431px]:h-[min(932px,calc(100dvh-48px))] min-[431px]:min-h-[720px] min-[431px]:rounded-[28px] min-[431px]:border min-[431px]:border-desk-line min-[431px]:shadow-[0_18px_48px_rgb(66_58_45/0.16)]">
         <main
           className={hasUtilityBar
-            ? "h-[calc(100%-98px)] overflow-hidden lg:h-[calc(100%-32px)] lg:pl-[72px]"
-            : "h-[calc(100%-66px)] overflow-hidden lg:h-full lg:pl-[72px]"}
+            ? "h-[calc(100%-98px)] overflow-hidden"
+            : "h-[calc(100%-66px)] overflow-hidden"}
         >
           {children}
         </main>
         {hasUtilityBar ? (
-          <div className="absolute inset-x-0 bottom-[66px] z-20 flex h-8 items-center justify-between border-t border-desk-line bg-desk-raised px-3 text-[11px] lg:bottom-0 lg:left-[72px]">
+          <div className="absolute inset-x-0 bottom-[66px] z-20 flex h-8 items-center justify-between border-t border-desk-line bg-desk-raised px-3 text-[11px]">
             {hasProfileControl ? (
               <button
                 className="inline-flex min-w-0 items-center gap-2 rounded-paper border-0 bg-transparent font-bold text-desk-accent hover:text-desk-ink"

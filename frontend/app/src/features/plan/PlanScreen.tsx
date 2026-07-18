@@ -308,7 +308,7 @@ export function PlanScreen({
       ) : null}
 
       {loadPhase === "ready" ? (
-        <div className="mx-auto grid max-w-4xl gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
+        <div className="mx-auto grid w-full gap-4 px-4 py-4">
           <div className="flex flex-col gap-4">
             <button
               className={`rounded-paper border p-4 text-left shadow-paper transition-colors duration-150 ${balanceSurfaceClass(metrics.status)}`}
