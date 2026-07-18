@@ -187,12 +187,14 @@ Engineering review on 2026-07-15:
 Release status:
 
 - PR #64 was squash-merged to `main` as `306061c` on 2026-07-15 PDT;
+- PR #68 removed the wide-screen iPad-like shell and kept the demo workspace
+  phone-sized before the authentication release;
 - the project owner explicitly approved direct merge and waived the separate
   teammate-review gate for this checkpoint;
 - STORY-030 formal local auth completed implementation, full automated
   verification, independent contract/security review, and product-owner visual
   verification on 2026-07-18 PDT; release history is recorded in its focused
-  GitHub PR;
+  GitHub PR #69;
 - the final STORY-030 gate passes 102 Python tests, 71 frontend tests, the
   production build, Python compilation, deterministic sample review, and
   authenticated demo preparation;

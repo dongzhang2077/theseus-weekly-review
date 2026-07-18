@@ -476,7 +476,7 @@ persisted records.
 
 Delivery status: implementation, full verification, independent contract and
 security review, and product-owner browser approval completed on 2026-07-18
-PDT. Release history is tracked by the focused STORY-030 GitHub PR.
+PDT. Release history is tracked by the focused STORY-030 GitHub PR #69.
 
 - Owner: Dong Zhang
 - Depends on: Tasks A-C, schema v2 ownership, accepted mobile shell

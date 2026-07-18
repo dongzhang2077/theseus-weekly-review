@@ -379,7 +379,7 @@ Priority: P0 for the 2026-07-18 demo
 
 Delivery checkpoint (2026-07-18 PDT): implementation, automated verification,
 independent contract/security review, and product-owner visual approval are
-complete. Release history is tracked by the focused STORY-030 GitHub PR.
+complete. Release history is tracked by the focused STORY-030 GitHub PR #69.
 
 Acceptance criteria:
 
