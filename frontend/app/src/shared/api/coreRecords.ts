@@ -1,5 +1,4 @@
 import type { FetchLike } from "./loadAppWeek";
-import { isValidLocalUserId, localUserHeaders } from "./localUserContext";
 
 export type ProjectStage = "startup" | "stable" | "sprint" | "dormant" | "wake_up";
 export type ProjectStatus = "active" | "paused" | "archived";
@@ -47,7 +46,6 @@ export interface ApiWriteResult<T> {
 
 export interface ApiWriteOptions<TPayload> {
   apiBaseUrl?: string;
-  userId?: number;
   payload: TPayload;
   fetchImpl?: FetchLike;
 }
@@ -69,14 +67,10 @@ async function postJson<TPayload>(options: ApiWriteOptions<TPayload> & { path: s
   if (!apiBaseUrl) {
     return { ok: false, data: null, error: "API base URL is not configured" };
   }
-  if (!isValidLocalUserId(options.userId)) {
-    return { ok: false, data: null, error: "Local user is not selected" };
-  }
-
   try {
     const response = await (options.fetchImpl ?? fetch)(`${apiBaseUrl.replace(/\/$/, "")}${options.path}`, {
       method: "POST",
-      headers: localUserHeaders(options.userId, true),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(options.payload)
     });
 

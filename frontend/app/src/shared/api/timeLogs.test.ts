@@ -53,12 +53,12 @@ describe("timeLogs api helpers", () => {
       };
     };
 
-    const result = await saveTimeLog({ apiBaseUrl: "http://127.0.0.1:8000/", userId: 7, payload, fetchImpl });
+    const result = await saveTimeLog({ apiBaseUrl: "http://127.0.0.1:8000/", payload, fetchImpl });
 
     expect(result).toEqual({ saved: true, error: null });
     expect(calls[0].input).toBe("http://127.0.0.1:8000/time-logs");
     expect(calls[0].init.method).toBe("POST");
-    expect(calls[0].init.headers).toMatchObject({ "X-Theseus-User-Id": "7" });
+    expect(calls[0].init.headers).toEqual({ "Content-Type": "application/json" });
     expect(JSON.parse(String(calls[0].init.body))).toMatchObject(payload);
   });
 
@@ -85,7 +85,6 @@ describe("timeLogs api helpers", () => {
     await expect(
       saveActivitySession({
         apiBaseUrl: "http://127.0.0.1:8000",
-        userId: 7,
         activity,
         date: "2026-06-26",
         fetchImpl
@@ -96,17 +95,6 @@ describe("timeLogs api helpers", () => {
       date: "2026-06-26",
       duration_minutes: 2,
       activity_name: "Frontend build block"
-    });
-  });
-
-  it("does not save personal logs without a selected local user", async () => {
-    const payload = activitySessionToTimeLog(activity, { date: "2026-06-26" }) as TimeLogCreatePayload;
-
-    await expect(
-      saveTimeLog({ apiBaseUrl: "http://127.0.0.1:8000", payload })
-    ).resolves.toEqual({
-      saved: false,
-      error: "Local user is not selected"
     });
   });
 });

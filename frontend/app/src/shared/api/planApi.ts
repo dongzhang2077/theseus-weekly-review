@@ -1,6 +1,5 @@
 import type { PlanDraft, PlanItem, PlanProject } from "../domain/plan";
 import type { FetchLike } from "./loadAppWeek";
-import { isValidLocalUserId, localUserHeaders } from "./localUserContext";
 
 interface WeeklyPlanApiRecord {
   id: number;
@@ -51,7 +50,6 @@ export interface PlanApiResult<T> {
 
 interface PlanApiOptions {
   apiBaseUrl?: string;
-  userId?: number;
   fetchImpl?: FetchLike;
 }
 
@@ -128,16 +126,12 @@ async function requestJson<T>(
   if (!apiBaseUrl) {
     return { status: "error", data: null, error: "API base URL is not configured" };
   }
-  if (!isValidLocalUserId(options.userId)) {
-    return { status: "error", data: null, error: "Local user is not selected" };
-  }
-
   try {
     const response = await (options.fetchImpl ?? fetch)(
       `${apiBaseUrl.replace(/\/$/, "")}${path}`,
       {
         method,
-        headers: localUserHeaders(options.userId, body !== undefined),
+        headers: body === undefined ? {} : { "Content-Type": "application/json" },
         ...(body === undefined ? {} : { body: JSON.stringify(body) })
       }
     );

@@ -10,6 +10,7 @@ interface AppShellProps {
   onProfileChange?: () => void;
   notice?: string;
   noticeTitle?: string;
+  overlay?: ReactNode;
 }
 
 export function AppShell({
@@ -19,7 +20,8 @@ export function AppShell({
   profileName,
   onProfileChange,
   notice,
-  noticeTitle
+  noticeTitle,
+  overlay
 }: AppShellProps) {
   const hasProfileControl = Boolean(profileName && onProfileChange);
   const hasUtilityBar = hasProfileControl || Boolean(notice);
@@ -40,8 +42,8 @@ export function AppShell({
               <button
                 className="inline-flex min-w-0 items-center gap-2 rounded-paper border-0 bg-transparent font-bold text-desk-accent hover:text-desk-ink"
                 type="button"
-                aria-label={`Switch local profile. Current profile: ${profileName}`}
-                title="Switch profile"
+                aria-label={`Open account. Signed in as ${profileName}`}
+                title="Open account"
                 onClick={onProfileChange}
               >
                 <span className="grid size-5 shrink-0 place-items-center rounded-full bg-desk-accent-soft" aria-hidden="true">
@@ -58,6 +60,7 @@ export function AppShell({
           </div>
         ) : null}
         <BottomNav activeTab={activeTab} onTabChange={onTabChange} />
+        {overlay}
       </div>
     </div>
   );
