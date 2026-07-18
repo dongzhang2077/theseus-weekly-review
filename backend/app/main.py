@@ -7,14 +7,15 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .api.auth import router as auth_router
 from .api.goals import router as goals_router
 from .api.imports import router as imports_router
 from .api.projects import router as projects_router
 from .api.reviews import router as reviews_router
 from .api.time_logs import router as time_logs_router
-from .api.users import router as users_router
 from .api.weekly_plans import router as weekly_plans_router
 from .db import Database
+from .services import AuthService, AuthSettings
 
 
 DEFAULT_DATABASE_PATH = Path(
@@ -33,12 +34,18 @@ def _cors_origins() -> list[str]:
     return [origin.strip() for origin in configured.split(",") if origin.strip()]
 
 
-def create_app(database_path: str | Path | None = None) -> FastAPI:
+def create_app(
+    database_path: str | Path | None = None,
+    *,
+    auth_settings: AuthSettings | None = None,
+) -> FastAPI:
     database = Database(database_path or DEFAULT_DATABASE_PATH)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         database.initialize()
+        settings = auth_settings or AuthSettings.from_environment(database.path)
+        application.state.auth_service = AuthService(settings)
         yield
 
     application = FastAPI(title="Theseus API", version="0.1.0", lifespan=lifespan)
@@ -47,11 +54,14 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
         application.add_middleware(
             CORSMiddleware,
             allow_origins=cors_origins,
+            allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
         )
     application.state.database = database
-    application.include_router(users_router)
+    application.state.auth_settings = auth_settings
+    application.state.auth_service = None
+    application.include_router(auth_router)
     application.include_router(goals_router)
     application.include_router(imports_router)
     application.include_router(projects_router)

@@ -7,7 +7,7 @@ from typing import Iterator
 
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 4
 
 LEGACY_TABLES = (
     "weekly_reviews",
@@ -57,14 +57,66 @@ class Database:
                     "SELECT name FROM sqlite_master WHERE type = 'table'"
                 ).fetchall()
             }
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
             if "goals" in tables and "users" not in tables:
                 self._migrate_legacy_schema(connection)
-            connection.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+            elif not tables:
+                self._apply_schema(connection)
+            elif version == 2:
+                self._migrate_v2_schema(connection)
+            elif version == 3:
+                self._migrate_v3_schema(connection)
+            elif version == SCHEMA_VERSION:
+                self._apply_schema(connection)
+            else:
+                raise RuntimeError(
+                    f"Unsupported Theseus schema version {version}; expected 1, 2, 3, or {SCHEMA_VERSION}"
+                )
             version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version != SCHEMA_VERSION:
                 raise RuntimeError(
                     f"Unsupported Theseus schema version {version}; expected {SCHEMA_VERSION}"
                 )
+
+    def _migrate_v2_schema(self, connection: sqlite3.Connection) -> None:
+        self._run_atomic_migration(
+            connection,
+            SCHEMA_PATH.read_text(encoding="utf-8"),
+            "The Theseus v2 database could not be migrated safely",
+        )
+
+    def _migrate_v3_schema(self, connection: sqlite3.Connection) -> None:
+        self._run_atomic_migration(
+            connection,
+            "ALTER TABLE auth_credentials DROP COLUMN recovery_code_hash;\n"
+            + SCHEMA_PATH.read_text(encoding="utf-8"),
+            "The Theseus v3 database could not be migrated safely",
+        )
+
+    def _apply_schema(self, connection: sqlite3.Connection) -> None:
+        self._run_atomic_migration(
+            connection,
+            SCHEMA_PATH.read_text(encoding="utf-8"),
+            "The Theseus database schema could not be applied safely",
+        )
+
+    @staticmethod
+    def _run_atomic_migration(
+        connection: sqlite3.Connection,
+        migration_sql: str,
+        integrity_error: str,
+    ) -> None:
+        try:
+            # executescript otherwise commits statements independently. Leaving the
+            # explicit transaction open lets the integrity check decide the outcome.
+            connection.executescript(f"BEGIN IMMEDIATE;\n{migration_sql}")
+            violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+            if violations:
+                raise RuntimeError(integrity_error)
+        except Exception:
+            connection.rollback()
+            raise
+        connection.commit()
 
     def _migrate_legacy_schema(self, connection: sqlite3.Connection) -> None:
         schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
@@ -78,12 +130,7 @@ class Database:
         drop_legacy_sql = "\n".join(
             f"DROP TABLE {table}_legacy;" for table in LEGACY_TABLES
         )
-        connection.executescript(
-            f"""
-            PRAGMA foreign_keys = OFF;
-            PRAGMA legacy_alter_table = ON;
-            BEGIN IMMEDIATE;
-
+        migration_sql = f"""
             {rename_sql}
             {drop_index_sql}
             {schema_sql}
@@ -162,15 +209,18 @@ class Database:
             FROM weekly_reviews_legacy;
 
             {drop_legacy_sql}
-
-            COMMIT;
-            PRAGMA legacy_alter_table = OFF;
-            PRAGMA foreign_keys = ON;
-            """
-        )
-        violations = connection.execute("PRAGMA foreign_key_check").fetchall()
-        if violations:
-            raise RuntimeError("The legacy Theseus database could not be migrated safely")
+        """
+        connection.execute("PRAGMA foreign_keys = OFF")
+        connection.execute("PRAGMA legacy_alter_table = ON")
+        try:
+            self._run_atomic_migration(
+                connection,
+                migration_sql,
+                "The legacy Theseus database could not be migrated safely",
+            )
+        finally:
+            connection.execute("PRAGMA legacy_alter_table = OFF")
+            connection.execute("PRAGMA foreign_keys = ON")
 
     @contextmanager
     def session(self) -> Iterator[sqlite3.Connection]:

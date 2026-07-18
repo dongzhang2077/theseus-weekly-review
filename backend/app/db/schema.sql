@@ -7,6 +7,32 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS auth_credentials (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    subject TEXT NOT NULL UNIQUE CHECK (length(subject) >= 32),
+    email TEXT NOT NULL COLLATE NOCASE UNIQUE CHECK (length(trim(email)) > 3),
+    password_hash TEXT NOT NULL CHECK (length(password_hash) > 20),
+    failed_attempts INTEGER NOT NULL DEFAULT 0 CHECK (failed_attempts >= 0),
+    locked_until TEXT,
+    password_changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    id TEXT PRIMARY KEY CHECK (length(id) >= 32),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE CHECK (length(token_hash) = 64),
+    csrf_hash TEXT NOT NULL CHECK (length(csrf_hash) = 64),
+    expires_at TEXT NOT NULL,
+    user_agent TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    revoked_at TEXT,
+    replaced_by_id TEXT REFERENCES auth_sessions(id) ON DELETE SET NULL,
+    CHECK (datetime(expires_at) > datetime(created_at))
+);
+
 CREATE TABLE IF NOT EXISTS goals (
     id INTEGER PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -120,6 +146,9 @@ CREATE TABLE IF NOT EXISTS weekly_reviews (
 );
 
 CREATE INDEX IF NOT EXISTS idx_goals_user_priority ON goals(user_id, priority, id);
+CREATE INDEX IF NOT EXISTS idx_auth_credentials_email ON auth_credentials(email COLLATE NOCASE);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_expiry ON auth_sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id, id);
 CREATE INDEX IF NOT EXISTS idx_projects_goal_id ON projects(goal_id);
 CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(user_id, status);
@@ -252,4 +281,4 @@ BEGIN
     SELECT RAISE(ABORT, 'time log activity must belong to the same user');
 END;
 
-PRAGMA user_version = 2;
+PRAGMA user_version = 4;

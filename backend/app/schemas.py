@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, time
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 ActivityType = Literal["consuming", "neutral", "restore", "destroy"]
@@ -44,6 +44,105 @@ class LocalUserRead(LocalUserCreate):
     id: int
     created_at: datetime
     updated_at: datetime
+
+
+class AccountRegister(APIModel):
+    email: EmailStr
+    password: str = Field(min_length=15, max_length=256, repr=False)
+    display_name: str = Field(min_length=1, max_length=80)
+    timezone: str = Field(min_length=1, max_length=80, default="UTC")
+    locale: str = Field(min_length=1, max_length=32, default="en")
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: EmailStr) -> str:
+        return str(value).strip().casefold()
+
+    @field_validator("display_name", "timezone", "locale")
+    @classmethod
+    def strip_account_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+
+class AccountLogin(APIModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=256, repr=False)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: EmailStr) -> str:
+        return str(value).strip().casefold()
+
+
+class AccountRead(APIModel):
+    id: int
+    email: EmailStr
+    display_name: str
+    timezone: str
+    locale: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AuthTokenResponse(APIModel):
+    access_token: str = Field(repr=False)
+    token_type: Literal["bearer"] = "bearer"
+    expires_in: int = Field(gt=0)
+    user: AccountRead
+
+
+class AccountUpdate(APIModel):
+    display_name: str | None = Field(default=None, min_length=1, max_length=80)
+    timezone: str | None = Field(default=None, min_length=1, max_length=80)
+    locale: str | None = Field(default=None, min_length=1, max_length=32)
+
+    @field_validator("display_name", "timezone", "locale")
+    @classmethod
+    def strip_optional_account_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+    @model_validator(mode="after")
+    def require_change(self) -> AccountUpdate:
+        if all(
+            getattr(self, field) is None
+            for field in ("display_name", "timezone", "locale")
+        ):
+            raise ValueError("at least one profile field is required")
+        return self
+
+
+class ChangePasswordRequest(APIModel):
+    current_password: str = Field(min_length=1, max_length=256, repr=False)
+    new_password: str = Field(min_length=15, max_length=256, repr=False)
+
+    @model_validator(mode="after")
+    def require_new_password(self) -> ChangePasswordRequest:
+        if self.current_password == self.new_password:
+            raise ValueError("new_password must differ from current_password")
+        return self
+
+
+class ChangeEmailRequest(APIModel):
+    email: EmailStr
+    current_password: str = Field(min_length=1, max_length=256, repr=False)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: EmailStr) -> str:
+        return str(value).strip().casefold()
+
+
+class DeleteAccountRequest(APIModel):
+    current_password: str = Field(min_length=1, max_length=256, repr=False)
+    confirmation: Literal["DELETE"]
 
 
 class GoalCreate(APIModel):

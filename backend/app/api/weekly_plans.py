@@ -5,8 +5,8 @@ import sqlite3
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from ..db.repositories import WeeklyPlanRepository
-from ..schemas import LocalUserRead, WeeklyPlanCreate, WeeklyPlanRead
-from .dependencies import get_connection, get_local_user
+from ..schemas import AccountRead, WeeklyPlanCreate, WeeklyPlanRead
+from .dependencies import get_connection, get_current_user
 
 
 router = APIRouter(prefix="/weekly-plans", tags=["weekly-plans"])
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/weekly-plans", tags=["weekly-plans"])
 @router.post("", response_model=WeeklyPlanRead, status_code=status.HTTP_201_CREATED)
 async def create_weekly_plan(
     plan: WeeklyPlanCreate,
-    user: LocalUserRead = Depends(get_local_user),
+    user: AccountRead = Depends(get_current_user),
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> WeeklyPlanRead:
     try:
@@ -29,7 +29,7 @@ async def create_weekly_plan(
 
 @router.get("", response_model=list[WeeklyPlanRead])
 async def list_weekly_plans(
-    user: LocalUserRead = Depends(get_local_user),
+    user: AccountRead = Depends(get_current_user),
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> list[WeeklyPlanRead]:
     return WeeklyPlanRepository(connection, user.id).list()
@@ -39,7 +39,7 @@ async def list_weekly_plans(
 async def replace_weekly_plan(
     plan_id: int,
     plan: WeeklyPlanCreate,
-    user: LocalUserRead = Depends(get_local_user),
+    user: AccountRead = Depends(get_current_user),
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> WeeklyPlanRead:
     try:
@@ -59,7 +59,7 @@ async def replace_weekly_plan(
 @router.delete("/{plan_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_weekly_plan(
     plan_id: int,
-    user: LocalUserRead = Depends(get_local_user),
+    user: AccountRead = Depends(get_current_user),
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> Response:
     try:

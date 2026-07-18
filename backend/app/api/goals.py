@@ -5,8 +5,8 @@ import sqlite3
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..db.repositories import GoalRepository
-from ..schemas import GoalCreate, GoalRead, LocalUserRead
-from .dependencies import get_connection, get_local_user
+from ..schemas import AccountRead, GoalCreate, GoalRead
+from .dependencies import get_connection, get_current_user
 
 
 router = APIRouter(prefix="/goals", tags=["goals"])
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/goals", tags=["goals"])
 @router.post("", response_model=GoalRead, status_code=status.HTTP_201_CREATED)
 async def create_goal(
     goal: GoalCreate,
-    user: LocalUserRead = Depends(get_local_user),
+    user: AccountRead = Depends(get_current_user),
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> GoalRead:
     try:
@@ -29,7 +29,7 @@ async def create_goal(
 
 @router.get("", response_model=list[GoalRead])
 async def list_goals(
-    user: LocalUserRead = Depends(get_local_user),
+    user: AccountRead = Depends(get_current_user),
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> list[GoalRead]:
     return GoalRepository(connection, user.id).list()

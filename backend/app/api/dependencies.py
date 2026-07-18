@@ -4,13 +4,14 @@ import sqlite3
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from ..db.repositories import UserRepository
-from ..schemas import LocalUserRead
+from ..schemas import AccountRead
+from ..services import AuthContext, AuthService, AuthSettings, InvalidAuthToken
 
 
-LOCAL_USER_HEADER = "X-Theseus-User-Id"
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_connection(request: Request) -> AsyncIterator[sqlite3.Connection]:
@@ -18,14 +19,42 @@ async def get_connection(request: Request) -> AsyncIterator[sqlite3.Connection]:
         yield connection
 
 
-async def get_local_user(
-    user_id: Annotated[int, Header(alias=LOCAL_USER_HEADER, ge=1)],
+async def get_auth_service(request: Request) -> AuthService:
+    service = getattr(request.app.state, "auth_service", None)
+    if service is None:
+        settings = request.app.state.auth_settings or AuthSettings.from_environment(
+            request.app.state.database.path
+        )
+        service = AuthService(settings)
+        request.app.state.auth_service = service
+    return service
+
+
+async def get_auth_context(
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Depends(bearer_scheme),
+    ],
     connection: sqlite3.Connection = Depends(get_connection),
-) -> LocalUserRead:
+    service: AuthService = Depends(get_auth_service),
+) -> AuthContext:
+    if credentials is None or credentials.scheme.casefold() != "bearer":
+        raise _unauthorized()
     try:
-        return UserRepository(connection).get(user_id)
-    except LookupError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Local user {user_id} was not found",
-        ) from exc
+        return service.authenticate_access_token(connection, credentials.credentials)
+    except InvalidAuthToken as exc:
+        raise _unauthorized() from exc
+
+
+async def get_current_user(
+    context: AuthContext = Depends(get_auth_context),
+) -> AccountRead:
+    return context.account
+
+
+def _unauthorized() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail={"code": "not_authenticated", "message": "Sign in to continue"},
+        headers={"WWW-Authenticate": "Bearer"},
+    )
