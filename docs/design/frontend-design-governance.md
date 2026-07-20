@@ -37,10 +37,22 @@ and quieter than an onboarding or celebration screen.
 
 ## 3. Navigation And Interaction
 
-- Primary navigation uses a familiar icon plus a one-word visible label:
-  `Review`, `Signals`, `Focus`, and `Plan`.
+- Primary navigation uses four familiar icons for `Review`, `Signals`, `Focus`,
+  and `Plan`. Visible labels are omitted in the accepted compact mobile
+  treatment; every control retains an accessible name, title, selected state,
+  and comfortable hit target.
 - Compact utility actions may remain icon-only when they have an accessible
   name and a familiar symbol.
+- Visible action labels use one English verb when the meaning remains clear,
+  such as `Restart`, `Adjust`, `Choose`, `Start`, or `Save`. Longer labels are
+  reserved for forms, destructive confirmation, or genuine ambiguity.
+- Routine actions use light semantic surfaces. Dark filled buttons are not the
+  default emphasis treatment for calm planning and review flows.
+- Tags are concise and never wrap. If a status label does not fit on one line,
+  shorten the label rather than increasing the tag height.
+- Goal, project, task, and activity names take priority over adjacent metadata.
+  They wrap and grow their row or card instead of being hidden behind a tag or
+  clipped into an unreadable fragment.
 - Every recommendation states why it is relevant now.
 - Recommendation controls distinguish `Next`, `Delay`, `Skip`, and `Choose`.
 - Timer state distinguishes start, pause/resume, end, and result capture.

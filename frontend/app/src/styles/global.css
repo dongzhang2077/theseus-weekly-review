@@ -622,6 +622,9 @@ textarea:focus-visible {
 }
 
 .status-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
   justify-self: start;
   padding: 5px 10px;
   border-radius: 999px;
@@ -629,6 +632,8 @@ textarea:focus-visible {
   color: var(--color-green);
   font-size: 12px;
   font-weight: 720;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .evidence-list {

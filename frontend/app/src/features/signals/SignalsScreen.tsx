@@ -17,6 +17,9 @@ const iconBySignal: Record<SignalId, "calendar" | "target" | "layers" | "leaf"> 
   energy: "leaf"
 };
 
+const signalActionClass =
+  "min-h-11 w-full rounded-paper border border-desk-accent/30 bg-desk-accent-soft px-4 text-sm font-bold text-desk-accent shadow-paper transition-colors hover:border-desk-accent/50 hover:bg-desk-sunk focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-desk-accent";
+
 interface SignalsScreenProps {
   signals: AppWeekViewModel["signals"];
   onAction: (action: AppSignalAction) => void;
@@ -52,7 +55,7 @@ export function SignalsScreen({
   }
 
   return (
-    <section className="screen signals-screen overflow-y-auto bg-desk-paper">
+    <section className="screen signals-screen !h-full !min-h-0 touch-pan-y overflow-y-auto overscroll-y-contain bg-desk-paper">
       <header className="screen-header">
         <div className="screen-title">Signals</div>
       </header>
@@ -72,25 +75,30 @@ export function SignalsScreen({
           <StateSurface icon="check" title="All checks steady" />
         </div>
       ) : (
-        <div className="mx-auto grid w-full gap-4 px-1 py-5 pb-8">
-          <div>
-            <p className="m-0 text-xs font-bold uppercase tracking-[0.16em] text-desk-muted">Needs attention</p>
-            <p className="mb-0 mt-1 text-sm leading-5 text-desk-muted">
-              Resolve the highest-impact issue first. Evidence stays available without blocking action.
-            </p>
-          </div>
+        <div className="mx-auto grid w-full gap-5 px-1 py-4 pb-8" aria-label="Current signal issues">
+          <section className="grid gap-2" aria-labelledby="priority-signal-heading">
+            <h2 id="priority-signal-heading" className="m-0 text-xs font-bold uppercase tracking-[0.16em] text-desk-muted">
+              Priority
+            </h2>
+            <PrioritySignalCard
+              issue={issues[0]}
+              onAction={onAction}
+              onDetails={() => setActiveDetail(issues[0])}
+            />
+          </section>
 
-          <div className="grid gap-3" aria-label="Current signal issues">
-            {issues.map((issue, index) => (
-              <SignalIssueCard
-                key={issue.id}
-                issue={issue}
-                priority={index === 0}
-                onAction={onAction}
-                onEvidence={() => setActiveDetail(issue)}
-              />
-            ))}
-          </div>
+          {issues.length > 1 ? (
+            <section className="grid gap-2" aria-labelledby="other-signals-heading">
+              <h2 id="other-signals-heading" className="m-0 text-xs font-bold uppercase tracking-[0.16em] text-desk-muted">
+                Other signals
+              </h2>
+              <div className="overflow-hidden rounded-paper border border-desk-line bg-desk-raised shadow-paper">
+                {issues.slice(1).map((issue) => (
+                  <SignalIssueRow key={issue.id} issue={issue} onDetails={() => setActiveDetail(issue)} />
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {steadyCount > 0 ? (
             <div className="flex min-h-11 items-center gap-2 rounded-paper border border-desk-line bg-desk-raised px-3 text-sm font-semibold text-desk-muted">
@@ -104,16 +112,14 @@ export function SignalsScreen({
   );
 }
 
-function SignalIssueCard({
+function PrioritySignalCard({
   issue,
-  priority,
   onAction,
-  onEvidence
+  onDetails
 }: {
   issue: AppSignalEvidence;
-  priority: boolean;
   onAction: (action: AppSignalAction) => void;
-  onEvidence: () => void;
+  onDetails: () => void;
 }) {
   return (
     <article
@@ -126,39 +132,54 @@ function SignalIssueCard({
             <Icon name={iconBySignal[issue.signalId]} className="size-4" />
           </span>
           <span className="min-w-0">
-            <small className="block text-[11px] font-bold uppercase tracking-wide text-desk-muted">
-              {priority ? "Priority" : signalLabel(issue.signalId)}
-            </small>
-            <strong className="block truncate text-base">{issue.title}</strong>
+            <strong className="block break-words text-base leading-5">{issue.title}</strong>
+            <small className="mt-0.5 block text-xs text-desk-muted">{signalLabel(issue.signalId)}</small>
           </span>
         </div>
-        <span className={`status-chip severity-${issue.severity}`}>
+        <span className={`status-chip shrink-0 whitespace-nowrap severity-${issue.severity}`}>
           {issue.status ?? severityLabel(issue.severity)}
         </span>
       </div>
 
-      <p className="mb-0 mt-3 text-sm leading-5 text-desk-muted">{issue.reason}</p>
-      {issue.value ? <strong className="mt-3 block text-lg tabular-nums">{issue.value}</strong> : null}
+      {issue.value ? <strong className="mt-4 block text-2xl tabular-nums">{issue.value}</strong> : null}
 
-      <div className={`mt-4 grid gap-2 ${issue.action ? "grid-cols-[1fr_auto]" : "grid-cols-1"}`}>
+      <div className={`mt-4 grid items-center gap-2 ${issue.action ? "grid-cols-[1fr_auto]" : "grid-cols-[auto] justify-end"}`}>
         {issue.action ? (
           <button
-            className="min-h-11 rounded-paper border-0 bg-desk-accent px-4 text-sm font-bold text-white"
+            className={signalActionClass}
             type="button"
             onClick={() => onAction(issue.action as AppSignalAction)}
           >
-            {issue.action.label}
+            {actionVerb(issue.action)}
           </button>
         ) : null}
-        <button
-          className="min-h-11 rounded-paper border border-desk-line bg-desk-raised px-4 text-sm font-bold text-desk-muted"
-          type="button"
-          onClick={onEvidence}
-        >
-          Evidence
-        </button>
+        <IconButton label={`Open ${issue.title} details`} icon="chevronRight" variant="soft" onClick={onDetails} />
       </div>
     </article>
+  );
+}
+
+function SignalIssueRow({ issue, onDetails }: { issue: AppSignalEvidence; onDetails: () => void }) {
+  return (
+    <button
+      className="grid min-h-16 w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 border-0 border-b border-desk-line bg-transparent px-3 py-3 text-left text-desk-ink last:border-b-0 hover:bg-desk-sunk focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-desk-accent"
+      type="button"
+      aria-label={`Open ${issue.title} details`}
+      title={`Open ${issue.title} details`}
+      onClick={onDetails}
+    >
+      <span className="grid size-8 place-items-center rounded-full bg-desk-sunk text-desk-muted" aria-hidden="true">
+        <Icon name={iconBySignal[issue.signalId]} className="size-4" />
+      </span>
+      <strong className="min-w-0 break-words text-sm leading-5">{issue.title}</strong>
+      <span className="text-right">
+        {issue.value ? <strong className="block text-sm tabular-nums">{issue.value}</strong> : null}
+        <small className="block text-[11px] text-desk-muted">
+          {issue.status ?? severityLabel(issue.severity)}
+        </small>
+      </span>
+      <Icon name="chevronRight" className="size-4 text-desk-subtle" />
+    </button>
   );
 }
 
@@ -180,7 +201,7 @@ function SignalDetailPage({
       </header>
       <div className="grid gap-5 px-1 py-6">
         <div>
-          <span className={`status-chip severity-${evidence.severity}`}>
+          <span className={`status-chip whitespace-nowrap severity-${evidence.severity}`}>
             {evidence.status ?? severityLabel(evidence.severity)}
           </span>
           <p className="mb-0 mt-3 text-sm leading-6 text-desk-muted">{evidence.reason}</p>
@@ -198,11 +219,11 @@ function SignalDetailPage({
         </section>
         {evidence.action ? (
           <button
-            className="min-h-11 rounded-paper border-0 bg-desk-accent px-4 font-bold text-white"
+            className={signalActionClass}
             type="button"
             onClick={() => onAction(evidence.action as AppSignalAction)}
           >
-            {evidence.action.label}
+            {actionVerb(evidence.action)}
           </button>
         ) : null}
       </div>
@@ -227,4 +248,19 @@ function severityLabel(severity: SignalSeverity): string {
 function issueSurface(severity: SignalSeverity): string {
   if (severity === "severe") return "border-desk-danger/40 bg-desk-danger-soft/30";
   return "border-desk-warn/40 bg-desk-raised";
+}
+
+function actionVerb(action: AppSignalAction): string {
+  const label = action.label.trim();
+  const normalized = label.toLocaleLowerCase();
+  if (normalized.includes("restart") || normalized.includes("resume") || normalized.includes("recover")) {
+    return "Restart";
+  }
+  if (normalized.startsWith("adjust") || normalized.startsWith("reduce") || normalized.startsWith("rebalance")) {
+    return "Adjust";
+  }
+  if (normalized.startsWith("choose") || normalized.startsWith("select") || normalized.startsWith("link")) {
+    return "Choose";
+  }
+  return label.split(/\s+/)[0] || "Open";
 }

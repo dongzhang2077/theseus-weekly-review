@@ -39,7 +39,8 @@ Desktop:
 
 Mobile:
 
-- Bottom navigation with icons and short visible labels.
+- Bottom navigation with familiar icons, accessible names, and a clear selected
+  state; visible labels are omitted in the accepted compact mobile treatment.
 - Compact week selector in the top bar.
 - Stack review sections into small panels.
 - Collapse tables into abbreviated rows or summary cards.
@@ -67,11 +68,21 @@ Avoid:
 
 ## Components
 
-- Primary navigation items use an icon and a one-word visible label with a clear selected state.
+- Primary navigation items use a familiar icon, an accessible name, and a clear
+  selected state. The accepted mobile bottom navigation is icon-only.
 - Familiar utility controls may be icon-only when they have accessible names.
-- Primary and ambiguous actions use concise visible labels.
+- Primary and ambiguous actions use one clear English verb when meaning remains
+  intact. Multi-word copy is reserved for forms, destructive confirmation, or
+  actions that would otherwise become ambiguous.
+- Light semantic surfaces are the default button treatment. Dark filled buttons
+  are reserved for active or high-consequence states, not routine planning.
 - Tables should use thin row dividers, compact labels, and clear numeric alignment.
 - Status chips should be small, soft, and color-coded.
+- Status chips and tags remain on one line. Keep their copy short enough to fit;
+  shorten the label instead of wrapping it.
+- Goal, project, task, and activity names wrap when needed. A neighboring tag
+  or control must not cover, squeeze into an unreadable fragment, or obscure
+  the entity name.
 - Review sections should use light section dividers and compact headers.
 - Evidence rows should prioritize project, planned, actual, delta, and note.
 - Progress indicators should be subtle rings, bars, or small status marks.

@@ -47,4 +47,18 @@ describe("AppShell", () => {
     expect(screen.queryByRole("navigation", { name: "App sections" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Open account/ })).not.toBeInTheDocument();
   });
+
+  it("keeps bottom navigation icon-only while preserving accessible names", () => {
+    render(
+      <AppShell activeTab="signals" onTabChange={vi.fn()}>
+        Signals content
+      </AppShell>
+    );
+
+    ["Review", "Signals", "Focus", "Plan"].forEach((label) => {
+      expect(screen.getByRole("button", { name: label })).toHaveAttribute("title", label);
+      expect(screen.queryByText(label, { selector: "nav span" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Signals" })).toHaveAttribute("aria-current", "page");
+  });
 });

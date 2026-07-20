@@ -6,13 +6,27 @@ import { SignalsScreen } from "./SignalsScreen";
 
 describe("SignalsScreen", () => {
   it("shows concrete issues once instead of repeating a priority category in four summaries", () => {
-    render(
+    const { container } = render(
       <SignalsScreen signals={demoWeek.signals} onAction={vi.fn()} onTrack={vi.fn()} />
     );
 
+    expect(container.querySelector(".signals-screen")).toHaveClass(
+      "!h-full",
+      "!min-h-0",
+      "overflow-y-auto",
+      "touch-pan-y"
+    );
     expect(screen.getByLabelText("Current signal issues")).toBeInTheDocument();
     expect(screen.getAllByText("Resume dormant")).toHaveLength(1);
     expect(screen.getByText("Priority")).toBeInTheDocument();
+    expect(screen.getByText("Other signals")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Plan drift details" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Energy thin details" })).toBeInTheDocument();
+    expect(screen.getByText("Resume dormant")).toHaveClass("break-words");
+    expect(screen.getByText("Wake-up")).toHaveClass("whitespace-nowrap", "shrink-0");
+    expect(screen.getByText("Plan drift")).toHaveClass("break-words");
+    expect(screen.queryByText("The project was planned, then received no active block.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Evidence" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Signal summaries")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Plan: Drift" })).not.toBeInTheDocument();
   });
@@ -22,7 +36,10 @@ describe("SignalsScreen", () => {
     render(<SignalsScreen signals={demoWeek.signals} onAction={onAction} onTrack={vi.fn()} />);
 
     const issue = screen.getByRole("article", { name: "Resume dormant: Wake-up" });
-    fireEvent.click(within(issue).getByRole("button", { name: "Schedule restart" }));
+    const action = within(issue).getByRole("button", { name: "Restart" });
+    expect(action).toHaveClass("bg-desk-accent-soft", "text-desk-accent");
+    expect(action).not.toHaveClass("bg-desk-accent", "text-white");
+    fireEvent.click(action);
 
     expect(onAction).toHaveBeenCalledWith({
       label: "Schedule restart",
@@ -47,11 +64,12 @@ describe("SignalsScreen", () => {
     );
 
     const issue = screen.getByRole("article", { name: "Resume dormant: Wake-up" });
-    fireEvent.click(within(issue).getByRole("button", { name: "Evidence" }));
+    fireEvent.click(within(issue).getByRole("button", { name: "Open Resume dormant details" }));
 
     const detail = screen.getByRole("region", { name: "Resume dormant" });
     expect(detail).toHaveClass("bg-desk-paper");
     expect(within(detail).getByText("Inactive")).toBeInTheDocument();
+    expect(within(detail).getByRole("button", { name: "Restart" })).toHaveClass("bg-desk-accent-soft");
     expect(screen.queryByLabelText("Current signal issues")).not.toBeInTheDocument();
     await waitFor(() => expect(onDetailOpenChange).toHaveBeenLastCalledWith(true));
 
