@@ -1,79 +1,84 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
 import { demoWeek } from "../../shared/demo/demoWeek";
 import { SignalsScreen } from "./SignalsScreen";
 
 describe("SignalsScreen", () => {
-  it("shows one priority signal and four stable, text-labelled summaries", () => {
-    const { container } = render(
-      <SignalsScreen signals={demoWeek.signals} onPlan={vi.fn()} onTrack={vi.fn()} />
+  it("shows concrete issues once instead of repeating a priority category in four summaries", () => {
+    render(
+      <SignalsScreen signals={demoWeek.signals} onAction={vi.fn()} onTrack={vi.fn()} />
     );
 
-    expect(screen.getByRole("button", { name: "Priority signal: Stage, Dormant" })).toHaveTextContent(
-      "A restart project stayed inactive this week."
+    expect(screen.getByLabelText("Current signal issues")).toBeInTheDocument();
+    expect(screen.getAllByText("Resume dormant")).toHaveLength(1);
+    expect(screen.getByText("Priority")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Signal summaries")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Plan: Drift" })).not.toBeInTheDocument();
+  });
+
+  it("sends the selected issue's project and minutes directly to Plan", () => {
+    const onAction = vi.fn();
+    render(<SignalsScreen signals={demoWeek.signals} onAction={onAction} onTrack={vi.fn()} />);
+
+    const issue = screen.getByRole("article", { name: "Resume dormant: Wake-up" });
+    fireEvent.click(within(issue).getByRole("button", { name: "Schedule restart" }));
+
+    expect(onAction).toHaveBeenCalledWith({
+      label: "Schedule restart",
+      detail: "suggestion",
+      suggestion: expect.objectContaining({
+        projectId: 3,
+        projectTitle: "Resume and applications",
+        deltaMinutes: 60
+      })
+    });
+  });
+
+  it("opens one opaque evidence page without keeping the issue list underneath", async () => {
+    const onDetailOpenChange = vi.fn();
+    render(
+      <SignalsScreen
+        signals={demoWeek.signals}
+        onAction={vi.fn()}
+        onTrack={vi.fn()}
+        onDetailOpenChange={onDetailOpenChange}
+      />
     );
-    const summary = screen.getByLabelText("Signal summaries");
-    expect(
-      within(summary).getAllByRole("button").map((button) => button.getAttribute("aria-label"))
-    ).toEqual(["Plan: Drift", "Stage: Dormant", "Goal: Aligned", "Energy: Thin"]);
-    expect(container.querySelector(".orbit-visual")).not.toBeInTheDocument();
-    expect(container.querySelector(".orbit-dot")).not.toBeInTheDocument();
-    expect(container.querySelector(".signal-entry")).not.toBeInTheDocument();
+
+    const issue = screen.getByRole("article", { name: "Resume dormant: Wake-up" });
+    fireEvent.click(within(issue).getByRole("button", { name: "Evidence" }));
+
+    const detail = screen.getByRole("region", { name: "Resume dormant" });
+    expect(detail).toHaveClass("bg-desk-paper");
+    expect(within(detail).getByText("Inactive")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Current signal issues")).not.toBeInTheDocument();
+    await waitFor(() => expect(onDetailOpenChange).toHaveBeenLastCalledWith(true));
+
+    fireEvent.click(within(detail).getByRole("button", { name: "Back" }));
+    expect(screen.getByLabelText("Current signal issues")).toBeInTheDocument();
+    await waitFor(() => expect(onDetailOpenChange).toHaveBeenLastCalledWith(false));
   });
 
-  it("opens signal evidence, then a concrete detail with a plan action", () => {
-    const onPlan = vi.fn();
+  it("collapses a data-backed week with no issues into a steady state", () => {
     const signals: AppWeekViewModel["signals"] = {
-      summaries: demoWeek.signals.summaries,
-      evidence: [
-        {
-          id: "frontend-under-plan",
-          signalId: "plan",
-          title: "Theseus frontend",
-          severity: "attention",
-          status: "Under plan",
-          value: "-3h",
-          reason: "Theseus frontend logged 3h below plan.",
-          rows: [
-            { label: "Planned", value: "4h" },
-            { label: "Actual", value: "1h" },
-            { label: "Delta", value: "-3h" }
-          ],
-          action: "Plan"
-        }
-      ]
+      summaries: demoWeek.signals.summaries.map((signal) => ({
+        ...signal,
+        severity: "normal",
+        status: "Steady"
+      })),
+      evidence: demoWeek.signals.evidence.map((row) => ({
+        ...row,
+        severity: "normal",
+        action: undefined
+      }))
     };
 
-    render(<SignalsScreen signals={signals} onPlan={onPlan} onTrack={vi.fn()} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Plan: Drift" }));
-    fireEvent.click(screen.getByRole("button", { name: "Theseus frontend: Under plan" }));
-
-    const detail = screen.getByRole("region", { name: "Theseus frontend" });
-    expect(within(detail).getByText("Planned")).toBeInTheDocument();
-    expect(within(detail).getByText("Actual")).toBeInTheDocument();
-    expect(within(detail).getByText("Delta")).toBeInTheDocument();
-    fireEvent.click(within(detail).getByRole("button", { name: "Plan" }));
-    expect(onPlan).toHaveBeenCalledOnce();
+    render(<SignalsScreen signals={signals} onAction={vi.fn()} onTrack={vi.fn()} />);
+    expect(screen.getByText("All checks steady")).toBeInTheDocument();
   });
 
-  it("shows a recovery action when one signal has no supporting evidence", () => {
-    const onTrack = vi.fn();
-    const signals: AppWeekViewModel["signals"] = {
-      summaries: demoWeek.signals.summaries,
-      evidence: demoWeek.signals.evidence.filter((row) => row.signalId !== "goal")
-    };
-
-    render(<SignalsScreen signals={signals} onPlan={vi.fn()} onTrack={onTrack} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Goal: Aligned" }));
-    expect(screen.getByText("No Goal evidence yet")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Open track" }));
-    expect(onTrack).toHaveBeenCalledOnce();
-  });
-
-  it("shows a track-first empty state when every signal has no data", () => {
+  it("shows a focus-first empty state when every signal has no data", () => {
     const onTrack = vi.fn();
     const signals: AppWeekViewModel["signals"] = {
       summaries: demoWeek.signals.summaries.map((signal) => ({
@@ -84,10 +89,9 @@ describe("SignalsScreen", () => {
       evidence: []
     };
 
-    render(<SignalsScreen signals={signals} onPlan={vi.fn()} onTrack={onTrack} />);
-
+    render(<SignalsScreen signals={signals} onAction={vi.fn()} onTrack={onTrack} />);
     expect(screen.getByText("Track a little more first")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Open track" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open focus" }));
     expect(onTrack).toHaveBeenCalledOnce();
   });
 });

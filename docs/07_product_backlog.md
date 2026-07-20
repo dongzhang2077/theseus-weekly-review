@@ -417,6 +417,45 @@ Acceptance criteria:
 - Two-context restore, 401 recovery, logout, and reuse cases have automated
   browser/API tests and documented security reasoning.
 
+### STORY-032 Correct the mobile execution and review feedback loops
+
+As a user, I want Focus, Review, Signals, and Plan to form one clear mobile
+workflow so that an observed problem can become a contextual, reversible plan
+change without duplicated status cards or hidden state.
+
+Priority: P0 corrective work for the 2026-07-18 demo
+
+Local implementation checkpoint (2026-07-18 PDT): implemented and verified on
+`feature/032-focus-ux-v2`, but not merged or released. This candidate remains
+subject to product-owner browser approval. The implementation keeps the 430px
+Warm Stationery shell, replaces repeated category summaries with concrete
+issues, and carries a selected Risk or Signal into a contextual Plan change.
+The full frontend suite passes 102 tests across 19 files, TypeScript and the
+production build pass, and the final diff check is clean.
+
+Acceptance criteria:
+
+- the primary workspace stays phone-sized at 430px and detail views are opaque
+  full-screen surfaces rather than transparent layers over the source page;
+- Focus preserves an in-progress draft across tab changes, records a completed
+  result exactly once, and determines Today using the user's local date;
+- Review browses real Monday-to-Sunday weeks, including an empty week, without
+  a stale response replacing the currently selected week;
+- Signals lists only concrete attention or risk items, collapses normal checks,
+  avoids repeating a priority category, and keeps Evidence optional;
+- a Risk or Signal reaches the correct contextual Plan draft in one action and
+  can be applied or saved as the second action; unknown project context opens
+  editing instead of guessing;
+- Energy signals use the same deterministic thresholds as the review engine:
+  restoration below 20% of consuming time, or destructive activity at least
+  120 minutes and at least 25% of total time;
+- Plan shows one clear adjustment path, one primary edit action, and truthful
+  loading, conflict, saved, undo, empty, and error states;
+- semantic Tailwind tokens and existing shared components remain the default;
+  large page-specific CSS or decoration-only animation is not introduced;
+- focused and full frontend tests, TypeScript, production build, diff check,
+  and 430x932 browser review pass before merge.
+
 ## Epic 8: Personal Assistant Evolution
 
 These stories are roadmap work. They are not part of the 2026-07-18 demo and

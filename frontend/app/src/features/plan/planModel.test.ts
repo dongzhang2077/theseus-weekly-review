@@ -5,7 +5,8 @@ import {
   buildPlanProposal,
   calculatePlanMetrics,
   createPlanWorkspace,
-  createUpcomingPlanSeed
+  createUpcomingPlanSeed,
+  withPlanSuggestion
 } from "./planModel";
 
 describe("planModel", () => {
@@ -50,6 +51,22 @@ describe("planModel", () => {
     expect(proposal?.afterProjectMinutes).toBe(180);
     expect(proposal?.beforeMetrics.plannedMinutes).toBe(660);
     expect(proposal?.afterMetrics.plannedMinutes).toBe(720);
+  });
+
+  it("replaces the global review suggestion with the selected signal action", () => {
+    const workspace = withPlanSuggestion(createPlanWorkspace(demoWeek.plan), {
+      title: "Adjust Theseus frontend",
+      reason: "Frontend stayed below plan.",
+      kind: "reduce",
+      projectId: 2,
+      projectTitle: "Theseus frontend",
+      deltaMinutes: -60
+    });
+    const proposal = buildPlanProposal(workspace);
+
+    expect(proposal?.suggestion.title).toBe("Adjust Theseus frontend");
+    expect(proposal?.suggestion.projectId).toBe(2);
+    expect((proposal?.beforeProjectMinutes ?? 0) - (proposal?.afterProjectMinutes ?? 0)).toBe(60);
   });
 
   it("can reduce a lower-priority plan block without leaving zero-minute items", () => {

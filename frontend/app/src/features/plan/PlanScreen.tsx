@@ -18,9 +18,11 @@ import {
   createUpcomingPlanSeed,
   dismissPlanSuggestion,
   formatPlanWeek,
+  withPlanSuggestion,
   type PlanDraft,
   type PlanItem,
   type PlanMetrics,
+  type PlanSuggestion,
   type PlanWorkspace
 } from "./planModel";
 
@@ -49,9 +51,11 @@ interface PlanScreenProps {
   entryRequest: {
     id: number;
     detail: PlanDetail;
+    suggestion?: PlanSuggestion;
   } | null;
   onReview: () => void;
   onFocusItem?: (item: PlanItem, projectTitle: string | null) => void;
+  onDetailOpenChange?: (open: boolean) => void;
   fetchImpl?: FetchLike;
 }
 
@@ -69,15 +73,19 @@ export function PlanScreen({
   entryRequest,
   onReview,
   onFocusItem,
+  onDetailOpenChange,
   fetchImpl
 }: PlanScreenProps) {
   const hasLiveApi = Boolean(apiBaseUrl);
   const initialSeed = hasLiveApi && reviewSource !== "api"
     ? createUpcomingPlanSeed()
     : planData;
-  const [workspace, setWorkspace] = useState<PlanWorkspace>(() =>
-    createPlanWorkspace(initialSeed)
-  );
+  const [workspace, setWorkspace] = useState<PlanWorkspace>(() => {
+    const initialWorkspace = createPlanWorkspace(initialSeed);
+    return entryRequest?.suggestion
+      ? withPlanSuggestion(initialWorkspace, entryRequest.suggestion)
+      : initialWorkspace;
+  });
   const [loadPhase, setLoadPhase] = useState<LoadPhase>(hasLiveApi ? "loading" : "ready");
   const [detail, setDetail] = useState<PlanDetail | null>(null);
   const [operation, setOperation] = useState<OperationState>(idleOperation);
@@ -95,7 +103,10 @@ export function PlanScreen({
       ? createUpcomingPlanSeed()
       : planData;
     if (!hasLiveApi) {
-      setWorkspace(createPlanWorkspace(seed));
+      const nextWorkspace = createPlanWorkspace(seed);
+      setWorkspace(entryRequest?.suggestion
+        ? withPlanSuggestion(nextWorkspace, entryRequest.suggestion)
+        : nextWorkspace);
       setLoadPhase("ready");
       setOperation(idleOperation);
       setUndoSnapshot(null);
@@ -110,7 +121,10 @@ export function PlanScreen({
         setLoadPhase("error");
         return;
       }
-      setWorkspace(createPlanWorkspace(seed, result.data));
+      const nextWorkspace = createPlanWorkspace(seed, result.data);
+      setWorkspace(entryRequest?.suggestion
+        ? withPlanSuggestion(nextWorkspace, entryRequest.suggestion)
+        : nextWorkspace);
       setLoadPhase("ready");
       setOperation(idleOperation);
       setUndoSnapshot(null);
@@ -122,8 +136,18 @@ export function PlanScreen({
   }, [apiBaseUrl, fetchImpl, hasLiveApi, planData, reload, reviewSource]);
 
   useEffect(() => {
-    if (entryRequest) setDetail(entryRequest.detail);
+    if (!entryRequest) return;
+    if (entryRequest.suggestion) {
+      setWorkspace((current) => withPlanSuggestion(current, entryRequest.suggestion as PlanSuggestion));
+    }
+    setDetail(entryRequest.detail);
   }, [entryRequest]);
+
+  useEffect(() => {
+    onDetailOpenChange?.(detail !== null && loadPhase === "ready");
+  }, [detail, loadPhase, onDetailOpenChange]);
+
+  useEffect(() => () => onDetailOpenChange?.(false), [onDetailOpenChange]);
 
   async function applySuggestion() {
     if (!proposal || operation.phase === "saving" || operation.phase === "undoing") return;
@@ -277,14 +301,7 @@ export function PlanScreen({
       <header className="grid h-[52px] grid-cols-[44px_1fr_44px] items-center border-b border-desk-line bg-desk-raised/90 px-3">
         <span aria-hidden="true" />
         <h1 className="m-0 truncate text-center text-[17px] font-bold">{formatPlanWeek(workspace.draft.week)}</h1>
-        <button
-          className="grid size-10 place-items-center rounded-full border-0 bg-transparent text-desk-muted hover:bg-desk-sunk"
-          type="button"
-          aria-label="Edit plan"
-          onClick={() => setDetail("edit")}
-        >
-          <Icon name="plus" className="size-5" />
-        </button>
+        <span aria-hidden="true" />
       </header>
 
       {loadPhase === "loading" ? (

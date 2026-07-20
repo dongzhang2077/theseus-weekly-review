@@ -12,7 +12,7 @@ export function DetailPanel({ title, open, onBack, children }: DetailPanelProps)
   if (!open) return null;
 
   return (
-    <section className="detail open" aria-label={title}>
+    <section className="detail open" role="dialog" aria-modal="true" aria-label={title}>
       <header className="detail-header">
         <IconButton label="Back" icon="chevronLeft" onClick={onBack} />
         <div className="detail-title-bar">{title}</div>

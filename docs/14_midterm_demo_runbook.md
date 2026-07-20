@@ -87,9 +87,9 @@ Pass conditions:
 |---|---|---|
 | 0:00-0:25 | State the problem: weekly evidence exists, but turning it into one realistic adjustment is still manual. | Narrow product scope. |
 | 0:25-0:55 | Sign in as `Theseus Demo`; briefly point out that registration is available but data ownership comes from JWT, not a selectable ID. | Formal local identity, isolation, and explicit ownership. |
-| 0:55-1:45 | On Review, show the week, the win-first summary, the attention state, and one evidence detail. | Evidence first; supportive wording second. |
-| 1:45-2:30 | Open Signals; inspect the dormant priority signal and its matching evidence. | Severity is evidence-derived, not decorative. |
-| 2:30-3:45 | Open Plan from the recommendation; show week balance and the project/planned/slack before-and-after diff, then Apply. | One bounded, user-approved next-week adjustment. |
+| 0:55-1:45 | On Review, browse an actual week, show the win-first summary, and open one opaque full-screen Risk detail. | Evidence first; supportive wording second; empty and populated weeks remain navigable. |
+| 1:45-2:30 | Open Signals; choose a concrete risk and use its direct action. Open Evidence only if explanation is needed. | Severity and the next step are evidence-derived, not decorative or duplicated. |
+| 2:30-3:45 | Arrive in Plan with the selected Risk/Signal context; show its project/planned/slack before-and-after diff, then Apply. | A problem becomes one bounded, user-approved adjustment in two steps. |
 | 3:45-4:20 | Reload, return to Plan, and show that the target plan remains. Use Undo and show the restored state. | SQLite persistence, restart continuity, and reversibility. |
 | 4:20-5:00 | Return to Review and state the limitations and gated agent roadmap. | Truthful architecture and feasible next phase. |
 
@@ -144,6 +144,13 @@ labels, or cross-screen style break. A 500x844 short-viewport check also keeps
 all three Plan actions visible. Focus and Plan use the same warm paper surface,
 restrained borders, semantic colors, and icon-plus-label navigation.
 
+Local STORY-032 visual gates were captured again at 430x932 on 2026-07-18 for
+Focus, Review, Review Risk detail, Signals, Plan, and the contextual
+Signals-to-Plan handoff. These are local approval artifacts, not replacements
+for the committed sanitized screenshots and not evidence of release. They
+verify the phone-width shell, opaque full-screen details, concrete Signal
+hierarchy, and contextual Plan draft before product-owner approval.
+
 ## 7. Known Limitations
 
 - Accounts, passwords, JWT sessions, and isolation are local-only;
@@ -161,6 +168,14 @@ restrained borders, semantic colors, and icon-plus-label navigation.
   source of truth.
 - Review feedback collection is documented but does not yet have a persisted
   API/UI implementation.
+- Evidence summarizes source counts and time ranges, but precise Session-ID
+  provenance, correction, exclusion, and merge APIs are still deferred.
+- Review browsing currently uses the generate endpoint to materialize a
+  selected week; a read-only stored-review endpoint should be added before
+  browsing becomes a high-frequency history feature.
+- The course schema still uses the stable Goal, Project, Activity, WeeklyPlan,
+  PlannedItem, TimeLog, DailyReflection, and WeeklyReview entities. A separate
+  first-class Task hierarchy and its migration are not part of this demo.
 - `global.css` remains as compatibility styling for screens not yet migrated.
   STORY-029 adds no new Focus or Plan selectors there; removal is deferred until
   each remaining consumer has screenshot and interaction coverage.
@@ -198,6 +213,10 @@ Release status:
 - the final STORY-030 gate passes 102 Python tests, 71 frontend tests, the
   production build, Python compilation, deterministic sample review, and
   authenticated demo preparation;
+- STORY-032 is a local corrective candidate on `feature/032-focus-ux-v2`, not
+  a merged release. Its current gate passes 102 frontend tests across 19 files,
+  TypeScript, the production build, and the final diff check; product-owner
+  browser approval remains required before any push or merge;
 - Issue #63 is closed as completed and its project-board status is `Done`.
 
 Still requires human completion:

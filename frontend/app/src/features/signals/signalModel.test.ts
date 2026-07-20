@@ -1,42 +1,48 @@
 import { describe, expect, it } from "vitest";
-import { choosePrioritySignal, orderSignalSummaries, sortSignalEvidence, type SignalSummary } from "./signalModel";
+import type { AppSignalEvidence } from "../../shared/api/weeklyReview";
+import { countSteadyEvidence, selectSignalIssues } from "./signalModel";
 
-const baseSignals: SignalSummary[] = [
-  { id: "plan", label: "Plan", severity: "attention", status: "Plan drift", reason: "Plan changed." },
-  { id: "stage", label: "Stage", severity: "severe", status: "Stage drift", reason: "Project is dormant." },
-  { id: "goal", label: "Goal", severity: "normal", status: "Aligned", reason: "Goals are covered." },
-  { id: "energy", label: "Energy", severity: "attention", status: "Thin", reason: "Recovery was low." }
+const rows: AppSignalEvidence[] = [
+  {
+    id: "goal-steady",
+    signalId: "goal",
+    title: "Goal supported",
+    severity: "normal",
+    reason: "Goal received time.",
+    rows: []
+  },
+  {
+    id: "plan-drift",
+    signalId: "plan",
+    title: "Plan drift",
+    severity: "attention",
+    reason: "Plan changed.",
+    rows: []
+  },
+  {
+    id: "stage-risk",
+    signalId: "stage",
+    title: "Project dormant",
+    severity: "severe",
+    reason: "Project needs a restart.",
+    rows: []
+  },
+  {
+    id: "energy-empty",
+    signalId: "energy",
+    title: "Energy",
+    severity: "nodata",
+    reason: "No data.",
+    rows: []
+  }
 ];
 
 describe("signalModel", () => {
-  it("chooses the highest severity signal", () => {
-    expect(choosePrioritySignal(baseSignals)?.id).toBe("stage");
+  it("keeps only concrete issues and orders the highest severity first", () => {
+    expect(selectSignalIssues(rows).map((row) => row.id)).toEqual(["stage-risk", "plan-drift"]);
   });
 
-  it("uses the product priority order when severity ties", () => {
-    const tied = baseSignals.map((signal) => ({ ...signal, severity: "attention" as const }));
-    expect(choosePrioritySignal(tied)?.id).toBe("stage");
-  });
-
-  it("sorts evidence rows by severity", () => {
-    const sorted = sortSignalEvidence([
-      { id: "healthy", title: "Healthy", severity: "normal", reason: "OK", rows: [] },
-      { id: "risk", title: "Risk", severity: "severe", reason: "Needs work", rows: [] }
-    ]);
-
-    expect(sorted.map((row) => row.id)).toEqual(["risk", "healthy"]);
-  });
-
-  it("keeps the four summary rows in a stable scan order", () => {
-    expect(orderSignalSummaries([...baseSignals].reverse()).map((row) => row.id)).toEqual([
-      "plan",
-      "stage",
-      "goal",
-      "energy"
-    ]);
-  });
-
-  it("returns no priority when signal data is absent", () => {
-    expect(choosePrioritySignal([])).toBeNull();
+  it("counts normal checks separately from issues and missing data", () => {
+    expect(countSteadyEvidence(rows)).toBe(1);
   });
 });

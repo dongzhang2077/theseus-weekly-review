@@ -47,7 +47,7 @@ describe("PlanScreen", () => {
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Suggested adjustment: Protect one restart block" }));
-    const detail = screen.getByRole("region", { name: "Adjustment" });
+    const detail = screen.getByRole("dialog", { name: "Adjustment" });
     expect(within(detail).getByText("Before")).toBeInTheDocument();
     expect(within(detail).getByText("After")).toBeInTheDocument();
     expect(within(detail).getByText("3h")).toBeInTheDocument();
@@ -56,6 +56,31 @@ describe("PlanScreen", () => {
     expect(await screen.findByText("Sample adjustment applied")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     expect(await screen.findByText("Plan restored")).toBeInTheDocument();
+  });
+
+  it("opens the selected Signal adjustment instead of the global review suggestion", async () => {
+    const onDetailOpenChange = vi.fn();
+    renderPlan({
+      onDetailOpenChange,
+      entryRequest: {
+        id: 10,
+        detail: "suggestion",
+        suggestion: {
+          title: "Adjust Theseus frontend",
+          reason: "Frontend stayed below plan.",
+          kind: "reduce",
+          projectId: 2,
+          projectTitle: "Theseus frontend",
+          deltaMinutes: -60
+        }
+      }
+    });
+
+    const detail = screen.getByRole("dialog", { name: "Adjustment" });
+    expect(within(detail).getByText("Adjust Theseus frontend")).toBeInTheDocument();
+    expect(within(detail).getByText("4h")).toBeInTheDocument();
+    expect(within(detail).getByText("3h")).toBeInTheDocument();
+    await waitFor(() => expect(onDetailOpenChange).toHaveBeenLastCalledWith(true));
   });
 
   it("persists a new target-week plan and deletes it on Undo", async () => {
@@ -75,7 +100,7 @@ describe("PlanScreen", () => {
     renderPlan({ apiBaseUrl: "http://127.0.0.1:8000", reviewSource: "api", fetchImpl });
 
     fireEvent.click(await screen.findByRole("button", { name: "Suggested adjustment: Protect one restart block" }));
-    fireEvent.click(within(screen.getByRole("region", { name: "Adjustment" })).getByRole("button", { name: "Apply" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Adjustment" })).getByRole("button", { name: "Apply" }));
 
     await waitFor(() => expect(calls.some((call) => call.init.method === "POST")).toBe(true));
     const createCall = calls.find((call) => call.init.method === "POST");
@@ -105,7 +130,7 @@ describe("PlanScreen", () => {
     renderPlan({ apiBaseUrl: "http://127.0.0.1:8000", reviewSource: "api", fetchImpl });
 
     fireEvent.click(await screen.findByRole("button", { name: "Suggested adjustment: Protect one restart block" }));
-    fireEvent.click(within(screen.getByRole("region", { name: "Adjustment" })).getByRole("button", { name: "Apply" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Adjustment" })).getByRole("button", { name: "Apply" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Plan changed elsewhere");
     expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
@@ -135,7 +160,7 @@ describe("PlanScreen", () => {
     renderPlan();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Edit plan" })[0]);
-    const editor = screen.getByRole("region", { name: "Edit plan" });
+    const editor = screen.getByRole("dialog", { name: "Edit plan" });
     expect(within(editor).getByLabelText("Weekly capacity hours")).toHaveValue(30);
 
     fireEvent.click(within(editor).getByRole("button", { name: "Add block" }));

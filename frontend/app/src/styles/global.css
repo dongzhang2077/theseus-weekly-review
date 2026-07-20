@@ -507,16 +507,16 @@ textarea:focus-visible {
   left: 0;
   right: 0;
   z-index: 20;
-  background: rgba(255, 253, 248, 0.94);
   border: 1px solid var(--color-line-soft);
 }
 
 .sheet {
-  bottom: 66px;
+  bottom: 0;
   max-height: 70%;
   overflow: auto;
   border-radius: 12px 12px 0 0;
   padding: 8px 16px 22px;
+  background: rgba(255, 253, 248, 0.94);
 }
 
 .sheet-handle {
@@ -605,6 +605,7 @@ textarea:focus-visible {
   inset: 0;
   padding: 0 16px 86px;
   overflow: auto;
+  background: var(--color-paper);
 }
 
 .detail-header {
