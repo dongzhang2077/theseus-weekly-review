@@ -1,6 +1,6 @@
 # Midterm Demo Runbook
 
-Checkpoint: 2026-07-17
+Completion checkpoint: 2026-07-19
 
 Demo date: 2026-07-18
 
@@ -213,16 +213,22 @@ Release status:
 - the final STORY-030 gate passes 102 Python tests, 71 frontend tests, the
   production build, Python compilation, deterministic sample review, and
   authenticated demo preparation;
-- STORY-032 is a local corrective candidate on `feature/032-focus-ux-v2`, not
-  a merged release. Its current gate passes 102 frontend tests across 19 files,
-  TypeScript, the production build, and the final diff check; product-owner
-  browser approval remains required before any push or merge;
+- STORY-032 is recorded locally as commit `08b3339` on
+  `feature/032-focus-ux-v2`, not as a merged release. Its current gate passes
+  102 frontend tests across 19 files, TypeScript, the production build, and the
+  final diff check; push and merge remain separate release decisions;
 - Issue #63 is closed as completed and its project-board status is `Done`.
 
-Still requires human completion:
+Presentation outcome:
 
-- one live five-minute rehearsal and one fallback recording remain to be
-  completed.
+- Progress Report 2 and the live demonstration were completed on 2026-07-18.
+- The delivered presentation used the teammate's unmerged
+  `feature/ui-product-update-2026-07-16` visual demo. It demonstrated the
+  product flow but did not replace `main` or release the cloud-sync prototypes
+  visible in that branch.
+- A fallback recording was not needed to complete the presentation. Any new
+  recording is now optional evidence for the final defense rather than an open
+  midterm gate.
 
 Full verification commands:
 

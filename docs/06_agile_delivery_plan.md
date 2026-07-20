@@ -168,6 +168,17 @@ Delivery checkpoint (2026-07-15 PDT):
 - Engineering verification is complete; one timed live rehearsal and one
   fallback recording remain before the July 18 demo.
 
+Presentation completion checkpoint (2026-07-18 PDT):
+
+- Progress Report 2 and its live product demonstration were completed.
+- The presentation used the teammate's stable
+  `feature/ui-product-update-2026-07-16` visual demo; that branch remains an
+  unmerged presentation reference rather than the released product baseline.
+- Formal local authentication remains the released `main` capability through
+  STORY-030, while STORY-032 is a separately verified local correction branch.
+- Sprint 5 is closed. A fallback recording is no longer a gate for the completed
+  presentation and may be recreated only if it supports the final defense.
+
 ### Sprint 6: Evaluation and Final Report
 
 Dates: 2026-07-19 to 2026-08-01
@@ -175,6 +186,28 @@ Dates: 2026-07-19 to 2026-08-01
 Goal:
 
 Improve the prototype and finish validation/reporting.
+
+Measurable sprint goal:
+
+By 2026-08-01, evaluate the authenticated weekly-review loop with 2-3 external
+reviewers, implement and verify one evidence-backed revision selected from that
+feedback, and complete the final report, presentation, evaluation summary, and
+AI-usage documentation.
+
+Critical path:
+
+```text
+Repository cleanup -> evaluation protocol -> reviewer sessions
+-> findings and one prioritized revision -> regression verification
+-> final report and defense rehearsal
+```
+
+Owners:
+
+- Dong Zhang: repository integration, data/review verification, and final
+  technical claims.
+- Zhi Kang: reviewer sessions, UX evidence, presentation, and visual handoff.
+- Both: evaluation scoring, scope decisions, report review, and final defense.
 
 Deliverables:
 
@@ -184,6 +217,18 @@ Deliverables:
 - Final presentation
 - Final report
 - AI usage documentation
+
+Exit gate:
+
+- 2-3 reviewers complete the accepted feedback questions or rubric;
+- the evaluation summary separates observed evidence from team interpretation;
+- one prioritized revision is implemented with focused tests and a documented
+  before/after result;
+- the complete authenticated demo passes without an external model key;
+- the final report includes references, limitations, contribution records, and
+  representative AI prompts, verification, and human revisions;
+- LangGraph, OpenClaw, cloud sync, and learned personalization remain outside
+  the critical path unless the exit gate is already satisfied.
 
 ## 4. Definition of Ready
 
