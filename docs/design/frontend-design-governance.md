@@ -61,6 +61,25 @@ and quieter than an onboarding or celebration screen.
 - Demo-only behavior must say that it is sample or view-local behavior. It must
   not imply server persistence.
 
+### Signals information depth
+
+Signals uses a strict three-level path so that evidence does not compete with
+the next action:
+
+1. The overview shows one complete priority signal, compact rows for other
+   issues, and a collapsed count for steady checks. It omits explanations and
+   raw evidence.
+2. The signal summary shows the issue, one reason, one key value, its affected
+   goal or project when known, the review period, one main action, and one
+   icon-only entry to evidence.
+3. The evidence page is read-only and shows the recorded source values, period,
+   and entity link available from the current API. It does not repeat the plan
+   action.
+
+Back navigation is equally strict: evidence returns to the signal summary, and
+the summary returns to the overview. Unknown entity or source metadata is
+omitted rather than inferred.
+
 ## 4. Frontend Architecture
 
 Tailwind CSS v4 is the default styling path for new and migrated screens.

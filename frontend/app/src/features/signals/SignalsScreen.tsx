@@ -22,13 +22,17 @@ const signalActionClass =
 
 interface SignalsScreenProps {
   signals: AppWeekViewModel["signals"];
+  weekLabel: string;
   onAction: (action: AppSignalAction) => void;
   onTrack: () => void;
   onDetailOpenChange?: (open: boolean) => void;
 }
 
+type SignalDetailLevel = "summary" | "evidence";
+
 export function SignalsScreen({
   signals,
+  weekLabel,
   onAction,
   onTrack,
   onDetailOpenChange
@@ -36,7 +40,18 @@ export function SignalsScreen({
   const issues = useMemo(() => selectSignalIssues(signals.evidence), [signals.evidence]);
   const steadyCount = useMemo(() => countSteadyEvidence(signals.evidence), [signals.evidence]);
   const [activeDetail, setActiveDetail] = useState<AppSignalEvidence | null>(null);
+  const [detailLevel, setDetailLevel] = useState<SignalDetailLevel>("summary");
   const hasSignalData = signals.summaries.some((signal) => signal.severity !== "nodata");
+
+  const openDetail = (evidence: AppSignalEvidence) => {
+    setActiveDetail(evidence);
+    setDetailLevel("summary");
+  };
+
+  const closeDetail = () => {
+    setActiveDetail(null);
+    setDetailLevel("summary");
+  };
 
   useEffect(() => {
     onDetailOpenChange?.(activeDetail !== null);
@@ -45,11 +60,19 @@ export function SignalsScreen({
   useEffect(() => () => onDetailOpenChange?.(false), [onDetailOpenChange]);
 
   if (activeDetail) {
-    return (
-      <SignalDetailPage
+    return detailLevel === "summary" ? (
+      <SignalSummaryPage
         evidence={activeDetail}
-        onBack={() => setActiveDetail(null)}
+        weekLabel={weekLabel}
+        onBack={closeDetail}
+        onEvidence={() => setDetailLevel("evidence")}
         onAction={onAction}
+      />
+    ) : (
+      <SignalEvidencePage
+        evidence={activeDetail}
+        weekLabel={weekLabel}
+        onBack={() => setDetailLevel("summary")}
       />
     );
   }
@@ -83,7 +106,7 @@ export function SignalsScreen({
             <PrioritySignalCard
               issue={issues[0]}
               onAction={onAction}
-              onDetails={() => setActiveDetail(issues[0])}
+              onDetails={() => openDetail(issues[0])}
             />
           </section>
 
@@ -94,7 +117,7 @@ export function SignalsScreen({
               </h2>
               <div className="overflow-hidden rounded-paper border border-desk-line bg-desk-raised shadow-paper">
                 {issues.slice(1).map((issue) => (
-                  <SignalIssueRow key={issue.id} issue={issue} onDetails={() => setActiveDetail(issue)} />
+                  <SignalIssueRow key={issue.id} issue={issue} onDetails={() => openDetail(issue)} />
                 ))}
               </div>
             </section>
@@ -183,31 +206,116 @@ function SignalIssueRow({ issue, onDetails }: { issue: AppSignalEvidence; onDeta
   );
 }
 
-function SignalDetailPage({
+function SignalSummaryPage({
   evidence,
+  weekLabel,
   onBack,
+  onEvidence,
   onAction
 }: {
   evidence: AppSignalEvidence;
+  weekLabel: string;
   onBack: () => void;
+  onEvidence: () => void;
   onAction: (action: AppSignalAction) => void;
 }) {
-  const rows = evidence.rows.filter((row) => row.value.trim() !== evidence.reason.trim());
+  const entity = affectedEntity(evidence);
   return (
-    <section className="screen h-full overflow-y-auto bg-desk-paper" aria-label={evidence.title}>
+    <section
+      className="screen !h-full !min-h-0 touch-pan-y overflow-y-auto overscroll-y-contain bg-desk-paper"
+      aria-label={`${evidence.title} summary`}
+    >
       <header className="screen-header">
         <IconButton label="Back" icon="chevronLeft" onClick={onBack} />
-        <div className="screen-title truncate px-2">{evidence.title}</div>
+        <div className="screen-title">Signal</div>
       </header>
-      <div className="grid gap-5 px-1 py-6">
-        <div>
-          <span className={`status-chip whitespace-nowrap severity-${evidence.severity}`}>
-            {evidence.status ?? severityLabel(evidence.severity)}
-          </span>
-          <p className="mb-0 mt-3 text-sm leading-6 text-desk-muted">{evidence.reason}</p>
+      <div className="grid gap-5 px-1 py-5 pb-8">
+        <section className="grid gap-3" aria-labelledby="signal-summary-title">
+          <div className="flex items-start gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-desk-sunk text-desk-muted" aria-hidden="true">
+              <Icon name={iconBySignal[evidence.signalId]} className="size-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h1 id="signal-summary-title" className="m-0 break-words text-xl leading-7 text-desk-ink">
+                {evidence.title}
+              </h1>
+              <span className={`status-chip mt-2 shrink-0 whitespace-nowrap severity-${evidence.severity}`}>
+                {evidence.status ?? severityLabel(evidence.severity)}
+              </span>
+            </div>
+            {evidence.value ? (
+              <strong className="shrink-0 text-2xl leading-8 tabular-nums text-desk-ink">{evidence.value}</strong>
+            ) : null}
+          </div>
+          <p className="m-0 text-sm leading-6 text-desk-muted">{evidence.reason}</p>
+        </section>
+
+        <dl className="overflow-hidden rounded-paper border border-desk-line bg-desk-raised shadow-paper">
+          <SignalContextRow label="Type" value={signalLabel(evidence.signalId)} />
+          {entity ? <SignalContextRow label={entity.label} value={entity.value} /> : null}
+          <SignalContextRow label="Period" value={weekLabel} />
+        </dl>
+
+        <div className={`grid items-center gap-2 ${evidence.action ? "grid-cols-[1fr_auto]" : "justify-end"}`}>
+          {evidence.action ? (
+            <button
+              className={signalActionClass}
+              type="button"
+              onClick={() => onAction(evidence.action as AppSignalAction)}
+            >
+              {actionVerb(evidence.action)}
+            </button>
+          ) : null}
+          <IconButton label="Evidence" icon="fileText" variant="soft" onClick={onEvidence} />
         </div>
-        <section className="grid gap-3 rounded-paper border border-desk-line bg-desk-raised p-4" aria-labelledby="signal-evidence-title">
-          <h2 id="signal-evidence-title" className="m-0 text-base font-bold">Evidence</h2>
+      </div>
+    </section>
+  );
+}
+
+function SignalContextRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid min-h-12 grid-cols-[5rem_minmax(0,1fr)] items-center gap-3 border-b border-desk-line px-3 py-2 last:border-b-0">
+      <dt className="text-xs font-bold uppercase tracking-[0.12em] text-desk-subtle">{label}</dt>
+      <dd className="m-0 min-w-0 break-words text-right text-sm font-semibold text-desk-ink">{value}</dd>
+    </div>
+  );
+}
+
+function SignalEvidencePage({
+  evidence,
+  weekLabel,
+  onBack
+}: {
+  evidence: AppSignalEvidence;
+  weekLabel: string;
+  onBack: () => void;
+}) {
+  const rows = evidence.rows.filter((row) => row.value.trim() !== evidence.reason.trim());
+  const entity = affectedEntity(evidence);
+
+  return (
+    <section
+      className="screen !h-full !min-h-0 touch-pan-y overflow-y-auto overscroll-y-contain bg-desk-paper"
+      aria-label={`${evidence.title} evidence`}
+    >
+      <header className="screen-header">
+        <IconButton label="Back" icon="chevronLeft" onClick={onBack} />
+        <div className="screen-title">Evidence</div>
+      </header>
+      <div className="grid gap-5 px-1 py-5 pb-8">
+        <section className="grid gap-2" aria-labelledby="signal-evidence-title">
+          <h1 id="signal-evidence-title" className="m-0 break-words text-xl leading-7 text-desk-ink">
+            {evidence.title}
+          </h1>
+          <p className="m-0 text-xs font-semibold uppercase tracking-[0.12em] text-desk-subtle">
+            {weekLabel}
+          </p>
+          {entity ? <p className="m-0 break-words text-sm text-desk-muted">{entity.label}: {entity.value}</p> : null}
+        </section>
+
+        <section className="grid gap-3 rounded-paper border border-desk-line bg-desk-raised p-4 shadow-paper" aria-label="Source values">
+          <h2 className="m-0 text-base font-bold">Recorded values</h2>
           <dl className="evidence-list">
             {rows.map((row) => (
               <div key={`${row.label}-${row.value}`}>
@@ -217,18 +325,19 @@ function SignalDetailPage({
             ))}
           </dl>
         </section>
-        {evidence.action ? (
-          <button
-            className={signalActionClass}
-            type="button"
-            onClick={() => onAction(evidence.action as AppSignalAction)}
-          >
-            {actionVerb(evidence.action)}
-          </button>
-        ) : null}
       </div>
     </section>
   );
+}
+
+function affectedEntity(evidence: AppSignalEvidence): { label: "Goal" | "Project"; value: string } | null {
+  if (evidence.signalId === "goal") return { label: "Goal", value: evidence.title };
+  if (evidence.signalId === "energy") return null;
+
+  const projectTitle = evidence.action?.suggestion?.projectTitle;
+  if (projectTitle) return { label: "Project", value: projectTitle };
+  if (evidence.title !== "Weekly plan") return { label: "Project", value: evidence.title };
+  return null;
 }
 
 function signalLabel(signalId: SignalId): string {

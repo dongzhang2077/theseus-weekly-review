@@ -7,7 +7,12 @@ import { SignalsScreen } from "./SignalsScreen";
 describe("SignalsScreen", () => {
   it("shows concrete issues once instead of repeating a priority category in four summaries", () => {
     const { container } = render(
-      <SignalsScreen signals={demoWeek.signals} onAction={vi.fn()} onTrack={vi.fn()} />
+      <SignalsScreen
+        signals={demoWeek.signals}
+        weekLabel={demoWeek.review.weekLabel}
+        onAction={vi.fn()}
+        onTrack={vi.fn()}
+      />
     );
 
     expect(container.querySelector(".signals-screen")).toHaveClass(
@@ -33,7 +38,14 @@ describe("SignalsScreen", () => {
 
   it("sends the selected issue's project and minutes directly to Plan", () => {
     const onAction = vi.fn();
-    render(<SignalsScreen signals={demoWeek.signals} onAction={onAction} onTrack={vi.fn()} />);
+    render(
+      <SignalsScreen
+        signals={demoWeek.signals}
+        weekLabel={demoWeek.review.weekLabel}
+        onAction={onAction}
+        onTrack={vi.fn()}
+      />
+    );
 
     const issue = screen.getByRole("article", { name: "Resume dormant: Wake-up" });
     const action = within(issue).getByRole("button", { name: "Restart" });
@@ -52,11 +64,12 @@ describe("SignalsScreen", () => {
     });
   });
 
-  it("opens one opaque evidence page without keeping the issue list underneath", async () => {
+  it("moves from a concise summary to raw evidence and back one level at a time", async () => {
     const onDetailOpenChange = vi.fn();
     render(
       <SignalsScreen
         signals={demoWeek.signals}
+        weekLabel={demoWeek.review.weekLabel}
         onAction={vi.fn()}
         onTrack={vi.fn()}
         onDetailOpenChange={onDetailOpenChange}
@@ -66,14 +79,31 @@ describe("SignalsScreen", () => {
     const issue = screen.getByRole("article", { name: "Resume dormant: Wake-up" });
     fireEvent.click(within(issue).getByRole("button", { name: "Open Resume dormant details" }));
 
-    const detail = screen.getByRole("region", { name: "Resume dormant" });
-    expect(detail).toHaveClass("bg-desk-paper");
-    expect(within(detail).getByText("Inactive")).toBeInTheDocument();
-    expect(within(detail).getByRole("button", { name: "Restart" })).toHaveClass("bg-desk-accent-soft");
+    const summary = screen.getByRole("region", { name: "Resume dormant summary" });
+    expect(summary).toHaveClass("bg-desk-paper", "overflow-y-auto");
+    expect(within(summary).getByText("The project was planned, then received no active block.")).toBeInTheDocument();
+    expect(within(summary).getByText("Resume and applications")).toBeInTheDocument();
+    expect(within(summary).getByText(demoWeek.review.weekLabel)).toBeInTheDocument();
+    expect(within(summary).queryByText("Inactive")).not.toBeInTheDocument();
+    expect(within(summary).getByRole("button", { name: "Restart" })).toHaveClass("bg-desk-accent-soft");
     expect(screen.queryByLabelText("Current signal issues")).not.toBeInTheDocument();
     await waitFor(() => expect(onDetailOpenChange).toHaveBeenLastCalledWith(true));
 
-    fireEvent.click(within(detail).getByRole("button", { name: "Back" }));
+    fireEvent.click(within(summary).getByRole("button", { name: "Evidence" }));
+    const evidence = screen.getByRole("region", { name: "Resume dormant evidence" });
+    expect(within(evidence).getByRole("region", { name: "Source values" })).toBeInTheDocument();
+    expect(within(evidence).getByText("Planned")).toBeInTheDocument();
+    expect(within(evidence).getByText("Logged")).toBeInTheDocument();
+    expect(within(evidence).getByText("Inactive")).toBeInTheDocument();
+    expect(within(evidence).queryByRole("button", { name: "Restart" })).not.toBeInTheDocument();
+    expect(onDetailOpenChange).toHaveBeenLastCalledWith(true);
+
+    fireEvent.click(within(evidence).getByRole("button", { name: "Back" }));
+    expect(screen.getByRole("region", { name: "Resume dormant summary" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Current signal issues")).not.toBeInTheDocument();
+    expect(onDetailOpenChange).toHaveBeenLastCalledWith(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByLabelText("Current signal issues")).toBeInTheDocument();
     await waitFor(() => expect(onDetailOpenChange).toHaveBeenLastCalledWith(false));
   });
@@ -92,7 +122,14 @@ describe("SignalsScreen", () => {
       }))
     };
 
-    render(<SignalsScreen signals={signals} onAction={vi.fn()} onTrack={vi.fn()} />);
+    render(
+      <SignalsScreen
+        signals={signals}
+        weekLabel={demoWeek.review.weekLabel}
+        onAction={vi.fn()}
+        onTrack={vi.fn()}
+      />
+    );
     expect(screen.getByText("All checks steady")).toBeInTheDocument();
   });
 
@@ -107,7 +144,14 @@ describe("SignalsScreen", () => {
       evidence: []
     };
 
-    render(<SignalsScreen signals={signals} onAction={vi.fn()} onTrack={onTrack} />);
+    render(
+      <SignalsScreen
+        signals={signals}
+        weekLabel={demoWeek.review.weekLabel}
+        onAction={vi.fn()}
+        onTrack={onTrack}
+      />
+    );
     expect(screen.getByText("Track a little more first")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Open focus" }));
     expect(onTrack).toHaveBeenCalledOnce();

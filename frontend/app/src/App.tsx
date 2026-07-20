@@ -371,6 +371,7 @@ export function App() {
       {!weekLoading && !signalsAreEmpty && !contentIsError && activeTab === "signals" ? (
         <SignalsScreen
           signals={appWeek.signals}
+          weekLabel={appWeek.review.weekLabel}
           onAction={openSignalAction}
           onTrack={() => setActiveTab("track")}
           onDetailOpenChange={setSignalsDetailOpen}
