@@ -95,9 +95,24 @@ Acceptance criteria:
 
 - Track remains a low-friction activity toggle surface.
 - Multi-running is preserved.
-- L1 timer focuses the active activity by current product rule.
+- Each activity row starts or pauses only that activity; another running timer
+  remains active.
+- Paused elapsed time accumulates until the user explicitly ends and records
+  that activity.
+- Open timers survive browser refresh through account-scoped local checkpoint
+  state. Running time missed while the page is closed is reconciled from wall
+  time; paused timers do not advance.
+- Cross-midnight elapsed time is allocated using the account timezone and
+  persisted as an atomic daily TimeLog batch.
+- L1 restores the frozen midterm hierarchy: current activity, state mark,
+  `HH:MM:SS`, one circular play/pause control, and Today total.
+- Recommendation switching and target controls are absent from L1.
+- The grouped Today sheet keeps time fixed at the right of every row. Running
+  rows show the current zero-based run; paused and idle rows show accumulated
+  Today time. The complete unsaved Session remains separate for persistence.
 - Activity detail is discoverable without relying only on long press.
-- Stopping an activity accumulates the session without a save confirmation step.
+- Session setup and End remain available from activity detail. End opens the
+  result confirmation and persists the accumulated session.
 
 Verification:
 

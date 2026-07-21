@@ -266,6 +266,41 @@ Status: `201 Created`.
 
 Returns time logs ordered by date, start time, and ID.
 
+### POST /time-logs/batch
+
+Creates between 1 and 32 time logs in one transaction:
+
+```json
+{
+  "time_logs": [
+    {
+      "project_id": 1,
+      "date": "2026-07-18",
+      "duration_minutes": 30,
+      "activity_name": "Backend schema design",
+      "activity_type": "consuming",
+      "type_source": "user_selected",
+      "note": "Cross-day focus session."
+    },
+    {
+      "project_id": 1,
+      "date": "2026-07-19",
+      "duration_minutes": 20,
+      "activity_name": "Backend schema design",
+      "activity_type": "consuming",
+      "type_source": "user_selected",
+      "note": "Cross-day focus session."
+    }
+  ]
+}
+```
+
+Status: `201 Created`. The response is the persisted list in request order.
+The Focus client uses this endpoint when one accumulated session crosses a
+local calendar-day boundary. If any record is invalid or references data
+outside the authenticated account, the entire batch is rolled back and the API
+returns a controlled `4xx` response.
+
 ## 7. Mobile Imports
 
 ### POST /imports/mobile-time-logs

@@ -8,12 +8,21 @@ import { SignalsScreen } from "./features/signals/SignalsScreen";
 import { TrackScreen } from "./features/track/TrackScreen";
 import { AuthClient, type AuthAccount, type LoginPayload, type RegisterPayload } from "./shared/auth/AuthClient";
 import { demoWeekRange, loadAppWeek, type LoadedAppWeek } from "./shared/api/loadAppWeek";
-import { applyTodayTimeLogs, calendarDate, loadTimeLogs } from "./shared/api/timeLogs";
+import {
+  applyTodayTimeLogs,
+  calendarDate,
+  loadTimeLogs,
+  splitElapsedSecondsByDate
+} from "./shared/api/timeLogs";
 import { StateSurface } from "./shared/components/StateSurface";
 import { demoWeek } from "./shared/demo/demoWeek";
 import type { PlanItem, PlanSuggestion } from "./features/plan/planModel";
 import type { AppSignalAction } from "./shared/api/weeklyReview";
-import { reconcileFocusActivities, tickActivities } from "./features/track/timerModel";
+import { reconcileFocusActivities, tickActivitiesByDate } from "./features/track/timerModel";
+import {
+  persistTimerCheckpoint,
+  restoreTimerCheckpoint
+} from "./features/track/timerCheckpoint";
 import type { ActivityTimer, FocusSessionDraft } from "./shared/domain/track";
 import { resolveInitialTab, type AppTab } from "./shared/navigation/tabs";
 import { AppShell } from "./shared/shell/AppShell";
@@ -46,6 +55,7 @@ export function App() {
   const [weekLoading, setWeekLoading] = useState(false);
   const [weekReload, setWeekReload] = useState(0);
   const [selectedReviewWeek, setSelectedReviewWeek] = useState<ReviewWeekRange>(demoWeekRange);
+  const [trackTodayDate, setTrackTodayDate] = useState(() => calendarDate());
   const [trackActivities, setTrackActivities] = useState<ActivityTimer[]>(demoWeek.track.activities);
   const [focusSessionDrafts, setFocusSessionDrafts] = useState<Record<string, FocusSessionDraft>>({});
   const [focusResultOpen, setFocusResultOpen] = useState(false);
@@ -89,6 +99,14 @@ export function App() {
   }, [authClient]);
 
   useEffect(() => {
+    if (!account || appPhase !== "signed_in") return;
+    const syncDate = () => setTrackTodayDate(calendarDate(account.timezone));
+    syncDate();
+    const interval = window.setInterval(syncDate, 30_000);
+    return () => window.clearInterval(interval);
+  }, [account, appPhase]);
+
+  useEffect(() => {
     if (!apiBaseUrl || !authClient || !account || appPhase !== "signed_in") return;
 
     let ignore = false;
@@ -107,19 +125,27 @@ export function App() {
           ? applyTodayTimeLogs(
               loaded.week.track.activities,
               timeLogs.logs,
-              calendarDate(account.timezone)
+              trackTodayDate
             )
           : loaded.week.track.activities;
         const hydratedWeek = {
           ...loaded.week,
           track: { activities }
         };
+        const restoredActivities = typeof window === "undefined"
+          ? activities
+          : restoreTimerCheckpoint(
+              window.localStorage,
+              account.id,
+              activities,
+              account.timezone
+            );
         setLoadedWeek({ ...loaded, week: hydratedWeek });
         setTrackHistoryError(timeLogs.error);
         setTrackActivities((current) =>
-          weekReload > 0
+          current.some((activity) => activity.running || activity.sessionSeconds > 0)
             ? reconcileFocusActivities(activities, current)
-            : activities
+            : restoredActivities
         );
         setWeekLoading(false);
       }
@@ -135,6 +161,7 @@ export function App() {
     authClient,
     selectedReviewWeek.end,
     selectedReviewWeek.start,
+    trackTodayDate,
     weekReload
   ]);
 
@@ -146,12 +173,29 @@ export function App() {
       const now = Date.now();
       const elapsedSeconds = Math.floor((now - lastTick) / 1000);
       if (elapsedSeconds <= 0) return;
+      const elapsedByDate = splitElapsedSecondsByDate(
+        lastTick,
+        elapsedSeconds,
+        account?.timezone
+      );
       lastTick += elapsedSeconds * 1000;
-      setTrackActivities((current) => tickActivities(current, elapsedSeconds));
+      setTrackActivities((current) => tickActivitiesByDate(current, elapsedByDate));
     }, 250);
 
     return () => window.clearInterval(interval);
-  }, [hasRunningTrackActivity]);
+  }, [account?.timezone, hasRunningTrackActivity]);
+
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      !account ||
+      appPhase !== "signed_in" ||
+      weekLoading
+    ) {
+      return;
+    }
+    persistTimerCheckpoint(window.localStorage, account.id, trackActivities);
+  }, [account, appPhase, trackActivities, weekLoading]);
 
   function enterSignedIn(nextAccount: AuthAccount) {
     setAccount(nextAccount);
@@ -165,6 +209,7 @@ export function App() {
     setTrackHistoryError(null);
     setWeekReload(0);
     setSelectedReviewWeek(demoWeekRange);
+    setTrackTodayDate(calendarDate(nextAccount.timezone));
     setWeekLoading(true);
     setAppPhase("signed_in");
   }
@@ -381,6 +426,7 @@ export function App() {
         <TrackScreen
           apiBaseUrl={apiBaseUrl}
           timeZone={account.timezone}
+          todayDate={trackTodayDate}
           fetchImpl={authClient.fetch}
           track={appWeek.track}
           activities={trackActivities}

@@ -9,16 +9,22 @@ import { StateSurface } from "../../shared/components/StateSurface";
 import {
   chooseFocusActivity,
   completeActivity,
+  currentRunSeconds,
   formatDuration,
-  nextFocusActivityId,
+  formatLiveClock,
   pauseActivity,
   startActivity,
-  tickActivities,
+  tickActivitiesByDate,
+  todayActivitySeconds,
   type ActivityTimer
 } from "./timerModel";
 import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
 import type { FetchLike } from "../../shared/api/loadAppWeek";
-import { saveActivitySession } from "../../shared/api/timeLogs";
+import {
+  calendarDate,
+  saveActivitySession,
+  splitElapsedSecondsByDate
+} from "../../shared/api/timeLogs";
 import { FocusWorkspace } from "./FocusWorkspace";
 import type { FocusSessionDraft } from "../../shared/domain/track";
 
@@ -39,6 +45,7 @@ interface TrackScreenProps {
   track: AppWeekViewModel["track"];
   apiBaseUrl?: string;
   timeZone?: string;
+  todayDate?: string;
   fetchImpl?: FetchLike;
   activities?: ActivityTimer[];
   onActivitiesChange?: Dispatch<SetStateAction<ActivityTimer[]>>;
@@ -51,6 +58,7 @@ interface TrackScreenProps {
 export function TrackScreen({
   apiBaseUrl,
   timeZone,
+  todayDate: controlledTodayDate,
   fetchImpl,
   track,
   activities: controlledActivities,
@@ -68,8 +76,6 @@ export function TrackScreen({
   const [newEnergy, setNewEnergy] = useState<ActivityTimer["energy"]>("neutral");
   const [newColor, setNewColor] = useState(colorOptions[0].value);
   const [manualFocusId, setManualFocusId] = useState<string | null>(null);
-  const [skippedIds, setSkippedIds] = useState<string[]>([]);
-  const [delayedIds, setDelayedIds] = useState<string[]>([]);
   const [recommendationNotice, setRecommendationNotice] = useState<string | null>(null);
   const [localSessionDrafts, setLocalSessionDrafts] = useState<Record<string, FocusSessionDraft>>({});
   const [pendingSession, setPendingSession] = useState<ActivityTimer | null>(null);
@@ -82,19 +88,23 @@ export function TrackScreen({
   const saveInFlightRef = useRef(false);
 
   const activities = controlledActivities ?? localActivities;
+  const todayDate = controlledTodayDate ?? calendarDate(timeZone);
   const focus = useMemo(
-    () => chooseFocusActivity(activities, { ignoredIds: skippedIds, preferredId: manualFocusId }),
-    [activities, manualFocusId, skippedIds]
+    () => chooseFocusActivity(activities, { preferredId: manualFocusId }),
+    [activities, manualFocusId]
   );
+  const detailActivity = detail
+    ? activities.find((activity) => activity.id === detail.id) ?? detail
+    : null;
   const sessionDrafts = controlledSessionDrafts ?? localSessionDrafts;
   const sessionDraft = focus ? sessionDrafts[focus.id] ?? defaultSessionDraft : defaultSessionDraft;
   const targetMinutes = sessionDraft.targetMinutes;
   const sessionIntent = sessionDraft.intent;
   const hasRunningActivity = activities.some((activity) => activity.running);
-  const hasOpenSession = activities.some((activity) => activity.running || activity.sessionSeconds > 0);
-  const recommendationLocked = hasOpenSession || pendingSession !== null || sessionSaveState === "saving";
+  const runningCount = activities.filter((activity) => activity.running).length;
+  const recommendationLocked = pendingSession !== null || sessionSaveState === "saving";
   const todayTotal = activities.reduce(
-    (total, activity) => total + activity.todaySeconds + activity.sessionSeconds,
+    (total, activity) => total + todayActivitySeconds(activity, todayDate),
     0
   );
   const activityCategories = [
@@ -121,12 +131,13 @@ export function TrackScreen({
       const now = Date.now();
       const elapsedSeconds = Math.floor((now - lastTick) / 1000);
       if (elapsedSeconds <= 0) return;
+      const elapsedByDate = splitElapsedSecondsByDate(lastTick, elapsedSeconds, timeZone);
       lastTick += elapsedSeconds * 1000;
-      setLocalActivities((current) => tickActivities(current, elapsedSeconds));
+      setLocalActivities((current) => tickActivitiesByDate(current, elapsedByDate));
     }, 250);
 
     return () => window.clearInterval(interval);
-  }, [hasRunningActivity, onActivitiesChange]);
+  }, [hasRunningActivity, onActivitiesChange, timeZone]);
 
   useEffect(() => {
     if (onActivitiesChange) return;
@@ -170,61 +181,6 @@ export function TrackScreen({
     noticeTimerRef.current = window.setTimeout(() => setRecommendationNotice(null), 1800);
   }
 
-  function selectNext() {
-    if (!focus || recommendationLocked) return;
-    const nextId = nextFocusActivityId(activities, focus.id, skippedIds);
-    if (!nextId) {
-      showNotice("No other activity yet");
-      return;
-    }
-    setManualFocusId(nextId);
-    showNotice("Showing the next activity");
-  }
-
-  function delayFocus() {
-    if (!focus || recommendationLocked) return;
-    const nextDelayedIds = [...delayedIds.filter((id) => id !== focus.id), focus.id];
-    const nextId = nextFocusActivityId(activities, focus.id, [...skippedIds, ...nextDelayedIds]);
-
-    if (nextId) {
-      setDelayedIds(nextDelayedIds);
-      setManualFocusId(nextId);
-      showNotice("Moved to later in this view");
-      return;
-    }
-
-    const releasedId = nextFocusActivityId(activities, focus.id, [...skippedIds, focus.id]);
-    if (!releasedId) {
-      showNotice("No other activity to delay");
-      return;
-    }
-    setDelayedIds([focus.id]);
-    setManualFocusId(releasedId);
-    showNotice("Moved to later in this view");
-  }
-
-  function skipFocus() {
-    if (!focus || recommendationLocked) return;
-    const nextSkippedIds = [...skippedIds.filter((id) => id !== focus.id), focus.id];
-    const nextId = nextFocusActivityId(activities, focus.id, nextSkippedIds);
-    if (!nextId) {
-      showNotice("Keep one activity available");
-      return;
-    }
-    setSkippedIds(nextSkippedIds);
-    setDelayedIds((current) => current.filter((id) => id !== focus.id));
-    setManualFocusId(nextId);
-    showNotice("Skipped for this view");
-  }
-
-  function chooseActivity(activity: ActivityTimer) {
-    if (recommendationLocked) return;
-    setSkippedIds((current) => current.filter((id) => id !== activity.id));
-    setDelayedIds((current) => current.filter((id) => id !== activity.id));
-    setManualFocusId(activity.id);
-    setActiveSheet(null);
-  }
-
   function onStart(activityId: string) {
     updateActivities((current) => startActivity(current, activityId));
   }
@@ -232,6 +188,17 @@ export function TrackScreen({
   function onPause(activityId: string) {
     updateActivities((current) => pauseActivity(current, activityId));
     showNotice("Session paused");
+  }
+
+  function onToggleActivity(activity: ActivityTimer) {
+    if (backgroundLocked) return;
+    setManualFocusId(activity.id);
+    if (activity.running) {
+      onPause(activity.id);
+      return;
+    }
+    onStart(activity.id);
+    showNotice("Session started");
   }
 
   function onEnd(activityId: string) {
@@ -273,7 +240,7 @@ export function TrackScreen({
     }
 
     if (requestId !== saveRequestIdRef.current) return;
-    updateActivities((current) => completeActivity(current, session.id));
+    updateActivities((current) => completeActivity(current, session.id, todayDate));
     saveInFlightRef.current = false;
     setPendingSession(null);
     setSessionSaveState("idle");
@@ -301,8 +268,10 @@ export function TrackScreen({
       category: newCategory,
       energy: newEnergy,
       color: newColor,
+      todayDate,
       todaySeconds: 0,
       sessionSeconds: 0,
+      runSeconds: 0,
       running: false,
       focusContext: {
         source: "manual",
@@ -318,7 +287,7 @@ export function TrackScreen({
   }
 
   return (
-    <section className="relative min-h-full overflow-y-auto bg-desk-paper font-work text-desk-ink">
+    <section className="relative h-full overflow-y-auto bg-desk-paper font-work text-desk-ink">
       <header className="grid h-[52px] grid-cols-[44px_1fr_44px] items-center border-b border-desk-line bg-desk-raised/90 px-3">
         <button
           className="col-start-1 grid size-10 place-items-center rounded-full border-0 bg-transparent text-desk-muted hover:bg-desk-sunk disabled:cursor-not-allowed disabled:text-desk-subtle"
@@ -329,7 +298,7 @@ export function TrackScreen({
         >
           <Icon name="layers" className="size-5" />
         </button>
-        <h1 className="col-start-2 m-0 text-center text-[17px] font-bold">Focus</h1>
+        <h1 className="col-start-2 m-0 text-center text-[17px] font-bold">Today</h1>
         <IconButton
           className="col-start-3"
           label="Activity detail"
@@ -342,19 +311,11 @@ export function TrackScreen({
       {focus ? (
         <FocusWorkspace
           focus={focus}
-          targetMinutes={targetMinutes}
           todayTotalSeconds={todayTotal}
+          runningCount={runningCount}
           notice={recommendationNotice}
-          recommendationLocked={recommendationLocked}
           timerLocked={backgroundLocked}
-          onNext={selectNext}
-          onDelay={delayFocus}
-          onSkip={skipFocus}
-          onChoose={() => setActiveSheet("logs")}
-          onOpenSetup={() => setActiveSheet("setup")}
-          onStart={() => onStart(focus.id)}
-          onPause={() => onPause(focus.id)}
-          onEnd={() => onEnd(focus.id)}
+          onToggle={() => onToggleActivity(focus)}
           onOpenToday={() => setActiveSheet("logs")}
         />
       ) : (
@@ -362,63 +323,93 @@ export function TrackScreen({
           <StateSurface
             icon="timer"
             title="No focus activity available"
-            actionLabel={activities.length > 0 ? "Choose skipped activity" : "Add a quick activity"}
+            actionLabel="Add a quick activity"
             actionIcon="plus"
-            onAction={() => setActiveSheet(activities.length > 0 ? "logs" : "create")}
+            onAction={() => setActiveSheet("create")}
           />
         </div>
       )}
 
       <Sheet
-        title="Choose activity"
+        title="Today"
         open={activeSheet === "logs"}
         onClose={() => setActiveSheet(null)}
         actions={<IconButton label="New activity" icon="plus" onClick={() => setActiveSheet("create")} />}
       >
         {activities.length > 0 ? (
-          <div className="divide-y divide-desk-line">
-            {activityCategories.map((category) => (
-              <section className="py-2" key={category}>
-                <h3 className="m-0 px-1 py-2 text-xs font-bold uppercase tracking-wide text-desk-muted">{category}</h3>
+          <div className="grid gap-4">
+            {activityCategories.map((category) => {
+              const categoryActivities = activities.filter((activity) => activity.category === category);
+              return (
+              <section className="grid gap-2" key={category}>
+                <h3 className="m-0 flex items-center gap-2 px-1 text-xs font-bold text-desk-muted">
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ backgroundColor: categoryActivities[0]?.color ?? "#6f8f6b" }}
+                    aria-hidden="true"
+                  />
+                  {category}
+                </h3>
                 {activities
                   .filter((activity) => activity.category === category)
-                  .map((activity) => (
-                    <div className="flex min-h-14 items-center gap-2" key={activity.id}>
+                  .map((activity) => {
+                    const activitySeconds = todayActivitySeconds(activity, todayDate);
+                    const activityTime = activity.running
+                      ? formatLiveClock(currentRunSeconds(activity))
+                      : formatDuration(activitySeconds);
+                    const selected = focus?.id === activity.id;
+
+                    return (
+                    <div
+                      className="grid min-h-14 grid-cols-[minmax(0,1fr)_34px] items-center gap-1 rounded-[16px] border p-1 shadow-[0_3px_10px_rgb(76_62_38/0.04)]"
+                      style={{
+                        borderColor: activity.running || selected ? activity.color : "rgba(231,222,208,0.76)",
+                        backgroundColor: activity.running || selected
+                          ? activitySoftColor(activity.color)
+                          : "rgba(255,253,248,0.76)"
+                      }}
+                      key={activity.id}
+                    >
                       <button
-                        className="flex min-w-0 flex-1 items-center gap-3 rounded-paper border-0 bg-transparent px-1 py-2 text-left hover:bg-desk-sunk disabled:cursor-not-allowed disabled:opacity-50"
+                        className="grid min-h-[46px] min-w-0 grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-paper border-0 bg-transparent px-1 text-left transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                         type="button"
-                        aria-label={`Choose ${activity.name}`}
-                        disabled={recommendationLocked}
-                        onClick={() => chooseActivity(activity)}
+                        aria-label={`${activity.running ? "Pause" : "Start"} ${activity.name}`}
+                        aria-describedby={`activity-time-${activity.id}`}
+                        aria-pressed={activity.running}
+                        disabled={backgroundLocked}
+                        onClick={() => onToggleActivity(activity)}
                       >
                         <span
-                          className="grid size-9 shrink-0 place-items-center rounded-paper bg-desk-sunk"
+                          className="grid size-[34px] shrink-0 place-items-center rounded-full border border-desk-line bg-desk-raised/75"
                           style={{ color: activity.color }}
                         >
                           <Icon name={activityIcon(activity.id)} className="size-5" />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <strong className="block truncate text-sm">{activity.name}</strong>
-                          <small className="text-desk-muted">
-                            {formatDuration(activity.todaySeconds + activity.sessionSeconds)}
-                            {skippedIds.includes(activity.id) ? " · Skipped" : delayedIds.includes(activity.id) ? " · Later" : ""}
-                          </small>
+                          <strong className="block break-words text-sm leading-5">{activity.name}</strong>
+                        </span>
+                        <span
+                          className={`min-w-[66px] shrink-0 whitespace-nowrap text-right text-xs font-bold tabular-nums ${
+                            activity.running || selected ? "text-desk-ink" : "text-desk-muted"
+                          }`}
+                          id={`activity-time-${activity.id}`}
+                        >
+                          {activityTime}
                         </span>
                       </button>
                       <IconButton
-                        label={`Start ${activity.name}`}
-                        icon="play"
-                        disabled={recommendationLocked}
-                        onClick={() => {
-                          chooseActivity(activity);
-                          onStart(activity.id);
-                        }}
+                        className="!size-8"
+                        label={`View ${activity.name}`}
+                        icon="info"
+                        style={{ color: activity.running || selected ? activity.color : undefined }}
+                        onClick={() => setDetail(activity)}
                       />
-                      <IconButton label={`View ${activity.name}`} icon="info" onClick={() => setDetail(activity)} />
                     </div>
-                  ))}
+                    );
+                  })}
               </section>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <p className="m-0 text-sm leading-6 text-desk-muted">Add a quick activity to start a local focus session.</p>
@@ -592,25 +583,53 @@ export function TrackScreen({
         </div>
       </Sheet>
 
-      <DetailPanel title={detail?.name ?? "Activity"} open={detail !== null} onBack={() => setDetail(null)}>
-        {detail ? (
+      <DetailPanel
+        title={detailActivity?.name ?? "Activity"}
+        open={detailActivity !== null}
+        onBack={() => setDetail(null)}
+      >
+        {detailActivity ? (
           <div className="grid gap-4">
-            <span className="w-fit rounded-full bg-desk-accent-soft px-3 py-1 text-xs font-bold text-desk-accent">
-              {energyLabel(detail.energy)}
-            </span>
+            <div className="flex items-center justify-between gap-3">
+              <span className="w-fit rounded-full bg-desk-accent-soft px-3 py-1 text-xs font-bold text-desk-accent">
+                {energyLabel(detailActivity.energy)}
+              </span>
+              <div className="flex items-center gap-2">
+                <IconButton
+                  label="Session setup"
+                  icon="target"
+                  onClick={() => {
+                    setManualFocusId(detailActivity.id);
+                    setDetail(null);
+                    setActiveSheet("setup");
+                  }}
+                />
+                {detailActivity.sessionSeconds > 0 ? (
+                  <button
+                    className="min-h-9 rounded-full border border-desk-danger/30 bg-desk-danger-soft px-4 text-sm font-bold text-desk-danger"
+                    type="button"
+                    aria-label="End focus"
+                    onClick={() => onEnd(detailActivity.id)}
+                  >
+                    End
+                  </button>
+                ) : null}
+              </div>
+            </div>
             <dl className="divide-y divide-desk-line border-y border-desk-line">
-              <DetailRow label="Today" value={formatDuration(detail.todaySeconds + detail.sessionSeconds)} />
-              <DetailRow label="Type" value={detail.category} />
-              <DetailRow label="Energy" value={energyLabel(detail.energy)} />
-              {detail.projectTitle ? <DetailRow label="Project" value={detail.projectTitle} /> : null}
-              {detail.focusContext?.plannedMinutes !== undefined ? (
-                <DetailRow label="Weekly plan" value={`${detail.focusContext.plannedMinutes} min`} />
+              <DetailRow label="Today" value={formatDuration(todayActivitySeconds(detailActivity, todayDate))} />
+              <DetailRow label="Session" value={formatDuration(detailActivity.sessionSeconds)} />
+              <DetailRow label="Type" value={detailActivity.category} />
+              <DetailRow label="Energy" value={energyLabel(detailActivity.energy)} />
+              {detailActivity.projectTitle ? <DetailRow label="Project" value={detailActivity.projectTitle} /> : null}
+              {detailActivity.focusContext?.plannedMinutes !== undefined ? (
+                <DetailRow label="Weekly plan" value={`${detailActivity.focusContext.plannedMinutes} min`} />
               ) : null}
             </dl>
-            {detail.focusContext?.reason ? (
+            {detailActivity.focusContext?.reason ? (
               <div className="rounded-paper bg-desk-sunk p-3">
                 <h3 className="m-0 text-xs font-bold uppercase tracking-wide text-desk-muted">Why this activity</h3>
-                <p className="mb-0 mt-1 text-sm leading-6">{detail.focusContext.reason}</p>
+                <p className="mb-0 mt-1 text-sm leading-6">{detailActivity.focusContext.reason}</p>
               </div>
             ) : null}
           </div>
@@ -689,6 +708,10 @@ function activityIcon(activityId: string): IconName {
   if (activityId === "backend") return "briefcase";
   if (activityId === "walk") return "leaf";
   return "book";
+}
+
+function activitySoftColor(color: string): string {
+  return /^#[0-9a-f]{6}$/i.test(color) ? `${color}1f` : "rgba(231,240,227,0.74)";
 }
 
 const defaultSessionDraft: FocusSessionDraft = {

@@ -13,76 +13,101 @@ describe("TrackScreen", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows a source-backed sample reason without inventing a completion criterion", () => {
+  it("restores the quiet midterm Level 1 timer hierarchy", () => {
     render(<TrackScreen track={demoWeek.track} />);
 
     const currentFocus = screen.getByRole("region", { name: "Current focus" });
     expect(within(currentFocus).getByText("Frontend build block")).toBeInTheDocument();
+    expect(within(currentFocus).getByText("Recommended now")).toBeInTheDocument();
+    expect(within(currentFocus).getByText("00:00:00")).toBeInTheDocument();
+    expect(within(currentFocus).getByText("Today total")).toBeInTheDocument();
+    expect(within(currentFocus).getByText("2h 46m")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Start focus activity" })).toHaveLength(3);
+    expect(screen.queryByText(/sample recommendation/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/session target/i)).not.toBeInTheDocument();
+  });
+
+  it("opens the midterm Today sheet with grouped activities and right-aligned totals", () => {
+    render(<TrackScreen track={demoWeek.track} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
+    const chooser = screen.getByRole("dialog", { name: "Today" });
+    expect(within(chooser).getByRole("heading", { name: "Project" })).toBeInTheDocument();
+    expect(within(chooser).getByRole("heading", { name: "Study" })).toBeInTheDocument();
+    expect(within(chooser).getByRole("heading", { name: "Health" })).toBeInTheDocument();
+    const frontendActivity = within(chooser).getByRole("button", {
+      name: "Start Frontend build block"
+    });
+    expect(within(frontendActivity).getByText("42m")).toBeInTheDocument();
     expect(
-      within(currentFocus).getByText(
-        "Sample recommendation: frontend work finished below its planned block."
+      within(within(chooser).getByRole("button", { name: "Start Backend polish" })).getByText(
+        "24m"
       )
     ).toBeInTheDocument();
-    expect(screen.queryByText(/done when/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/one clear result is recorded/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start focus activity" })).toBeInTheDocument();
   });
 
-  it("moves to the next activity without recording feedback", () => {
+  it("selects and starts an activity by tapping its row", () => {
     render(<TrackScreen track={demoWeek.track} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
-
-    expect(screen.getByRole("region", { name: "Current focus" })).toHaveTextContent("Backend polish");
-    expect(screen.getByRole("status")).toHaveTextContent("Showing the next activity");
-    expect(screen.queryByText(/later|skipped/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
+    const chooser = screen.getByRole("dialog", { name: "Today" });
+    fireEvent.click(within(chooser).getByRole("button", { name: "Start Backend polish" }));
+    fireEvent.click(within(chooser).getByRole("button", { name: "Close" }));
+    const currentFocus = screen.getByRole("region", { name: "Current focus" });
+    expect(currentFocus).toHaveTextContent("Backend polish");
+    expect(currentFocus).toHaveTextContent("Project");
+    expect(screen.getAllByRole("button", { name: "Pause focus activity" })).toHaveLength(3);
   });
 
-  it("marks a delayed activity as later in this view", () => {
-    render(<TrackScreen track={demoWeek.track} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Delay" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Moved to later in this view");
-
-    fireEvent.click(screen.getByRole("button", { name: "Choose" }));
-    const chooser = screen.getByRole("dialog", { name: "Choose activity" });
-    expect(within(chooser).getByText("42m · Later")).toBeInTheDocument();
-  });
-
-  it("skips an activity for the view and restores it through manual choice", () => {
-    render(<TrackScreen track={demoWeek.track} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Skipped for this view");
-    expect(screen.getByRole("region", { name: "Current focus" })).toHaveTextContent("Backend polish");
-
-    fireEvent.click(screen.getByRole("button", { name: "Choose" }));
-    const chooser = screen.getByRole("dialog", { name: "Choose activity" });
-    expect(within(chooser).getByText("42m · Skipped")).toBeInTheDocument();
-
-    fireEvent.click(within(chooser).getByRole("button", { name: "Choose Frontend build block" }));
-    expect(screen.queryByRole("dialog", { name: "Choose activity" })).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Current focus" })).toHaveTextContent(
-      "Frontend build block"
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Choose" }));
-    expect(screen.queryByText("42m · Skipped")).not.toBeInTheDocument();
-  });
-
-  it("locks every recommendation and activity-switch entry while running and paused", () => {
+  it("runs, pauses, and accumulates multiple activities independently", () => {
     vi.useFakeTimers();
     render(<TrackScreen track={demoWeek.track} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Start focus activity" }));
-    expectFocusSwitchingToBeLocked();
-
+    fireEvent.click(screen.getAllByRole("button", { name: "Start focus activity" })[0]);
     act(() => vi.advanceTimersByTime(1_000));
-    fireEvent.click(screen.getByRole("button", { name: "Pause focus" }));
+    fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
+    const chooser = screen.getByRole("dialog", { name: "Today" });
+    expect(
+      within(within(chooser).getByRole("button", { name: "Pause Frontend build block" })).getByText(
+        "00:01"
+      )
+    ).toBeInTheDocument();
+    fireEvent.click(within(chooser).getByRole("button", { name: "Start Backend polish" }));
+    expect(within(chooser).getByRole("button", { name: "Pause Frontend build block" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(within(chooser).getByRole("button", { name: "Pause Backend polish" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
 
-    expect(screen.getByRole("button", { name: "Resume focus" })).toBeEnabled();
-    expect(screen.getByRole("status")).toHaveTextContent("Session paused");
-    expectFocusSwitchingToBeLocked();
+    act(() => vi.advanceTimersByTime(2_000));
+    fireEvent.click(within(chooser).getByRole("button", { name: "Pause Backend polish" }));
+    const pausedBackend = within(chooser).getByRole("button", { name: "Start Backend polish" });
+    expect(within(pausedBackend).getByText("24m")).toBeInTheDocument();
+    expect(within(pausedBackend).queryByText(/paused|running/i)).not.toBeInTheDocument();
+    expect(
+      within(within(chooser).getByRole("button", { name: "Pause Frontend build block" })).getByText(
+        "00:03"
+      )
+    ).toBeInTheDocument();
+    expect(within(chooser).getByRole("button", { name: "Pause Frontend build block" })).toBeEnabled();
+
+    fireEvent.click(pausedBackend);
+    const resumedBackend = within(chooser).getByRole("button", { name: "Pause Backend polish" });
+    expect(within(resumedBackend).getByText("00:00")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(within(resumedBackend).getByText("00:01")).toBeInTheDocument();
+    fireEvent.click(resumedBackend);
+
+    fireEvent.click(within(chooser).getByRole("button", { name: "Close" }));
+    expect(screen.getByRole("region", { name: "Current focus" })).toHaveTextContent("Backend polish");
+    expect(screen.getAllByRole("button", { name: "Resume focus activity" })[0]).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
+    expect(screen.getByRole("button", { name: "Pause Frontend build block" })).toBeInTheDocument();
   });
 
   it("keeps the session target and goal local to this view", () => {
@@ -91,7 +116,7 @@ describe("TrackScreen", () => {
       <TrackScreen apiBaseUrl="http://127.0.0.1:8000" fetchImpl={fetchImpl} track={demoWeek.track} />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Session target · 25 min" }));
+    openSessionSetup();
     const setup = screen.getByRole("dialog", { name: "Session setup" });
     fireEvent.click(within(setup).getByRole("button", { name: "45 minute target" }));
     fireEvent.change(within(setup).getByLabelText("Goal for this session (optional)"), {
@@ -100,22 +125,28 @@ describe("TrackScreen", () => {
     fireEvent.click(within(setup).getByRole("button", { name: "Use this setup" }));
 
     expect(fetchImpl).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Session target · 45 min" })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Session target · 45 min" }));
+    openSessionSetup();
+    expect(screen.getByRole("button", { name: "45 minute target" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
     expect(screen.getByLabelText("Goal for this session (optional)")).toHaveValue(
       "Complete the mobile focus layout"
     );
 
     unmount();
     render(<TrackScreen track={demoWeek.track} />);
-    expect(screen.getByRole("button", { name: "Session target · 25 min" })).toBeInTheDocument();
+    openSessionSetup();
+    expect(screen.getByRole("button", { name: "25 minute target" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
   });
 
   it("restores the session setup when Focus is unmounted during tab navigation", () => {
     render(<SessionDraftHarness />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Session target · 25 min" }));
+    openSessionSetup();
     const setup = screen.getByRole("dialog", { name: "Session setup" });
     fireEvent.click(within(setup).getByRole("button", { name: "45 minute target" }));
     fireEvent.change(within(setup).getByLabelText("Goal for this session (optional)"), {
@@ -126,8 +157,11 @@ describe("TrackScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Leave Focus" }));
     fireEvent.click(screen.getByRole("button", { name: "Return to Focus" }));
 
-    expect(screen.getByRole("button", { name: "Session target · 45 min" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Session target · 45 min" }));
+    openSessionSetup();
+    expect(screen.getByRole("button", { name: "45 minute target" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
     expect(screen.getByLabelText("Goal for this session (optional)")).toHaveValue(
       "Keep the tab handoff stable"
     );
@@ -137,10 +171,11 @@ describe("TrackScreen", () => {
     const onResultModalChange = vi.fn();
     render(<TrackScreen track={trackWithSession()} onResultModalChange={onResultModalChange} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "End focus" }));
+    endCurrentFocus();
     const result = screen.getByRole("dialog", { name: "Session result" });
-    expect(screen.getByRole("button", { name: "Resume focus" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "End focus" })).toBeDisabled();
+    screen
+      .getAllByRole("button", { name: "Resume focus activity" })
+      .forEach((button) => expect(button).toBeDisabled());
     expect(onResultModalChange).toHaveBeenLastCalledWith(true);
     fireEvent.click(within(result).getByRole("button", { name: "Completed" }));
     fireEvent.change(within(result).getByLabelText("Result note"), {
@@ -150,7 +185,7 @@ describe("TrackScreen", () => {
 
     expect(screen.queryByRole("dialog", { name: "Session result" })).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Session kept in this demo");
-    expect(screen.getByText("00:00")).toBeInTheDocument();
+    expect(screen.getByText("00:00:00")).toBeInTheDocument();
     expect(onResultModalChange).toHaveBeenLastCalledWith(false);
   });
 
@@ -167,7 +202,7 @@ describe("TrackScreen", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "End focus" }));
+    endCurrentFocus();
     const result = screen.getByRole("dialog", { name: "Session result" });
     fireEvent.click(within(result).getByRole("button", { name: "Stuck" }));
     fireEvent.change(within(result).getByLabelText("Result note"), {
@@ -209,7 +244,7 @@ describe("TrackScreen", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "End focus" }));
+    endCurrentFocus();
     const result = screen.getByRole("dialog", { name: "Session result" });
     const saveButton = within(result).getByRole("button", { name: "Save result" });
     fireEvent.click(saveButton);
@@ -229,15 +264,67 @@ describe("TrackScreen", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Session recorded");
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
+
+  it("saves a cross-day accumulated session through one batch request", async () => {
+    const calls: Array<{ input: string; init?: RequestInit }> = [];
+    const fetchImpl: FetchLike = async (input, init) => {
+      calls.push({ input, init });
+      return response(true, 201);
+    };
+    const track: AppWeekViewModel["track"] = {
+      activities: demoWeek.track.activities.map((activity, index) =>
+        index === 0
+          ? {
+              ...activity,
+              todayDate: "2026-07-19",
+              todaySeconds: 0,
+              sessionSeconds: 120,
+              sessionSecondsByDate: {
+                "2026-07-18": 60,
+                "2026-07-19": 60
+              },
+              running: false
+            }
+          : { ...activity, todayDate: "2026-07-19", todaySeconds: 0 }
+      )
+    };
+
+    render(
+      <TrackScreen
+        apiBaseUrl="http://127.0.0.1:8000"
+        todayDate="2026-07-19"
+        timeZone="America/Los_Angeles"
+        fetchImpl={fetchImpl}
+        track={track}
+      />
+    );
+
+    endCurrentFocus();
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Session result" })).getByRole("button", { name: "Save result" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Session recorded");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].input).toBe("http://127.0.0.1:8000/time-logs/batch");
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({
+      time_logs: [
+        expect.objectContaining({ date: "2026-07-18", duration_minutes: 1 }),
+        expect.objectContaining({ date: "2026-07-19", duration_minutes: 1 })
+      ]
+    });
+    expect(screen.getByText("00:00:00")).toBeInTheDocument();
+  });
 });
 
-function expectFocusSwitchingToBeLocked() {
-  ["Next", "Delay", "Skip", "Choose"].forEach((name) => {
-    expect(screen.getByRole("button", { name })).toBeDisabled();
-  });
-  expect(screen.getByRole("button", { name: "Choose activity" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: /Session target/ })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Open today's activity list" })).toBeDisabled();
+function openSessionSetup() {
+  fireEvent.click(screen.getByRole("button", { name: "Activity detail" }));
+  const detail = screen.getByRole("dialog", { name: "Frontend build block" });
+  fireEvent.click(within(detail).getByRole("button", { name: "Session setup" }));
+}
+
+function endCurrentFocus() {
+  fireEvent.click(screen.getByRole("button", { name: "Activity detail" }));
+  const detail = screen.getByRole("dialog", { name: "Frontend build block" });
+  fireEvent.click(within(detail).getByRole("button", { name: "End focus" }));
 }
 
 function trackWithSession(): AppWeekViewModel["track"] {

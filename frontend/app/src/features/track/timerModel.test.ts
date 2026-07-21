@@ -2,13 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   chooseFocusActivity,
   completeActivity,
+  currentRunSeconds,
   formatClock,
   formatCompactClock,
+  formatLiveClock,
   nextFocusActivityId,
   pauseActivity,
   reconcileFocusActivities,
   startActivity,
   tickActivities,
+  tickActivitiesByDate,
+  todayActivitySeconds,
   type ActivityTimer
 } from "./timerModel";
 
@@ -37,7 +41,7 @@ const activities: ActivityTimer[] = [
 ];
 
 describe("timerModel", () => {
-  it("resolves a legacy multi-running state to the highest-energy activity", () => {
+  it("selects one visible focus while preserving multiple running activities", () => {
     const running = [
       { ...activities[0], running: true, sessionSeconds: 10 },
       { ...activities[1], running: true, sessionSeconds: 90 }
@@ -46,17 +50,44 @@ describe("timerModel", () => {
     expect(chooseFocusActivity(running)?.id).toBe("build");
   });
 
+  it("starts and accumulates multiple activities independently", () => {
+    const bothRunning = startActivity(startActivity(activities, "build"), "walk");
+    const ticked = tickActivitiesByDate(bothRunning, { "2026-07-18": 75 });
+    const pausedWalk = pauseActivity(ticked, "walk");
+    const tickedAgain = tickActivitiesByDate(pausedWalk, { "2026-07-18": 15 });
+
+    expect(tickedAgain[0]).toMatchObject({ running: true, sessionSeconds: 90, runSeconds: 90 });
+    expect(tickedAgain[1]).toMatchObject({ running: false, sessionSeconds: 75, runSeconds: 0 });
+    expect(tickedAgain[0].sessionSecondsByDate).toEqual({ "2026-07-18": 90 });
+    expect(tickedAgain[1].sessionSecondsByDate).toEqual({ "2026-07-18": 75 });
+  });
+
   it("supports pause and completion as separate session states", () => {
     const started = startActivity(activities, "build");
     const ticked = tickActivities(started, 75);
     const paused = pauseActivity(ticked, "build");
-    expect(paused[0]).toMatchObject({ running: false, sessionSeconds: 75, todaySeconds: 1200 });
+    expect(paused[0]).toMatchObject({
+      running: false,
+      sessionSeconds: 75,
+      runSeconds: 0,
+      todaySeconds: 1200
+    });
 
-    const completed = completeActivity(paused, "build");
-    expect(completed[0]).toMatchObject({ running: false, sessionSeconds: 0, todaySeconds: 1275 });
+    const resumed = startActivity(paused, "build");
+    expect(resumed[0]).toMatchObject({ running: true, sessionSeconds: 75, runSeconds: 0 });
+    const resumedTick = tickActivities(resumed, 5);
+    expect(resumedTick[0]).toMatchObject({ running: true, sessionSeconds: 80, runSeconds: 5 });
+
+    const completed = completeActivity(resumedTick, "build");
+    expect(completed[0]).toMatchObject({
+      running: false,
+      sessionSeconds: 0,
+      runSeconds: 0,
+      todaySeconds: 1280
+    });
   });
 
-  it("does not switch away from an in-progress session", () => {
+  it("starts a second activity without changing another open session", () => {
     const current = [
       { ...activities[0], running: true, sessionSeconds: 15 },
       { ...activities[1], sessionSeconds: 20 }
@@ -64,7 +95,31 @@ describe("timerModel", () => {
 
     const started = startActivity(current, "walk");
     expect(started[0]).toMatchObject({ running: true, sessionSeconds: 15 });
-    expect(started[1]).toMatchObject({ running: false, sessionSeconds: 20 });
+    expect(currentRunSeconds(started[0])).toBe(15);
+    expect(started[1]).toMatchObject({ running: true, sessionSeconds: 20, runSeconds: 0 });
+  });
+
+  it("keeps cross-day session buckets separate from the current Today total", () => {
+    const running = startActivity([
+      { ...activities[0], todayDate: "2026-07-18", todaySeconds: 1200 }
+    ], "build");
+    const ticked = tickActivitiesByDate(running, {
+      "2026-07-18": 30,
+      "2026-07-19": 45
+    });
+
+    expect(todayActivitySeconds(ticked[0], "2026-07-18")).toBe(1230);
+    expect(todayActivitySeconds(ticked[0], "2026-07-19")).toBe(45);
+
+    const completed = completeActivity(ticked, "build", "2026-07-19");
+    expect(completed[0]).toMatchObject({
+      todayDate: "2026-07-19",
+      todaySeconds: 45,
+      sessionSeconds: 0,
+      runSeconds: 0,
+      running: false
+    });
+    expect(completed[0].sessionSecondsByDate).toBeUndefined();
   });
 
   it("can ignore a recommendation or honor a manual choice", () => {
@@ -95,6 +150,7 @@ describe("timerModel", () => {
       projectId: 7,
       todaySeconds: 180,
       sessionSeconds: 25,
+      runSeconds: 7,
       running: true,
       focusContext: { source: "persisted_plan" as const, planItemId: 12 }
     }];
@@ -104,6 +160,7 @@ describe("timerModel", () => {
         id: "review-project-7",
         todaySeconds: 0,
         sessionSeconds: 25,
+        runSeconds: 7,
         running: true,
         focusContext: { source: "review_evidence", actualMinutes: 45 }
       })
@@ -129,5 +186,7 @@ describe("timerModel", () => {
     expect(formatClock(42)).toBe("00:00:42");
     expect(formatCompactClock(42)).toBe("00:42");
     expect(formatCompactClock(3661)).toBe("61:01");
+    expect(formatLiveClock(42)).toBe("00:42");
+    expect(formatLiveClock(3661)).toBe("1:01:01");
   });
 });

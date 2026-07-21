@@ -263,6 +263,10 @@ class TimeLogCreate(APIModel):
         return self
 
 
+class TimeLogBatchCreate(APIModel):
+    time_logs: list[TimeLogCreate] = Field(min_length=1, max_length=32)
+
+
 class TimeLog(TimeLogCreate):
     pass
 

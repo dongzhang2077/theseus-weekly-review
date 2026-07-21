@@ -433,6 +433,17 @@ issues, and carries a selected Risk or Signal into a contextual Plan change.
 The full frontend suite passes 102 tests across 19 files, TypeScript and the
 production build pass, and the final diff check is clean.
 
+Focus freeze checkpoint (2026-07-21 PDT): the product owner accepted the
+restored midterm-style Focus hierarchy and Activity-bar state treatment. The
+frozen candidate preserves independent multi-Activity timers, separate live-run
+and accumulated-session values, account-scoped refresh checkpoints, local-date
+rollover, and atomic cross-midnight TimeLog persistence. Verification passes
+113 frontend tests across 20 files, 103 backend tests, TypeScript, the
+production build, compileall, and the sample review path. Persisted creation of
+new Activities, an inspectable/correctable Today history, and cross-tab session
+coordination remain non-blocking follow-up work in STORY-033, STORY-034, and
+STORY-031 respectively.
+
 Acceptance criteria:
 
 - the primary workspace stays phone-sized at 430px and detail views are opaque
@@ -455,6 +466,52 @@ Acceptance criteria:
   large page-specific CSS or decoration-only animation is not introduced;
 - focused and full frontend tests, TypeScript, production build, diff check,
   and 430x932 browser review pass before merge.
+
+### STORY-033 Persist user-created Focus activities
+
+As a local account user, I want an Activity created in Focus to be stored under
+my account so that it remains available after restart and can own later TimeLog
+records.
+
+Priority: P1 after the accepted Focus freeze
+
+Acceptance criteria:
+
+- authenticated Activity create, list, and correction routes use the existing
+  `activities` table and `ActivityRepository` rather than route-level SQL;
+- ownership comes only from the validated JWT, and project links belonging to
+  another account are rejected;
+- Focus loads persisted activities and saves a newly created Activity before
+  presenting it as durable;
+- later TimeLogs reference the persisted `activity_id` while preserving the raw
+  activity name and normalized type snapshot;
+- loading, saving, validation, retry, restart, and cross-account isolation have
+  focused API and frontend tests;
+- view-local fallback behavior, if retained for a demo, is labelled truthfully
+  and is never presented as persisted data.
+
+### STORY-034 Add an inspectable and correctable Today history
+
+As a local account user, I want Today total to open the records that produced
+the number so that I can inspect and correct mistakes instead of seeing only an
+activity picker.
+
+Priority: P1 after the accepted Focus freeze
+
+Acceptance criteria:
+
+- Today total is calculated from authenticated persisted TimeLogs plus open
+  local sessions without double counting completed sessions;
+- opening Today shows chronological records and their Activity, Project,
+  duration, energy type, and note provenance;
+- a user can correct a mistaken record or remove it through user-scoped API
+  behavior, with confirmation and immediate total refresh;
+- corrections flow into project progress, Evidence, and Weekly Review through
+  the existing normalized TimeLog path;
+- empty, loading, error, retry, save, and undo or confirmation states are
+  explicit;
+- local-date boundaries follow the account timezone and have cross-midnight,
+  restart, and account-isolation tests.
 
 ## Epic 8: Personal Assistant Evolution
 

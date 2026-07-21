@@ -27,8 +27,11 @@ export interface ActivityTimer {
   category: string;
   energy: EnergyKind;
   color: string;
+  todayDate?: string;
   todaySeconds: number;
   sessionSeconds: number;
+  sessionSecondsByDate?: Record<string, number>;
+  runSeconds?: number;
   running: boolean;
   recommended?: boolean;
 }

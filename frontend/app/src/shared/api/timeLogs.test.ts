@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   activitySessionToTimeLog,
+  activitySessionToTimeLogs,
   applyTodayTimeLogs,
   calendarDate,
   energyToApiActivityType,
   loadTimeLogs,
   saveActivitySession,
+  saveTimeLogBatch,
   saveTimeLog,
+  splitElapsedSecondsByDate,
   type ApiTimeLogRead,
   type TimeLogCreatePayload
 } from "./timeLogs";
@@ -57,6 +60,36 @@ describe("timeLogs api helpers", () => {
     expect(calendarDate("America/Los_Angeles", losAngelesEvening)).toBe("2026-07-18");
     expect(calendarDate("Asia/Shanghai", losAngelesEvening)).toBe("2026-07-19");
     expect(calendarDate("Not/A_Timezone", losAngelesEvening)).toMatch(/^2026-07-(18|19)$/);
+  });
+
+  it("splits elapsed seconds at the account's local midnight", () => {
+    const beforeLosAngelesMidnight = new Date("2026-07-19T06:59:58.000Z").getTime();
+
+    expect(
+      splitElapsedSecondsByDate(beforeLosAngelesMidnight, 4, "America/Los_Angeles")
+    ).toEqual({
+      "2026-07-18": 2,
+      "2026-07-19": 2
+    });
+  });
+
+  it("turns a cross-day session into duration-preserving daily logs", () => {
+    expect(
+      activitySessionToTimeLogs(
+        {
+          ...activity,
+          sessionSeconds: 125,
+          sessionSecondsByDate: {
+            "2026-07-18": 65,
+            "2026-07-19": 60
+          }
+        },
+        { timeZone: "America/Los_Angeles" }
+      )
+    ).toEqual([
+      expect.objectContaining({ date: "2026-07-18", duration_minutes: 1 }),
+      expect.objectContaining({ date: "2026-07-19", duration_minutes: 1 })
+    ]);
   });
 
   it("posts time-log payloads when an API base URL is configured", async () => {
@@ -114,6 +147,41 @@ describe("timeLogs api helpers", () => {
       duration_minutes: 2,
       activity_name: "Frontend build block"
     });
+  });
+
+  it("posts cross-day segments as one atomic batch", async () => {
+    const calls: Array<{ input: string; init: RequestInit }> = [];
+    const fetchImpl: FetchLike = async (input, init) => {
+      calls.push({ input, init });
+      return { ok: true, status: 201, json: async () => [] };
+    };
+    const crossDayActivity = {
+      ...activity,
+      sessionSeconds: 120,
+      sessionSecondsByDate: { "2026-07-18": 60, "2026-07-19": 60 }
+    };
+
+    await expect(
+      saveActivitySession({
+        apiBaseUrl: "http://127.0.0.1:8000",
+        activity: crossDayActivity,
+        fetchImpl
+      })
+    ).resolves.toEqual({ saved: true, error: null });
+
+    expect(calls[0].input).toBe("http://127.0.0.1:8000/time-logs/batch");
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({
+      time_logs: [
+        expect.objectContaining({ date: "2026-07-18", duration_minutes: 1 }),
+        expect.objectContaining({ date: "2026-07-19", duration_minutes: 1 })
+      ]
+    });
+  });
+
+  it("rejects an empty atomic batch before making a request", async () => {
+    await expect(
+      saveTimeLogBatch({ apiBaseUrl: "http://127.0.0.1:8000", payloads: [] })
+    ).resolves.toEqual({ saved: false, error: "Time-log batch is empty" });
   });
 
   it("loads account-scoped time logs from the authenticated API", async () => {

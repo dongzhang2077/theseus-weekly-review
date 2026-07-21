@@ -80,6 +80,37 @@ Back navigation is equally strict: evidence returns to the signal summary, and
 the summary returns to the overview. Unknown entity or source metadata is
 omitted rather than inferred.
 
+### Focus information depth and timer behavior
+
+Focus keeps the presentation-proven tracker hierarchy while retaining the
+authenticated persistence path:
+
+1. The Today overview shows one current activity, its timer state, the primary
+   timer control, a compact running count, and today's total. It follows the
+   frozen midterm tracker structure; recommendation controls, target setup, and
+   result actions do not remain visible on Level 1.
+2. The activity sheet groups all available activities. Tapping an activity row
+   starts or pauses that activity directly; it does not stop another running
+   activity. The fixed, non-wrapping time at the right follows the midterm
+   semantics: a running row shows only its current uninterrupted run in live
+   `MM:SS`/`H:MM:SS`; a paused or idle row shows the Activity's accumulated
+   Today duration in compact `Xm`/`Xh Ym` form. Do not repeat `Running` or
+   `Paused` as visible row copy; row treatment, time format, `aria-pressed`, and
+   the accessible Start/Pause name carry that state.
+3. The opaque activity detail shows the selected activity's metadata, current
+   session, today's accumulated value, and evidence-backed recommendation
+   reason. Session setup and End live here rather than adding controls back to
+   Level 1. It does not duplicate the full activity list.
+
+Multiple activities may run concurrently. Each timer accumulates independently;
+pause preserves the complete unsaved Session, while the next resume starts a
+new zero-based live run display. Today total and the eventual TimeLog use the
+complete Session rather than the zero-based display segment. Open timer state
+is checkpointed per local account without storing credentials. Elapsed time is
+allocated by the account timezone, and a session crossing local midnight is
+stored as an atomic batch of daily TimeLogs rather than being assigned wholly
+to its end date.
+
 ## 4. Frontend Architecture
 
 Tailwind CSS v4 is the default styling path for new and migrated screens.
