@@ -634,12 +634,13 @@ plan block every week.
 
 Priority: P0 for Agent foundation
 
-Acceptance candidate checkpoint (2026-07-22 PDT): schema v5, atomic v1-v4
+Accepted checkpoint (2026-07-22 PDT): schema v5, atomic v1-v4
 migrations, authenticated Task lifecycle API, optimistic versions,
 PlannedItem/TimeLog Task links, restart isolation, and the focused mobile
 Plan -> Tasks -> Task detail flow are implemented on
-`feature/036-durable-tasks`. Automated verification is green; product-owner
-browser acceptance remains the story exit gate.
+`feature/036-durable-tasks`. Automated verification is green, and the product
+owner completed the local browser acceptance flow for create, complete,
+reopen, archive, restore, Plan linkage, and reload persistence.
 
 Acceptance criteria:
 

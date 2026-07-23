@@ -6,7 +6,7 @@ Contract status:
 - Section 10 remains a planned evaluation endpoint.
 - Section 11 is the accepted STORY-035 Agent-foundation contract. STORY-036
   implements Tasks, optional PlannedItem Task links, and TimeLog Task
-  snapshots on its acceptance candidate branch. Activity mutation,
+  snapshots on its product-owner accepted branch. Activity mutation,
   FocusSession, correction, deletion, Undo, and idempotency routes remain
   unavailable until their owning stories pass verification and merge.
 
@@ -545,8 +545,9 @@ Request:
 ## 11. Accepted Agent-Foundation Contract
 
 Current implementation status: STORY-036 Task routes, Plan Task links, and
-TimeLog Task links are implemented and verified on the schema-v5 acceptance
-candidate. Sections 11.3 and 11.5-11.6 remain future runtime contracts except
+TimeLog Task links are implemented, verified, and product-owner accepted on
+the schema-v5 runtime baseline. Sections 11.3 and 11.5-11.6 remain future
+runtime contracts except
 for the explicitly identified v5 TimeLog Task fields.
 
 Implementation is split across STORY-036, STORY-033, STORY-037, and STORY-034.
@@ -593,7 +594,7 @@ New conflict responses use a stable detail shape:
 
 ### 11.2 Tasks
 
-Implementation status: STORY-036 acceptance candidate.
+Implementation status: STORY-036 accepted on 2026-07-22 PDT.
 
 #### POST /tasks
 
@@ -742,7 +743,7 @@ return to product-owner review rather than being added implicitly.
 
 ### 11.4 WeeklyPlan Task References
 
-Implementation status: STORY-036 acceptance candidate.
+Implementation status: STORY-036 accepted on 2026-07-22 PDT.
 
 `POST /weekly-plans` and `PUT /weekly-plans/{plan_id}` accept optional
 `task_id` on each item:

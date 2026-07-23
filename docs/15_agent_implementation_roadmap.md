@@ -497,12 +497,16 @@ weaken the August 1 course exit gate.
 ## 9. Current Gate
 
 Current status: roadmap and STORY-035 domain contract accepted by the product
-owner on 2026-07-22. STORY-036 is implemented and automatically verified on
-`feature/036-durable-tasks`; product-owner browser/API acceptance is pending.
+owner on 2026-07-22. STORY-036 is implemented, automatically verified, and
+product-owner accepted on `feature/036-durable-tasks`.
 
 Next acceptance request:
 
-1. run the local STORY-036 browser acceptance script;
-2. create, complete, reopen, archive, and restore a durable Task;
-3. link that Task to a Plan block and reload the app;
-4. accept or reject STORY-036 before persisted Activities or FocusSession work.
+1. implement authenticated Activity create, list, inspect, and correction
+   behavior through `ActivityService` and the existing repository;
+2. replace Focus view-local creation with truthful persisted loading and save
+   states;
+3. create an Activity, restart backend and browser, and select it again;
+4. verify later TimeLog input preserves the stable Activity ID plus its
+   normalized snapshots;
+5. accept or reject STORY-033 before persisted FocusSession work.

@@ -2,7 +2,7 @@
 
 - Story: STORY-035
 - Status: accepted test outline; version 5 automatically verified
-- Baseline schema: version 5 STORY-036 acceptance candidate
+- Baseline schema: version 5 STORY-036 accepted runtime
 - Target migrations: versions 5, 6, and 7
 - Owner: Dong Zhang
 
@@ -46,8 +46,10 @@ STORY-036 checkpoint (2026-07-22 PDT): v1-v4 migration/rollback, schema
 constraints, TaskService lifecycle/version behavior, authenticated Task/Plan/
 TimeLog API behavior, account isolation, restart persistence, focused browser
 state tests, full backend/frontend suites, sample review, persisted review,
-compileall, and production build pass. Product-owner browser acceptance and
-screenshots remain pending.
+compileall, and production build pass. The product owner accepted the local
+browser flow on 2026-07-22 after verifying Task lifecycle, Plan linkage, and
+reload persistence. No screenshot was recorded; the written acceptance in the
+development conversation is the product gate evidence.
 
 ## 2. Schema And Migration Matrix
 

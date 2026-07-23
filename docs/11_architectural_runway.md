@@ -39,7 +39,7 @@ These concepts should remain stable:
 
 The backend schema and review engine should be built around these concepts, not around one demo JSON file.
 
-`Task` is implemented by the schema-v5 STORY-036 acceptance candidate.
+`Task` is implemented by the accepted schema-v5 STORY-036 runtime baseline.
 `FocusSession` remains an accepted STORY-035 contract for schema v6. Their
 authoritative contracts are defined in `docs/03_data_model.md` and
 `docs/04_api_contract.md`.
@@ -278,8 +278,8 @@ Task + Activity
 ```
 
 Accepted contract status: STORY-035. Runtime status: schema v5 durable Tasks
-and nullable Task references are implemented on the STORY-036 acceptance
-candidate; later steps remain unavailable.
+and nullable Task references are implemented and product-owner accepted
+through STORY-036; later steps remain unavailable.
 
 Implementation sequence:
 

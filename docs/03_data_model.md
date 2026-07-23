@@ -3,8 +3,9 @@
 ## 1. Core Entities
 
 The tree below is the accepted Agent-foundation target. Schema version 5 is the
-currently implemented candidate. `Task` and its nullable PlannedItem/TimeLog
-links are implemented by STORY-036. `FocusSession`, `FocusSessionSegment`, and
+current accepted runtime baseline. `Task` and its nullable PlannedItem/TimeLog
+links are implemented and product-owner accepted through STORY-036.
+`FocusSession`, `FocusSessionSegment`, and
 the correction/audit extensions remain contracts for later versioned
 migrations; their presence here does not mean the current runtime exposes them.
 
@@ -464,8 +465,8 @@ payloads are user-owned personal data and cascade on account deletion.
 
 ## 5. Accepted Migration Sequence
 
-Version 5 is implemented by the STORY-036 candidate. Versions 6 and 7 remain
-accepted contracts rather than current implementation claims:
+Version 5 is the product-owner accepted STORY-036 runtime baseline. Versions 6
+and 7 remain accepted contracts rather than current implementation claims:
 
 | Version | Story | Additive behavior |
 |---|---|---|
