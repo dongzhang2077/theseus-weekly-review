@@ -56,12 +56,15 @@ automation, and machine learning extend that kernel; they do not replace it.
 
 ## 3. Current Reality
 
-As of 2026-07-18, Theseus is a working weekly-review MVP foundation rather than
-a general life assistant.
+As of 2026-07-22, Theseus is a working weekly-review MVP foundation rather than
+a general life assistant. The product owner accepted the sequential Agent
+implementation roadmap and STORY-035 domain contract direction. That acceptance
+does not claim the target schema or endpoints are implemented.
 
 | Capability | Current state | Direction |
 |---|---|---|
-| Stable review entities | Schema v4 ownership, credentials, and sessions are implemented and verified in STORY-030 | Keep the core model stable while Signals and Plan consume it |
+| Stable review entities | Schema v4 ownership, credentials, and auth sessions are implemented and verified in STORY-030 | Preserve v4 while versioned Agent-domain migrations are implemented |
+| Durable Tasks and live Focus state | STORY-035 contracts Task, Activity, PlannedItem, FocusSession/segments, and TimeLog responsibilities; runtime remains schema v4 | Implement and accept STORY-036, STORY-033, STORY-037, and STORY-034 sequentially |
 | Persistent review path | User-scoped sample data flows through SQLite, the review engine, and stored review; v1 migration and restart coverage are merged | Rehearse the browser-to-API restart path |
 | Review reasoning | Deterministic, evidence-first rules | Keep framework-independent |
 | AI wording | Evidence-bound writer adapters exist | Keep AI wording downstream of computed facts |
@@ -354,9 +357,16 @@ LangGraph and OpenClaw are explicitly excluded from this phase.
 
 Goal: make ownership, provenance, feedback, and reversible changes reliable.
 
+Status note (2026-07-22): the product owner accepted the gated implementation
+roadmap. STORY-035 defines the authoritative Task/Activity/Plan/Focus/TimeLog
+contract and the v5-v7 migration sequence. No schema migration or Agent runtime
+is complete merely because its contract is accepted.
+
 Exit gate:
 
 - all relevant repositories and API operations are user-scoped;
+- durable Task and FocusSession behavior, exactly-once TimeLog production, and
+  correctable Evidence are implemented through shared domain services;
 - migrations, export, and reset behavior are documented;
 - preferences, proposals, approvals, actions, and outcomes have accepted
   contracts;
@@ -706,6 +716,8 @@ Do not introduce LangGraph until:
 
 - the same workflow is understandable as explicit domain-service calls;
 - user ownership and durable records are stable;
+- Task, Activity, FocusSession, and TimeLog correction contracts have passed
+  their product-owner implementation gates;
 - a human approval checkpoint is genuinely required.
 
 Do not enable OpenClaw writes until:

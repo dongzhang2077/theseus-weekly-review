@@ -1,6 +1,6 @@
 # Theseus Agent Implementation Roadmap
 
-- Status: proposed execution plan
+- Status: accepted execution plan
 - Baseline date: 2026-07-22
 - Stable product checkpoint: `677de39`
 - Active planning branch: `feature/035-agent-ready-domain-contract`
@@ -174,7 +174,7 @@ Files/modules:
 - `docs/04_api_contract.md`
 - `docs/11_architectural_runway.md`
 - `docs/13_product_agent_development_strategy.md`
-- schema/API test outlines
+- `docs/16_agent_domain_contract_test_plan.md`
 
 Acceptance:
 
@@ -496,11 +496,15 @@ weaken the August 1 course exit gate.
 
 ## 9. Current Gate
 
-Current status: roadmap proposed; runtime implementation has not started.
+Current status: roadmap accepted by the product owner on 2026-07-22. The
+STORY-035 authoritative contract candidate and test outline are complete on
+`feature/035-agent-ready-domain-contract`; runtime implementation has not
+started. Product-owner contract acceptance is pending.
 
 Next acceptance request:
 
-1. approve this module order and the Task/FocusSession distinction;
-2. complete STORY-035 authoritative data/API contracts;
-3. return the contract lifecycle for product-owner review before any migration
-   or endpoint is implemented.
+1. review the STORY-035 data/API/migration contract and lifecycle;
+2. if accepted, freeze and integrate STORY-035;
+3. open `feature/036-durable-tasks` from the accepted contract baseline;
+4. implement only durable Tasks before beginning persisted Activities or
+   FocusSession work.

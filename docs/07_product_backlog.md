@@ -479,12 +479,16 @@ Acceptance criteria:
 
 - authenticated Activity create, list, and correction routes use the existing
   `activities` table and `ActivityRepository` rather than route-level SQL;
+- Activity reads expose an optimistic version and stale corrections are
+  rejected without overwriting a newer user change;
 - ownership comes only from the validated JWT, and project links belonging to
   another account are rejected;
 - Focus loads persisted activities and saves a newly created Activity before
   presenting it as durable;
 - later TimeLogs reference the persisted `activity_id` while preserving the raw
   activity name and normalized type snapshot;
+- Project reassignment is rejected while that Activity has an open
+  FocusSession;
 - loading, saving, validation, retry, restart, and cross-account isolation have
   focused API and frontend tests;
 - view-local fallback behavior, if retained for a demo, is labelled truthfully
@@ -506,8 +510,11 @@ Acceptance criteria:
   duration, energy type, and note provenance;
 - a user can correct a mistaken record or remove it through user-scoped API
   behavior, with confirmation and immediate total refresh;
+- removal is a versioned soft delete; every correction, removal, restore, and
+  Undo appends an owned revision rather than erasing history;
 - corrections flow into project progress, Evidence, and Weekly Review through
   the existing normalized TimeLog path;
+- overlapping stored reviews are marked stale until successful regeneration;
 - empty, loading, error, retry, save, and undo or confirmation states are
   explicit;
 - local-date boundaries follow the account timezone and have cross-midnight,
@@ -598,6 +605,14 @@ data.
 
 Priority: P0 before Agent runtime work
 
+Contract candidate checkpoint (2026-07-22 PDT): the approved roadmap has been
+translated into authoritative data/API contracts, an atomic v5-v7 migration
+sequence, a Task-to-corrected-Review lifecycle, service boundaries, a decision
+record, and an executable test outline on
+`feature/035-agent-ready-domain-contract`. No SQL, Python, frontend runtime,
+LangGraph, or OpenClaw behavior is included. Product-owner contract acceptance
+remains the story exit gate.
+
 Acceptance criteria:
 
 - Task, Activity, PlannedItem, FocusSession, and TimeLog have non-overlapping
@@ -624,6 +639,8 @@ Acceptance criteria:
 
 - A user can create, list, inspect, update, complete, reopen, and archive a
   Task linked to one of their Projects.
+- Task updates use optimistic versions and never silently overwrite a newer
+  mutation.
 - PlannedItems may reference a Task while existing ad-hoc PlannedItems remain
   valid.
 - Cross-account links and invalid lifecycle transitions are rejected.

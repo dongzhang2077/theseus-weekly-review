@@ -24,8 +24,11 @@ These concepts should remain stable:
 - AuthCredential and revocable AuthSession
 - Goal
 - Project
+- Task
+- Activity
 - WeeklyPlan
 - PlannedItem
+- FocusSession and FocusSessionSegment
 - TimeLog
 - ActivityType
 - DailyReflection
@@ -35,6 +38,10 @@ These concepts should remain stable:
 - ReviewRecommendation
 
 The backend schema and review engine should be built around these concepts, not around one demo JSON file.
+
+`Task` and `FocusSession` are accepted STORY-035 Agent-foundation additions,
+not implemented schema-v4 claims. Their authoritative target contracts are
+defined in `docs/03_data_model.md` and `docs/04_api_contract.md`.
 
 ### Replaceable Interfaces
 
@@ -50,6 +57,15 @@ These can change over time:
 
 The system should allow multiple input sources to produce the same normalized `TimeLog` and `WeeklyPlan` records.
 
+STORY-035 extends this principle for conversational execution:
+
+```text
+Task or PlannedItem -> FocusSession segments -> normalized TimeLogs -> review
+```
+
+Live Focus state is durable runtime evidence, but completed TimeLogs remain the
+review engine's normalized input.
+
 ## 3. Target Module Boundaries
 
 ```text
@@ -58,7 +74,16 @@ backend/
     api/              HTTP endpoints
     db/               SQLite connection, schema, repositories
     schemas.py        API/Pydantic models
-    services/         orchestration
+    services/         authenticated domain commands and orchestration
+      tasks.py        Task lifecycle and Project ownership
+      activities.py   durable Activity creation and correction
+      focus.py        transitions, segments, allocation, idempotency
+      time_logs.py    correction, revisions, invalidation, project recalc
+      review_service.py
+
+agent/                added only after the domain-service gate
+  workflows/          LangGraph state and nodes
+  adapters/           replaceable channel/OpenClaw boundary
 
 review_engine/
   rules.py            deterministic review checks
@@ -93,6 +118,10 @@ Theseus should support several data sources through adapters:
 
 Every source should map into normalized backend records instead of bypassing the model.
 
+Conversation is another source adapter. A message may produce a typed proposal,
+but only an approved domain command can create or mutate a Task, Plan,
+FocusSession, or TimeLog.
+
 ## 5. Database Design Rules
 
 Sprint 1 schema should include long-term extension points now:
@@ -112,6 +141,16 @@ Sprint 1 schema should include long-term extension points now:
   boundary; request bodies and legacy user-ID headers never select an owner.
 - Keep short-lived access tokens in browser memory. Rotate refresh tokens in an
   HttpOnly, SameSite cookie and persist only token/CSRF digests.
+- Store FocusSession timestamps as UTC instants and capture the account IANA
+  timezone once at session start. Split completed evidence by that snapshot,
+  not by the server timezone.
+- Preserve exact Focus seconds and derive review-compatible whole minutes
+  deterministically.
+- Use optimistic versions plus user-scoped idempotency receipts for commands
+  that browsers or conversation channels may replay.
+- Preserve current Task/Activity records and their historical snapshots in
+  PlannedItems, FocusSessions, and TimeLogs.
+- Use soft deletion plus append-only revisions for correctable TimeLogs.
 - Keep credentials, generated auth keys, demo credential files, databases, and
   personal exports outside Git.
 
@@ -195,8 +234,9 @@ Current status: implemented.
 sample_week.json -> SQLite -> review_engine -> stored weekly_review
 ```
 
-Current status: implemented with SQLite schema version 2, version 1 migration,
-user-scoped repositories, and restart-path tests.
+Current status: implemented with SQLite schema version 4, atomic version
+1-through-3 migration paths, formal account ownership, user-scoped
+repositories, and restart-path tests.
 
 ### Stage C: Web Input
 
@@ -204,11 +244,12 @@ user-scoped repositories, and restart-path tests.
 web forms -> backend SQLite -> review_engine
 ```
 
-Current status: implemented through the React local-profile flow and typed
-goal, project, plan, and time-log API adapters. Signals consumes interpreted
-review evidence, and Plan can load, atomically replace, or Undo a user-scoped
-next-week adjustment. This path reached `main` through PR #64 on 2026-07-15
-PDT.
+Current status: the released path began with the React local-profile flow and
+typed goal, project, plan, and time-log adapters in PR #64, then formal local
+accounts superseded profile selection in STORY-030. Signals consumes
+interpreted review evidence, and Plan can load, atomically replace, or Undo a
+user-scoped next-week adjustment. The accepted mobile correction baseline is
+commit `677de39`; it remains local until its release branch is integrated.
 
 ### Stage D: Mobile Export
 
@@ -226,12 +267,64 @@ Flutter app -> sync API -> backend DB -> review_engine
 
 This is a later extension after the review loop works.
 
+### Stage F: Agent-Ready Domain
+
+```text
+Task + Activity
+  -> durable FocusSession segments
+  -> exactly-once TimeLogs
+  -> correctable Evidence
+```
+
+Accepted contract status: STORY-035. Runtime status: not implemented in schema
+version 4.
+
+Implementation sequence:
+
+1. schema v5 adds durable Tasks and nullable Task references;
+2. STORY-033 exposes the existing Activity repository through authenticated
+   service/API behavior;
+3. schema v6 adds FocusSession, segments, idempotency receipts, exact seconds,
+   Focus provenance, and atomically rebuilds the TimeLog duration constraint
+   so positive exact sub-minute slices can coexist with zero whole minutes;
+4. schema v7 adds TimeLog revisions, soft deletion, versions, and WeeklyReview
+   invalidation;
+5. only then may the bounded Assistant API call these domain services.
+
+Each migration is atomic, additive for existing users, and verified from every
+supported prior schema. Existing ad-hoc PlannedItems and TimeLogs keep null
+extension references.
+
+### Stage G: Assistant And Channels
+
+```text
+typed Assistant request
+  -> evidence-backed proposal
+  -> approval
+  -> idempotent domain service
+  -> verification and action outcome
+```
+
+LangGraph may orchestrate this sequence after the explicit service workflow is
+tested. OpenClaw remains a replaceable transport adapter and uses scoped
+integration identity rather than browser cookies or direct database access.
+
 ## 10. Anti-Patterns to Avoid
 
 Avoid:
 
 - Treating `sample_week.json` as the real data model.
 - Mixing review rule logic into FastAPI route files.
+- Treating a WeeklyPlan `PlannedItem` as the only durable Task record.
+- Keeping live Focus state only in one browser once a second channel can
+  observe or control it.
+- Calculating elapsed Focus time with one start/end subtraction that ignores
+  pause segments.
+- Letting FastAPI routes, LangGraph nodes, or OpenClaw tools implement different
+  Task or timer transitions.
+- Letting OpenClaw reuse browser refresh credentials or access SQLite directly.
+- Using LangGraph checkpoints or chat transcripts as canonical preferences,
+  Plans, Tasks, or TimeLogs.
 - Rewriting mobile app code before defining the import contract.
 - Committing private historical CSV or local SQLite databases.
 - Adding Postgres/JWT/sync before the weekly review loop is usable.
