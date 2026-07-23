@@ -223,7 +223,9 @@ describe("PlanScreen", () => {
     };
     renderPlan({ apiBaseUrl: "http://127.0.0.1:8000", reviewSource: "api", fetchImpl });
 
-    fireEvent.click(await screen.findByRole("button", { name: "New plan" }));
+    const newPlan = await screen.findByRole("button", { name: "New plan" });
+    await waitFor(() => expect(newPlan).toBeEnabled());
+    fireEvent.click(newPlan);
     fireEvent.click(within(screen.getByRole("dialog", { name: "Edit plan" })).getByRole("button", { name: "Save plan" }));
 
     await waitFor(() => expect(calls.some((call) => call.init.method === "POST")).toBe(true));
