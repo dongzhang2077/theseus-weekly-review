@@ -358,9 +358,10 @@ LangGraph and OpenClaw are explicitly excluded from this phase.
 Goal: make ownership, provenance, feedback, and reversible changes reliable.
 
 Status note (2026-07-22): the product owner accepted the gated implementation
-roadmap. STORY-035 defines the authoritative Task/Activity/Plan/Focus/TimeLog
-contract and the v5-v7 migration sequence. No schema migration or Agent runtime
-is complete merely because its contract is accepted.
+roadmap and the STORY-035 authoritative Task/Activity/Plan/Focus/TimeLog
+contract with its v5-v7 migration sequence. STORY-036 is the first runtime
+implementation gate; no later Agent runtime is complete merely because its
+contract is accepted.
 
 Exit gate:
 

@@ -605,13 +605,12 @@ data.
 
 Priority: P0 before Agent runtime work
 
-Contract candidate checkpoint (2026-07-22 PDT): the approved roadmap has been
-translated into authoritative data/API contracts, an atomic v5-v7 migration
-sequence, a Task-to-corrected-Review lifecycle, service boundaries, a decision
-record, and an executable test outline on
-`feature/035-agent-ready-domain-contract`. No SQL, Python, frontend runtime,
-LangGraph, or OpenClaw behavior is included. Product-owner contract acceptance
-remains the story exit gate.
+Accepted contract checkpoint (2026-07-22 PDT): the product owner accepted the
+authoritative data/API contracts, atomic v5-v7 migration sequence,
+Task-to-corrected-Review lifecycle, service boundaries, decision record, and
+executable test outline on `feature/035-agent-ready-domain-contract`. No SQL,
+Python, frontend runtime, LangGraph, or OpenClaw behavior is included. This
+accepted contract is the baseline for STORY-036.
 
 Acceptance criteria:
 
