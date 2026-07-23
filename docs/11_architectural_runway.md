@@ -279,7 +279,9 @@ Task + Activity
 
 Accepted contract status: STORY-035. Runtime status: schema v5 durable Tasks
 and nullable Task references are implemented and product-owner accepted
-through STORY-036; later steps remain unavailable.
+through STORY-036. Authenticated durable Activity management is implemented
+and automatically verified on the STORY-033 acceptance candidate; durable
+FocusSession state and later correction steps remain unavailable.
 
 Implementation sequence:
 

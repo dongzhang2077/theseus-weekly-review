@@ -253,15 +253,56 @@ class TaskRead(APIModel):
 
 class ActivityCreate(APIModel):
     project_id: int | None = None
-    name: str = Field(min_length=1)
-    description: str = ""
+    name: str = Field(min_length=1, max_length=240)
+    description: str = Field(default="", max_length=4000)
     activity_type: ActivityType
-    type_source: ActivityTypeSource = "user_selected"
+    type_source: Literal["user_selected"] = "user_selected"
+
+    @field_validator("name")
+    @classmethod
+    def strip_activity_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
 
 
-class ActivityRead(ActivityCreate):
+class ActivityUpdate(APIModel):
+    expected_version: int = Field(ge=1)
+    project_id: int | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=240)
+    description: str | None = Field(default=None, max_length=4000)
+    activity_type: ActivityType | None = None
+
+    @field_validator("name")
+    @classmethod
+    def strip_optional_activity_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+    @model_validator(mode="after")
+    def validate_activity_patch(self) -> ActivityUpdate:
+        changed = self.model_fields_set - {"expected_version"}
+        if not changed:
+            raise ValueError("at least one activity field is required")
+        required_values = ("name", "activity_type")
+        if any(field in changed and getattr(self, field) is None for field in required_values):
+            raise ValueError("name and activity_type cannot be null")
+        return self
+
+
+class ActivityRead(APIModel):
     id: int
     user_id: int
+    project_id: int | None
+    name: str
+    description: str
+    activity_type: ActivityType
+    type_source: ActivityTypeSource
     version: int
     created_at: datetime
     updated_at: datetime

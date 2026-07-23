@@ -5,7 +5,8 @@
 The tree below is the accepted Agent-foundation target. Schema version 5 is the
 current accepted runtime baseline. `Task` and its nullable PlannedItem/TimeLog
 links are implemented and product-owner accepted through STORY-036.
-`FocusSession`, `FocusSessionSegment`, and
+Authenticated Activity management is implemented on the STORY-033 acceptance
+candidate without a schema-version change. `FocusSession`, `FocusSessionSegment`, and
 the correction/audit extensions remain contracts for later versioned
 migrations; their presence here does not mean the current runtime exposes them.
 

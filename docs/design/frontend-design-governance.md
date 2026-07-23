@@ -111,6 +111,25 @@ allocated by the account timezone, and a session crossing local midnight is
 stored as an atomic batch of daily TimeLogs rather than being assigned wholly
 to its end date.
 
+### Durable Activity information depth
+
+STORY-033 keeps the accepted Focus hierarchy and replaces only the false
+view-local Activity boundary:
+
+1. Focus Level 1 remains the single current timer and Today total. Persistence
+   controls or catalog management do not move onto this surface.
+2. The Today sheet remains the Activity picker and exposes one icon-only New
+   action. Persisted and contextual Activities share the same compact row;
+   durable records are not duplicated by Project.
+3. New/Edit Activity is one focused sheet for name, optional Project, energy,
+   and note. The record appears as durable only after API success. Saving,
+   retry, version conflict, and validation are explicit; demo-only fallback is
+   labelled truthfully.
+
+Activity color is a stable visual derivation rather than a claimed persisted
+field. Activity detail owns the icon-only edit entry. No Activity dashboard,
+fifth navigation tab, archive, or delete behavior is introduced in this story.
+
 ### Plan information depth and creation
 
 Plan keeps one question at each depth while preserving formal WeeklyPlan

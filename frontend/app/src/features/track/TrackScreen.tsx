@@ -21,21 +21,21 @@ import {
 import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
 import type { FetchLike } from "../../shared/api/loadAppWeek";
 import {
+  activityRecordToTimer,
+  createActivity,
+  updateActivity
+} from "../../shared/api/activities";
+import {
   calendarDate,
   saveActivitySession,
   splitElapsedSecondsByDate
 } from "../../shared/api/timeLogs";
 import { FocusWorkspace } from "./FocusWorkspace";
 import type { FocusSessionDraft } from "../../shared/domain/track";
+import type { PlanProject } from "../../shared/domain/plan";
 
 const categories = ["Project", "Study", "Health"];
-const energyOptions = ["consume", "restore", "neutral"] as const;
-const colorOptions = [
-  { name: "Green", value: "#6f8f6b" },
-  { name: "Blue", value: "#8aa9c0" },
-  { name: "Amber", value: "#c8a25f" },
-  { name: "Pink", value: "#d69a9a" }
-];
+const energyOptions = ["consume", "restore", "neutral", "destroy"] as const;
 const targetOptions = [15, 25, 45, 60] as const;
 
 type TrackSheet = "logs" | "create" | "setup" | "complete";
@@ -48,6 +48,7 @@ interface TrackScreenProps {
   todayDate?: string;
   fetchImpl?: FetchLike;
   activities?: ActivityTimer[];
+  projects?: PlanProject[];
   onActivitiesChange?: Dispatch<SetStateAction<ActivityTimer[]>>;
   sessionDrafts?: Record<string, FocusSessionDraft>;
   onSessionDraftChange?: (activityId: string, draft: FocusSessionDraft | null) => void;
@@ -62,6 +63,7 @@ export function TrackScreen({
   fetchImpl,
   track,
   activities: controlledActivities,
+  projects = [],
   onActivitiesChange,
   sessionDrafts: controlledSessionDrafts,
   onSessionDraftChange,
@@ -72,9 +74,14 @@ export function TrackScreen({
   const [activeSheet, setActiveSheet] = useState<TrackSheet | null>(null);
   const [detail, setDetail] = useState<ActivityTimer | null>(null);
   const [newName, setNewName] = useState("");
-  const [newCategory, setNewCategory] = useState("Project");
+  const [newDescription, setNewDescription] = useState("");
+  const [newProjectId, setNewProjectId] = useState<number | null>(null);
   const [newEnergy, setNewEnergy] = useState<ActivityTimer["energy"]>("neutral");
-  const [newColor, setNewColor] = useState(colorOptions[0].value);
+  const [editingActivityId, setEditingActivityId] = useState<number | null>(null);
+  const [activitySaveState, setActivitySaveState] = useState<
+    "idle" | "saving" | "error" | "conflict"
+  >("idle");
+  const [activitySaveError, setActivitySaveError] = useState<string | null>(null);
   const [manualFocusId, setManualFocusId] = useState<string | null>(null);
   const [recommendationNotice, setRecommendationNotice] = useState<string | null>(null);
   const [localSessionDrafts, setLocalSessionDrafts] = useState<Record<string, FocusSessionDraft>>({});
@@ -258,16 +265,117 @@ export function TrackScreen({
     setActiveSheet(null);
   }
 
-  function onCreateActivity() {
+  function openNewActivity() {
+    setEditingActivityId(null);
+    setNewName("");
+    setNewDescription("");
+    setNewProjectId(null);
+    setNewEnergy("neutral");
+    setActivitySaveState("idle");
+    setActivitySaveError(null);
+    setActiveSheet("create");
+  }
+
+  function openEditActivity(activity: ActivityTimer) {
+    if (!activity.activityId || !activity.activityVersion) return;
+    setEditingActivityId(activity.activityId);
+    setNewName(activity.name);
+    setNewDescription(activity.activityDescription ?? "");
+    setNewProjectId(activity.projectId ?? null);
+    setNewEnergy(activity.energy);
+    setActivitySaveState("idle");
+    setActivitySaveError(null);
+    setActiveSheet("create");
+  }
+
+  async function onSaveActivity() {
     const name = newName.trim();
-    if (!name || recommendationLocked) return;
+    if (!name || recommendationLocked || activitySaveState === "saving") return;
+
+    if (apiBaseUrl) {
+      setActivitySaveState("saving");
+      setActivitySaveError(null);
+      const current = editingActivityId === null
+        ? null
+        : activities.find((activity) => activity.activityId === editingActivityId) ?? null;
+      const result = editingActivityId === null
+        ? await createActivity({
+            apiBaseUrl,
+            fetchImpl,
+            draft: {
+              projectId: newProjectId,
+              name,
+              description: newDescription.trim(),
+              activityType: energyToActivityType(newEnergy)
+            }
+          })
+        : current?.activityVersion
+          ? await updateActivity({
+              apiBaseUrl,
+              fetchImpl,
+              activityId: editingActivityId,
+              draft: {
+                expectedVersion: current.activityVersion,
+                projectId: newProjectId,
+                name,
+                description: newDescription.trim(),
+                activityType: energyToActivityType(newEnergy)
+              }
+            })
+          : {
+              status: "error" as const,
+              data: null,
+              current: null,
+              error: "Reload this activity before saving"
+            };
+
+      if (result.status !== "ok" || !result.data) {
+        if (result.current) {
+          const latest = activityRecordToTimer(result.current, projects);
+          updateActivities((items) =>
+            items.map((item) =>
+              item.activityId === latest.activityId
+                ? preserveTimerState(latest, item)
+                : item
+            )
+          );
+          setNewName(latest.name);
+          setNewDescription(latest.activityDescription ?? "");
+          setNewProjectId(latest.projectId ?? null);
+          setNewEnergy(latest.energy);
+        }
+        setActivitySaveState(result.status === "conflict" ? "conflict" : "error");
+        setActivitySaveError(result.error);
+        return;
+      }
+
+      const saved = activityRecordToTimer(result.data, projects);
+      updateActivities((items) => {
+        const existing = items.find((item) => item.activityId === saved.activityId);
+        if (!existing) return [...items, saved];
+        return items.map((item) =>
+          item.activityId === saved.activityId
+            ? preserveTimerState(saved, item)
+            : item
+        );
+      });
+      setManualFocusId(saved.id);
+      setEditingActivityId(null);
+      setNewName("");
+      setNewDescription("");
+      setActivitySaveState("idle");
+      setActiveSheet(null);
+      showNotice("Activity saved");
+      return;
+    }
 
     const activity: ActivityTimer = {
       id: `activity-${Date.now()}`,
       name,
-      category: newCategory,
+      category: newProjectId ? "Project" : "Activity",
+      ...(newProjectId ? { projectId: newProjectId } : {}),
       energy: newEnergy,
-      color: newColor,
+      color: "#6f8f6b",
       todayDate,
       todaySeconds: 0,
       sessionSeconds: 0,
@@ -282,8 +390,9 @@ export function TrackScreen({
     updateActivities((current) => [...current, activity]);
     setManualFocusId(activity.id);
     setNewName("");
+    setNewDescription("");
     setActiveSheet(null);
-    showNotice("Activity added to this view");
+    showNotice("Activity kept in this demo");
   }
 
   return (
@@ -325,7 +434,7 @@ export function TrackScreen({
             title="No focus activity available"
             actionLabel="Add a quick activity"
             actionIcon="plus"
-            onAction={() => setActiveSheet("create")}
+            onAction={openNewActivity}
           />
         </div>
       )}
@@ -334,7 +443,7 @@ export function TrackScreen({
         title="Today"
         open={activeSheet === "logs"}
         onClose={() => setActiveSheet(null)}
-        actions={<IconButton label="New activity" icon="plus" onClick={() => setActiveSheet("create")} />}
+        actions={<IconButton label="New activity" icon="plus" onClick={openNewActivity} />}
       >
         {activities.length > 0 ? (
           <div className="grid gap-4">
@@ -416,50 +525,92 @@ export function TrackScreen({
         )}
       </Sheet>
 
-      <Sheet title="Quick activity" open={activeSheet === "create"} onClose={() => setActiveSheet("logs")}>
+      <Sheet
+        title={editingActivityId === null ? "New activity" : "Edit activity"}
+        open={activeSheet === "create"}
+        closeDisabled={activitySaveState === "saving"}
+        onClose={() => setActiveSheet("logs")}
+      >
         <div className="grid gap-4">
-          <p className="m-0 rounded-paper bg-desk-warn-soft px-3 py-2 text-sm leading-5 text-desk-muted">
-            Quick activities stay in this view. Completed sessions are saved to your account.
-          </p>
+          {!apiBaseUrl ? (
+            <p className="m-0 rounded-paper bg-desk-warn-soft px-3 py-2 text-sm leading-5 text-desk-muted">
+              Local preview only.
+            </p>
+          ) : null}
           <label className="grid gap-1 text-sm font-semibold">
             <span>Name</span>
             <input
-              className="min-h-11 rounded-paper border border-desk-line bg-desk-raised px-3"
+              className="min-h-11 rounded-paper border border-desk-line bg-desk-raised px-3 disabled:opacity-60"
               type="text"
               value={newName}
               aria-label="Activity name"
+              disabled={activitySaveState === "saving"}
               onChange={(event) => setNewName(event.currentTarget.value)}
             />
           </label>
-          <ChoiceGroup label="Category" options={categories} value={newCategory} onChange={setNewCategory} />
+          <label className="grid gap-1 text-sm font-semibold">
+            <span>Project</span>
+            <select
+              className="min-h-11 min-w-0 rounded-paper border border-desk-line bg-desk-raised px-3 disabled:opacity-60"
+              aria-label="Activity project"
+              value={newProjectId ?? ""}
+              disabled={activitySaveState === "saving"}
+              onChange={(event) =>
+                setNewProjectId(
+                  event.currentTarget.value
+                    ? Number(event.currentTarget.value)
+                    : null
+                )
+              }
+            >
+              <option value="">None</option>
+              {projects.map((project) => (
+                <option value={project.id} key={project.id}>
+                  {project.title}
+                </option>
+              ))}
+            </select>
+          </label>
           <ChoiceGroup
             label="Energy"
             options={energyOptions.map(energyLabel)}
             value={energyLabel(newEnergy)}
+            disabled={activitySaveState === "saving"}
             onChange={(value) =>
               setNewEnergy(energyOptions.find((energy) => energyLabel(energy) === value) ?? "neutral")
             }
           />
-          <div className="flex gap-3" aria-label="Color">
-            {colorOptions.map((color) => (
-              <button
-                className={`size-9 rounded-full border-2 ${newColor === color.value ? "border-desk-ink" : "border-transparent"}`}
-                style={{ backgroundColor: color.value }}
-                key={color.name}
-                type="button"
-                aria-label={color.name}
-                aria-pressed={newColor === color.value}
-                onClick={() => setNewColor(color.value)}
-              />
-            ))}
-          </div>
+          <label className="grid gap-1 text-sm font-semibold">
+            <span>Note</span>
+            <textarea
+              className="rounded-paper border border-desk-line bg-desk-raised p-3 disabled:opacity-60"
+              rows={3}
+              value={newDescription}
+              disabled={activitySaveState === "saving"}
+              onChange={(event) => setNewDescription(event.currentTarget.value)}
+            />
+          </label>
+          {activitySaveState === "error" || activitySaveState === "conflict" ? (
+            <p
+              className="m-0 rounded-paper bg-desk-danger-soft px-3 py-2 text-sm font-semibold text-desk-danger"
+              role="alert"
+            >
+              {activitySaveState === "conflict"
+                ? "Activity changed elsewhere. Current values loaded."
+                : activitySaveError ?? "Activity could not be saved."}
+            </p>
+          ) : null}
           <button
             className="min-h-11 rounded-paper border-0 bg-desk-accent px-4 font-bold text-white disabled:opacity-40"
             type="button"
-            disabled={!newName.trim()}
-            onClick={onCreateActivity}
+            disabled={!newName.trim() || activitySaveState === "saving"}
+            onClick={() => void onSaveActivity()}
           >
-            Add to this view
+            {activitySaveState === "saving"
+              ? "Saving"
+              : activitySaveState === "error" || activitySaveState === "conflict"
+                ? "Retry"
+                : "Save"}
           </button>
         </div>
       </Sheet>
@@ -595,6 +746,16 @@ export function TrackScreen({
                 {energyLabel(detailActivity.energy)}
               </span>
               <div className="flex items-center gap-2">
+                {detailActivity.activityId && detailActivity.activityVersion ? (
+                  <IconButton
+                    label="Edit activity"
+                    icon="edit"
+                    onClick={() => {
+                      openEditActivity(detailActivity);
+                      setDetail(null);
+                    }}
+                  />
+                ) : null}
                 <IconButton
                   label="Session setup"
                   icon="target"
@@ -643,11 +804,13 @@ function ChoiceGroup({
   label,
   options,
   value,
+  disabled = false,
   onChange
 }: {
   label: string;
   options: readonly string[];
   value: string;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
@@ -656,7 +819,7 @@ function ChoiceGroup({
       <div className="flex flex-wrap gap-2" aria-label={label}>
         {options.map((option) => (
           <button
-            className={`min-h-9 rounded-full border px-3 text-sm font-semibold ${
+            className={`min-h-9 rounded-full border px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
               value === option
                 ? "border-desk-accent bg-desk-accent-soft text-desk-accent"
                 : "border-desk-line bg-desk-raised text-desk-muted"
@@ -664,6 +827,7 @@ function ChoiceGroup({
             type="button"
             key={option}
             aria-pressed={value === option}
+            disabled={disabled}
             onClick={() => onChange(option)}
           >
             {option}
@@ -701,6 +865,29 @@ function energyLabel(energy: ActivityTimer["energy"]): string {
   if (energy === "restore") return "Restorative";
   if (energy === "destroy") return "Draining";
   return "Neutral";
+}
+
+function energyToActivityType(
+  energy: ActivityTimer["energy"]
+): "consuming" | "neutral" | "restore" | "destroy" {
+  return energy === "consume" ? "consuming" : energy;
+}
+
+function preserveTimerState(
+  saved: ActivityTimer,
+  current: ActivityTimer
+): ActivityTimer {
+  return {
+    ...saved,
+    todayDate: current.todayDate,
+    todaySeconds: current.todaySeconds,
+    sessionSeconds: current.sessionSeconds,
+    sessionSecondsByDate: current.sessionSecondsByDate,
+    runSeconds: current.runSeconds,
+    running: current.running,
+    recommended: current.recommended,
+    focusContext: current.focusContext ?? saved.focusContext
+  };
 }
 
 function activityIcon(activityId: string): IconName {

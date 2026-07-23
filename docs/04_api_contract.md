@@ -6,9 +6,11 @@ Contract status:
 - Section 10 remains a planned evaluation endpoint.
 - Section 11 is the accepted STORY-035 Agent-foundation contract. STORY-036
   implements Tasks, optional PlannedItem Task links, and TimeLog Task
-  snapshots on its product-owner accepted branch. Activity mutation,
-  FocusSession, correction, deletion, Undo, and idempotency routes remain
-  unavailable until their owning stories pass verification and merge.
+  snapshots on its product-owner accepted branch. STORY-033 implements
+  authenticated Activity create, list, detail, and optimistic correction on
+  its acceptance-candidate branch. FocusSession, TimeLog correction, deletion,
+  Undo, and idempotency routes remain unavailable until their owning stories
+  pass verification and merge.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -693,6 +695,10 @@ no normal hard-delete Task route; account deletion remains the ownership-level
 destructive operation.
 
 ### 11.3 Activities
+
+Implementation status: STORY-033 acceptance candidate on
+`feature/033-persisted-activities`; automated verification is green and
+product-owner browser acceptance is pending.
 
 #### POST /activities
 

@@ -7,6 +7,11 @@ import type { ReviewWeekRange } from "./features/review/reviewWeek";
 import { SignalsScreen } from "./features/signals/SignalsScreen";
 import { TrackScreen } from "./features/track/TrackScreen";
 import { AuthClient, type AuthAccount, type LoginPayload, type RegisterPayload } from "./shared/auth/AuthClient";
+import {
+  activityRecordToTimer,
+  loadActivityCatalog,
+  mergeActivityCatalog
+} from "./shared/api/activities";
 import { demoWeekRange, loadAppWeek, type LoadedAppWeek } from "./shared/api/loadAppWeek";
 import {
   applyTodayTimeLogs,
@@ -24,6 +29,7 @@ import {
   restoreTimerCheckpoint
 } from "./features/track/timerCheckpoint";
 import type { ActivityTimer, FocusSessionDraft } from "./shared/domain/track";
+import type { PlanProject } from "./shared/domain/plan";
 import { resolveInitialTab, type AppTab } from "./shared/navigation/tabs";
 import { AppShell } from "./shared/shell/AppShell";
 
@@ -57,6 +63,7 @@ export function App() {
   const [selectedReviewWeek, setSelectedReviewWeek] = useState<ReviewWeekRange>(demoWeekRange);
   const [trackTodayDate, setTrackTodayDate] = useState(() => calendarDate());
   const [trackActivities, setTrackActivities] = useState<ActivityTimer[]>(demoWeek.track.activities);
+  const [activityProjects, setActivityProjects] = useState<PlanProject[]>([]);
   const [focusSessionDrafts, setFocusSessionDrafts] = useState<Record<string, FocusSessionDraft>>({});
   const [focusResultOpen, setFocusResultOpen] = useState(false);
   const [reviewDetailOpen, setReviewDetailOpen] = useState(false);
@@ -118,16 +125,26 @@ export function App() {
         weekStart: selectedReviewWeek.start,
         weekEnd: selectedReviewWeek.end
       }),
-      loadTimeLogs({ apiBaseUrl, fetchImpl: authClient.fetch })
-    ]).then(([loaded, timeLogs]) => {
+      loadTimeLogs({ apiBaseUrl, fetchImpl: authClient.fetch }),
+      loadActivityCatalog({ apiBaseUrl, fetchImpl: authClient.fetch })
+    ]).then(([loaded, timeLogs, activityCatalog]) => {
       if (!ignore) {
+        const persistedActivities = activityCatalog.status === "ok" && activityCatalog.data
+          ? activityCatalog.data.activities.map((activity) =>
+              activityRecordToTimer(activity, activityCatalog.data?.projects ?? [])
+            )
+          : [];
+        const activitySeed = mergeActivityCatalog(
+          persistedActivities,
+          loaded.week.track.activities
+        );
         const activities = timeLogs.loaded
           ? applyTodayTimeLogs(
-              loaded.week.track.activities,
+              activitySeed,
               timeLogs.logs,
               trackTodayDate
             )
-          : loaded.week.track.activities;
+          : activitySeed;
         const hydratedWeek = {
           ...loaded.week,
           track: { activities }
@@ -141,7 +158,12 @@ export function App() {
               account.timezone
             );
         setLoadedWeek({ ...loaded, week: hydratedWeek });
-        setTrackHistoryError(timeLogs.error);
+        setActivityProjects(
+          activityCatalog.status === "ok" && activityCatalog.data
+            ? activityCatalog.data.projects
+            : []
+        );
+        setTrackHistoryError(timeLogs.error ?? activityCatalog.error);
         setTrackActivities((current) =>
           current.some((activity) => activity.running || activity.sessionSeconds > 0)
             ? reconcileFocusActivities(activities, current)
@@ -201,6 +223,7 @@ export function App() {
     setAccount(nextAccount);
     setAccountOpen(false);
     setTrackActivities([]);
+    setActivityProjects([]);
     setFocusSessionDrafts({});
     setFocusResultOpen(false);
     setReviewDetailOpen(false);
@@ -236,6 +259,7 @@ export function App() {
     setAccountOpen(false);
     setAccount(null);
     setTrackActivities([]);
+    setActivityProjects([]);
     setFocusSessionDrafts({});
     setFocusResultOpen(false);
     setReviewDetailOpen(false);
@@ -330,7 +354,6 @@ export function App() {
 
   const appWeek = loadedWeek.week;
   const signalsAreEmpty = loadedWeek.source === "empty" && activeTab === "signals";
-  const trackIsEmpty = activeTab === "track" && !trackHistoryError && trackActivities.length === 0;
   const trackIsError = activeTab === "track" && Boolean(trackHistoryError);
   const contentIsError = loadedWeek.source === "error" && (activeTab === "review" || activeTab === "signals");
   const notice = weekLoading
@@ -376,15 +399,6 @@ export function App() {
           onAction={() => setActiveTab("plan")}
         />
       ) : null}
-      {!weekLoading && trackIsEmpty ? (
-        <StateSurface
-          icon="activity"
-          title="No activity yet"
-          actionLabel="Create a plan"
-          actionIcon="calendar"
-          onAction={() => setActiveTab("plan")}
-        />
-      ) : null}
       {!weekLoading && contentIsError ? (
         <StateSurface
           icon="info"
@@ -422,7 +436,7 @@ export function App() {
           onDetailOpenChange={setSignalsDetailOpen}
         />
       ) : null}
-      {!weekLoading && !trackIsEmpty && !trackIsError && !contentIsError && activeTab === "track" ? (
+      {!weekLoading && !trackIsError && !contentIsError && activeTab === "track" ? (
         <TrackScreen
           apiBaseUrl={apiBaseUrl}
           timeZone={account.timezone}
@@ -430,6 +444,7 @@ export function App() {
           fetchImpl={authClient.fetch}
           track={appWeek.track}
           activities={trackActivities}
+          projects={activityProjects}
           onActivitiesChange={setTrackActivities}
           sessionDrafts={focusSessionDrafts}
           onSessionDraftChange={updateFocusSessionDraft}

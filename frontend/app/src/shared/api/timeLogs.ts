@@ -75,7 +75,7 @@ export function activitySessionToTimeLogs(
     duration_minutes: minutes,
     activity_name: activity.name,
     activity_type: energyToApiActivityType(activity.energy),
-    type_source: "user_selected",
+    type_source: activity.activityTypeSource ?? "user_selected",
     note: options.note ?? ""
   }));
 }

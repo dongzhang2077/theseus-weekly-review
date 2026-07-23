@@ -51,6 +51,13 @@ browser flow on 2026-07-22 after verifying Task lifecycle, Plan linkage, and
 reload persistence. No screenshot was recorded; the written acceptance in the
 development conversation is the product gate evidence.
 
+STORY-033 candidate checkpoint (2026-07-22 PDT): ActivityService create/list/
+detail/correction behavior, optimistic conflicts, future open-Focus Project
+guard, authenticated API isolation, restart persistence, TimeLog snapshot
+preservation, Focus create/retry/catalog mapping, full backend/frontend suites,
+sample review, compileall, typecheck, and production build pass. Product-owner
+browser and backend-restart acceptance remain pending.
+
 ## 2. Schema And Migration Matrix
 
 ### Version 5: Durable Tasks

@@ -167,6 +167,35 @@ describe("timerModel", () => {
     ]);
   });
 
+  it("does not collapse two persisted Activities that share one Project", () => {
+    const incoming = [
+      {
+        ...activities[0],
+        id: "activity-7",
+        activityId: 7,
+        projectId: 4,
+        name: "Writing"
+      },
+      {
+        ...activities[1],
+        id: "activity-8",
+        activityId: 8,
+        projectId: 4,
+        name: "Editing"
+      }
+    ];
+    const current = incoming.map((activity, index) => ({
+      ...activity,
+      sessionSeconds: index + 10,
+      running: index === 0
+    }));
+
+    expect(reconcileFocusActivities(incoming, current)).toEqual([
+      expect.objectContaining({ activityId: 7, sessionSeconds: 10, running: true }),
+      expect.objectContaining({ activityId: 8, sessionSeconds: 11, running: false })
+    ]);
+  });
+
   it("retains only explicit view-local and persisted-plan additions across a review refresh", () => {
     const manual = {
       ...activities[1],

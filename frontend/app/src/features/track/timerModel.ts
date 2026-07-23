@@ -91,12 +91,18 @@ export function reconcileFocusActivities(
 ): ActivityTimer[] {
   const matchedCurrentIds = new Set<string>();
   const reconciled = incoming.map((activity) => {
-    const previous = current.find((candidate) =>
-      activity.projectId && candidate.projectId
-        ? activity.projectId === candidate.projectId
-        : activity.id === candidate.id ||
-          (activity.focusContext?.source === "persisted_log" && activity.name === candidate.name)
-    );
+    const previous = current.find((candidate) => {
+      if (activity.activityId !== undefined || candidate.activityId !== undefined) {
+        return activity.activityId !== undefined &&
+          activity.activityId === candidate.activityId;
+      }
+      if (activity.id === candidate.id) return true;
+      if (activity.projectId && candidate.projectId) {
+        return activity.projectId === candidate.projectId;
+      }
+      return activity.focusContext?.source === "persisted_log" &&
+        activity.name === candidate.name;
+    });
     if (!previous) return activity;
     matchedCurrentIds.add(previous.id);
     return {

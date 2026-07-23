@@ -19,6 +19,7 @@ import type { FetchLike } from "./loadAppWeek";
 const activity: ActivityTimer = {
   id: "frontend",
   activityId: 7,
+  activityTypeSource: "user_corrected",
   projectId: 3,
   name: "Frontend build block",
   category: "Project",
@@ -45,7 +46,7 @@ describe("timeLogs api helpers", () => {
       duration_minutes: 2,
       activity_name: "Frontend build block",
       activity_type: "consuming",
-      type_source: "user_selected",
+      type_source: "user_corrected",
       note: "Focused UI polish."
     });
   });

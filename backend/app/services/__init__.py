@@ -1,3 +1,9 @@
+from .activities import (
+    ActivityInUse,
+    ActivityNotFound,
+    ActivityService,
+    ActivityVersionConflict,
+)
 from .auth_service import (
     AccountLocked,
     AuthContext,
@@ -27,6 +33,10 @@ from .tasks import (
 )
 
 __all__ = [
+    "ActivityInUse",
+    "ActivityNotFound",
+    "ActivityService",
+    "ActivityVersionConflict",
     "AccountLocked",
     "AuthContext",
     "AuthService",

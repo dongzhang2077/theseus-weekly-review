@@ -498,15 +498,15 @@ weaken the August 1 course exit gate.
 
 Current status: roadmap and STORY-035 domain contract accepted by the product
 owner on 2026-07-22. STORY-036 is implemented, automatically verified, and
-product-owner accepted on `feature/036-durable-tasks`.
+product-owner accepted on `feature/036-durable-tasks`. STORY-033 is implemented
+and automatically verified on `feature/033-persisted-activities`;
+product-owner browser/restart acceptance is pending.
 
 Next acceptance request:
 
-1. implement authenticated Activity create, list, inspect, and correction
-   behavior through `ActivityService` and the existing repository;
-2. replace Focus view-local creation with truthful persisted loading and save
-   states;
-3. create an Activity, restart backend and browser, and select it again;
-4. verify later TimeLog input preserves the stable Activity ID plus its
-   normalized snapshots;
-5. accept or reject STORY-033 before persisted FocusSession work.
+1. create an Activity in Focus and link it to a Project;
+2. refresh the browser and confirm it remains selectable;
+3. correct its name, Project, note, or energy and confirm the saved version;
+4. complete a short Session and confirm its TimeLog carries the Activity ID;
+5. restart the backend, sign in again, and confirm the Activity remains;
+6. accept or reject STORY-033 before persisted FocusSession work.

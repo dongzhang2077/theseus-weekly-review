@@ -2,6 +2,7 @@ export type EnergyKind = "destroy" | "consume" | "neutral" | "restore";
 
 export type FocusContextSource =
   | "persisted_plan"
+  | "persisted_activity"
   | "review_evidence"
   | "persisted_log"
   | "manual"
@@ -20,6 +21,9 @@ export interface FocusContext {
 export interface ActivityTimer {
   id: string;
   activityId?: number;
+  activityVersion?: number;
+  activityDescription?: string;
+  activityTypeSource?: "user_selected" | "ai_suggested" | "user_corrected";
   projectId?: number;
   projectTitle?: string;
   focusContext?: FocusContext;

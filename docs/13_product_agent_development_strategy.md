@@ -65,7 +65,7 @@ endpoints remain unimplemented.
 | Capability | Current state | Direction |
 |---|---|---|
 | Stable review entities | Schema v5 preserves STORY-030 ownership, credentials, sessions, and existing review records | Preserve v5 while later Agent-domain migrations are implemented |
-| Durable Tasks and live Focus state | Durable Tasks and nullable Plan/TimeLog links are accepted in STORY-036; live Focus remains local browser state | Implement STORY-033, STORY-037, and STORY-034 sequentially |
+| Durable Tasks and live Focus state | Durable Tasks and nullable Plan/TimeLog links are accepted in STORY-036; durable Activity management is a locally verified STORY-033 candidate; live Focus remains local browser state | Accept STORY-033, then implement STORY-037 and STORY-034 sequentially |
 | Persistent review path | User-scoped sample data flows through SQLite, the review engine, and stored review; v1 migration and restart coverage are merged | Rehearse the browser-to-API restart path |
 | Review reasoning | Deterministic, evidence-first rules | Keep framework-independent |
 | AI wording | Evidence-bound writer adapters exist | Keep AI wording downstream of computed facts |

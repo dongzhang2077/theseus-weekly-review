@@ -143,6 +143,112 @@ describe("TrackScreen", () => {
     );
   });
 
+  it("adds an Activity only after the durable API save succeeds", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
+      response(true, 201, {
+        id: 7,
+        user_id: 1,
+        project_id: 11,
+        name: "Focused writing",
+        description: "Draft the findings",
+        activity_type: "consuming",
+        type_source: "user_selected",
+        version: 1,
+        created_at: "2026-07-22T20:00:00Z",
+        updated_at: "2026-07-22T20:00:00Z"
+      })
+    );
+    render(
+      <TrackScreen
+        apiBaseUrl="http://127.0.0.1:8000"
+        fetchImpl={fetchImpl}
+        track={{ activities: [] }}
+        projects={[
+          {
+            id: 11,
+            title: "Final report",
+            stage: "sprint",
+            status: "active",
+            weeklyMinMinutes: 120,
+            weeklyTargetMinutes: 300
+          }
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add a quick activity" }));
+    const form = screen.getByRole("dialog", { name: "New activity" });
+    fireEvent.change(within(form).getByLabelText("Activity name"), {
+      target: { value: "Focused writing" }
+    });
+    fireEvent.change(within(form).getByLabelText("Activity project"), {
+      target: { value: "11" }
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Focused" }));
+    fireEvent.change(within(form).getByLabelText("Note"), {
+      target: { value: "Draft the findings" }
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Activity saved");
+    expect(screen.getByRole("region", { name: "Current focus" })).toHaveTextContent(
+      "Focused writing"
+    );
+    expect(JSON.parse(String(fetchImpl.mock.calls[0][1].body))).toEqual({
+      project_id: 11,
+      name: "Focused writing",
+      description: "Draft the findings",
+      activity_type: "consuming"
+    });
+  });
+
+  it("keeps the Activity draft visible after a save failure and allows retry", async () => {
+    const fetchImpl = vi
+      .fn<FetchLike>()
+      .mockResolvedValueOnce(
+        response(false, 503, {
+          detail: { message: "Activity storage is unavailable" }
+        })
+      )
+      .mockResolvedValueOnce(
+        response(true, 201, {
+          id: 9,
+          user_id: 1,
+          project_id: null,
+          name: "Inbox cleanup",
+          description: "",
+          activity_type: "neutral",
+          type_source: "user_selected",
+          version: 1,
+          created_at: "2026-07-22T20:00:00Z",
+          updated_at: "2026-07-22T20:00:00Z"
+        })
+      );
+    render(
+      <TrackScreen
+        apiBaseUrl="http://127.0.0.1:8000"
+        fetchImpl={fetchImpl}
+        track={{ activities: [] }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add a quick activity" }));
+    const form = screen.getByRole("dialog", { name: "New activity" });
+    fireEvent.change(within(form).getByLabelText("Activity name"), {
+      target: { value: "Inbox cleanup" }
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Save" }));
+
+    expect(await within(form).findByRole("alert")).toHaveTextContent(
+      "Activity storage is unavailable"
+    );
+    expect(within(form).getByLabelText("Activity name")).toHaveValue("Inbox cleanup");
+    fireEvent.click(within(form).getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Activity saved");
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
   it("restores the session setup when Focus is unmounted during tab navigation", () => {
     render(<SessionDraftHarness />);
 
@@ -341,11 +447,11 @@ function trackWithSession(): AppWeekViewModel["track"] {
   };
 }
 
-function response(ok: boolean, status: number) {
+function response(ok: boolean, status: number, payload: unknown = {}) {
   return {
     ok,
     status,
-    json: async () => ({})
+    json: async () => payload
   };
 }
 
