@@ -134,8 +134,13 @@ Files/modules: `features/plan`
 Acceptance criteria:
 
 - Plan supports suggestion available/applied/dismissed states.
-- Focus and slack details can be saved.
-- Empty or incomplete plan paths lead to focused planning surfaces.
+- Level 1 contains one compact balance, one primary adjustment, and one
+  collapsed Plan-block entry instead of parallel item and action lists.
+- Plan blocks, Projects, and manual editing remain available at Level 2 or
+  Level 3, and a selected block can still hand off to Focus.
+- A target week with no saved WeeklyPlan retains a `New` entry; the normal
+  editor creates it through the authenticated API without requiring Review.
+- Apply, Edit, save, conflict, and Undo states remain truthful and reversible.
 
 Verification:
 

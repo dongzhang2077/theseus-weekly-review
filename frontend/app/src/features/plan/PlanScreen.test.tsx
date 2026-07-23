@@ -43,6 +43,8 @@ describe("PlanScreen", () => {
     expect(screen.getByRole("button", { name: "Suggested adjustment: Protect one restart block" })).toHaveTextContent(
       "Resume and applications · +1h"
     );
+    expect(screen.getByRole("button", { name: "Apply adjustment" })).toHaveTextContent("Apply");
+    expect(screen.getByRole("button", { name: "Open plan blocks" })).toHaveTextContent("3 blocks · 11h");
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
 
@@ -81,6 +83,16 @@ describe("PlanScreen", () => {
     expect(within(detail).getByText("4h")).toBeInTheDocument();
     expect(within(detail).getByText("3h")).toBeInTheDocument();
     await waitFor(() => expect(onDetailOpenChange).toHaveBeenLastCalledWith(true));
+  });
+
+  it("applies the previewed adjustment directly from Level 1", async () => {
+    renderPlan();
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply adjustment" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Sample adjustment applied");
+    expect(screen.getByText("Adjustment applied")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
   });
 
   it("persists a new target-week plan and deletes it on Undo", async () => {
@@ -156,12 +168,18 @@ describe("PlanScreen", () => {
     expect(await screen.findByRole("button", { name: "Suggested adjustment: Protect one restart block" })).toBeInTheDocument();
   });
 
-  it("offers a discoverable manual editor without requiring Review", async () => {
+  it("keeps a discoverable New plan editor without requiring Review", async () => {
     renderPlan();
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Edit plan" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "New plan" }));
     const editor = screen.getByRole("dialog", { name: "Edit plan" });
     expect(within(editor).getByLabelText("Weekly capacity hours")).toHaveValue(30);
+    expect(within(editor).getByTestId("plan-block-fields-1")).toHaveClass(
+      "grid-cols-1",
+      "min-[390px]:grid-cols-[minmax(0,1fr)_96px]"
+    );
+    expect(within(editor).getByLabelText("Plan block 1 project")).toHaveClass("w-full", "min-w-0", "max-w-full");
+    expect(within(editor).getByLabelText("Plan block 1 duration")).toHaveClass("w-full", "min-w-0", "max-w-full");
 
     fireEvent.click(within(editor).getByRole("button", { name: "Add block" }));
     fireEvent.change(within(editor).getByLabelText("Plan block 4 title"), {
@@ -176,10 +194,31 @@ describe("PlanScreen", () => {
     expect(screen.getByRole("button", { name: "Week balance: Balanced" })).toHaveTextContent("11h 45m");
   });
 
+  it("creates a new target-week plan through the retained New entry", async () => {
+    const calls: Array<{ input: string; init: RequestInit }> = [];
+    const fetchImpl: FetchLike = async (input, init) => {
+      calls.push({ input, init });
+      if (init.method === "GET" && input.endsWith("/weekly-plans")) return ok([reviewedPlan]);
+      if (init.method === "GET" && input.endsWith("/projects")) return ok(projects);
+      if (init.method === "POST") return ok(targetPlan, 201);
+      return failed(500);
+    };
+    renderPlan({ apiBaseUrl: "http://127.0.0.1:8000", reviewSource: "api", fetchImpl });
+
+    fireEvent.click(await screen.findByRole("button", { name: "New plan" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Edit plan" })).getByRole("button", { name: "Save plan" }));
+
+    await waitFor(() => expect(calls.some((call) => call.init.method === "POST")).toBe(true));
+    expect(await screen.findByRole("status")).toHaveTextContent("Plan updated");
+    expect(screen.getByRole("button", { name: "Edit plan" })).toBeInTheDocument();
+  });
+
   it("starts a planned block through the parent Focus callback", () => {
     const onFocusItem = vi.fn();
     renderPlan({ onFocusItem });
 
+    expect(screen.queryByRole("button", { name: "Focus Design backend schema and API" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open plan blocks" }));
     fireEvent.click(screen.getByRole("button", { name: "Focus Design backend schema and API" }));
     expect(onFocusItem).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Design backend schema and API", plannedMinutes: 300 }),

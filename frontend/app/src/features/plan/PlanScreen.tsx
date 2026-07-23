@@ -9,6 +9,7 @@ import {
 } from "../../shared/api/planApi";
 import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
 import { DetailPanel } from "../../shared/components/DetailPanel";
+import { IconButton } from "../../shared/components/IconButton";
 import { StateSurface } from "../../shared/components/StateSurface";
 import { Icon } from "../../shared/icons/Icon";
 import {
@@ -301,7 +302,13 @@ export function PlanScreen({
       <header className="grid h-[52px] grid-cols-[44px_1fr_44px] items-center border-b border-desk-line bg-desk-raised/90 px-3">
         <span aria-hidden="true" />
         <h1 className="m-0 truncate text-center text-[17px] font-bold">{formatPlanWeek(workspace.draft.week)}</h1>
-        <span aria-hidden="true" />
+        <IconButton
+          className="col-start-3"
+          label={workspace.persistedPlan ? "Edit plan" : "New plan"}
+          icon={workspace.persistedPlan ? "fileText" : "plus"}
+          disabled={loadPhase !== "ready" || operation.phase === "saving" || operation.phase === "undoing"}
+          onClick={() => setDetail("edit")}
+        />
       </header>
 
       {loadPhase === "loading" ? (
@@ -322,139 +329,131 @@ export function PlanScreen({
 
       {loadPhase === "ready" ? (
         <div className="mx-auto grid w-full gap-4 px-4 py-4">
-          <div className="flex flex-col gap-4">
-            <button
-              className={`rounded-paper border p-4 text-left shadow-paper transition-colors duration-150 ${balanceSurfaceClass(metrics.status)}`}
-              type="button"
-              aria-label={`Week balance: ${balanceLabel(metrics.status)}`}
-              onClick={() => setDetail("slack")}
+          <button
+            className={`rounded-paper border px-3 py-3 text-left transition-colors duration-150 ${balanceSurfaceClass(metrics.status)}`}
+            type="button"
+            aria-label={`Week balance: ${balanceLabel(metrics.status)}`}
+            onClick={() => setDetail("slack")}
+          >
+            <span className="flex items-center justify-between gap-3">
+              <span className="flex items-baseline gap-2">
+                <small className="text-xs font-bold uppercase tracking-wide text-desk-muted">Balance</small>
+                <strong className="text-sm">{balanceLabel(metrics.status)}</strong>
+              </span>
+              <Icon name="chevronRight" className="size-4 text-desk-muted" />
+            </span>
+            <span className="mt-2 grid grid-cols-3 divide-x divide-desk-line">
+              <Metric label="Planned" value={formatMinutes(metrics.plannedMinutes)} />
+              <Metric label="Capacity" value={formatMinutesOrDash(metrics.capacityMinutes)} />
+              <Metric label="Slack" value={formatNullableMinutes(metrics.slackMinutes)} />
+            </span>
+            <span className="mt-2 block h-1 overflow-hidden rounded-full bg-desk-sunk" aria-hidden="true">
+              <span
+                className={`block h-full rounded-full transition-[width] duration-200 ${balanceFillClass(metrics.status)}`}
+                style={{ width: `${loadPercent(metrics)}%` }}
+              />
+            </span>
+          </button>
+
+          {operation.phase !== "idle" ? (
+            <div
+              className={`flex min-h-11 items-center gap-2 rounded-paper px-3 py-2 text-sm font-semibold ${operationSurfaceClass(operation.phase)}`}
+              role={operation.phase === "error" || operation.phase === "conflict" ? "alert" : "status"}
+              title={operation.detail ?? undefined}
             >
-              <span className="flex items-center justify-between gap-3">
-                <span>
-                  <small className="block text-xs font-bold uppercase tracking-wide text-desk-muted">Week balance</small>
-                  <strong className="mt-1 block text-xl">{balanceLabel(metrics.status)}</strong>
-                </span>
-                <Icon name="chevronRight" className="size-5 text-desk-muted" />
-              </span>
-              <span className="mt-4 block h-1.5 overflow-hidden rounded-full bg-desk-sunk" aria-hidden="true">
-                <span
-                  className={`block h-full rounded-full transition-[width] duration-200 ${balanceFillClass(metrics.status)}`}
-                  style={{ width: `${loadPercent(metrics)}%` }}
-                />
-              </span>
-              <span className="mt-4 grid grid-cols-3 divide-x divide-desk-line">
-                <Metric label="Planned" value={formatMinutes(metrics.plannedMinutes)} />
-                <Metric label="Capacity" value={formatMinutesOrDash(metrics.capacityMinutes)} />
-                <Metric label="Slack" value={formatNullableMinutes(metrics.slackMinutes)} />
-              </span>
-            </button>
+              <Icon name={operationIcon(operation.phase)} className="size-4 shrink-0" />
+              <span className="min-w-0 flex-1">{operation.message}</span>
+              {operation.phase === "saved" && undoSnapshot && detail !== "suggestion" ? (
+                <button className="rounded-paper border-0 bg-transparent px-2 py-1 font-bold underline-offset-2 hover:underline" type="button" onClick={() => void undoAdjustment()}>Undo</button>
+              ) : null}
+              {operation.phase === "error" && operation.action !== "manual" ? (
+                <button className="rounded-paper border-0 bg-transparent px-2 py-1 font-bold underline-offset-2 hover:underline" type="button" onClick={retryOperation}>Retry</button>
+              ) : null}
+              {operation.phase === "conflict" ? (
+                <button className="rounded-paper border-0 bg-transparent px-2 py-1 font-bold underline-offset-2 hover:underline" type="button" onClick={() => setReload((value) => value + 1)}>Reload</button>
+              ) : null}
+            </div>
+          ) : null}
 
-            {operation.phase !== "idle" ? (
-              <div
-                className={`flex min-h-11 items-center gap-2 rounded-paper px-3 py-2 text-sm font-semibold ${operationSurfaceClass(operation.phase)}`}
-                role={operation.phase === "error" || operation.phase === "conflict" ? "alert" : "status"}
-                title={operation.detail ?? undefined}
-              >
-                <Icon name={operationIcon(operation.phase)} className="size-4 shrink-0" />
-                <span className="min-w-0 flex-1">{operation.message}</span>
-                {operation.phase === "saved" && undoSnapshot && detail !== "suggestion" ? (
-                  <button className="rounded-paper border-0 bg-transparent px-2 py-1 font-bold underline-offset-2 hover:underline" type="button" onClick={() => void undoAdjustment()}>Undo</button>
-                ) : null}
-                {operation.phase === "error" && operation.action !== "manual" ? (
-                  <button className="rounded-paper border-0 bg-transparent px-2 py-1 font-bold underline-offset-2 hover:underline" type="button" onClick={retryOperation}>Retry</button>
-                ) : null}
-                {operation.phase === "conflict" ? (
-                  <button className="rounded-paper border-0 bg-transparent px-2 py-1 font-bold underline-offset-2 hover:underline" type="button" onClick={() => setReload((value) => value + 1)}>Reload</button>
-                ) : null}
-              </div>
-            ) : null}
-
-            {workspace.draft.items.length > 0 ? (
-              <section aria-labelledby="planned-blocks-title">
-                <div className="mb-2 flex items-center justify-between">
-                  <h2 className="m-0 text-sm font-bold" id="planned-blocks-title">Plan blocks</h2>
-                  <button className="border-0 bg-transparent text-xs font-bold text-desk-accent" type="button" onClick={() => setDetail("focus")}>View all</button>
-                </div>
-                <div className="divide-y divide-desk-line border-y border-desk-line">
-                  {[...workspace.draft.items]
-                    .sort((left, right) => left.priority - right.priority)
-                    .slice(0, 3)
-                    .map((item, index) => (
-                      <button
-                        className="grid min-h-14 w-full grid-cols-[28px_1fr_auto] items-center gap-3 border-0 bg-transparent py-2 text-left hover:bg-desk-sunk disabled:cursor-default"
-                        type="button"
-                        key={item.id ?? `${item.title}-${index}`}
-                        aria-label={`Focus ${item.title}`}
-                        disabled={!onFocusItem}
-                        onClick={() => onFocusItem?.(item, item.projectId ? projectNames.get(item.projectId) ?? null : null)}
-                      >
-                        <span className="grid size-7 place-items-center rounded-full bg-desk-sunk text-xs font-bold text-desk-muted">{item.priority}</span>
-                        <span className="min-w-0">
-                          <strong className="block truncate text-sm">{item.title}</strong>
-                          <small className="block truncate text-desk-muted">{item.projectId ? projectNames.get(item.projectId) ?? "Project" : "Flexible"}</small>
-                        </span>
-                        <span className="flex items-center gap-2 font-bold">
-                          {formatMinutes(item.plannedMinutes)}
-                          {onFocusItem ? <Icon name="play" className="size-4 text-desk-accent" /> : null}
-                        </span>
-                      </button>
-                    ))}
-                </div>
-              </section>
-            ) : null}
-          </div>
-
-          <div className="flex flex-col gap-4">
-            {proposal ? (
+          {proposal ? (
+            <section className="overflow-hidden rounded-paper border border-desk-warn/35 bg-desk-raised shadow-paper" aria-labelledby="plan-adjustment-title">
               <button
-                className="rounded-paper border border-desk-line bg-desk-raised p-4 text-left shadow-paper transition-colors duration-150 hover:border-desk-warn"
+                className="block w-full border-0 bg-transparent p-4 text-left transition-colors duration-150 hover:bg-desk-warn-soft/25"
                 type="button"
                 aria-label={`Suggested adjustment: ${proposal.suggestion.title}`}
                 onClick={() => setDetail("suggestion")}
               >
-                <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-desk-warn">
-                  <Icon name="route" className="size-4" /> Suggested adjustment
+                <span className="flex items-center justify-between gap-3 text-xs font-bold uppercase tracking-wide text-desk-warn">
+                  <span className="flex items-center gap-2"><Icon name="route" className="size-4" /> Adjustment</span>
+                  <Icon name="chevronRight" className="size-4" />
                 </span>
-                <strong className="mt-3 block text-lg leading-snug">{proposal.suggestion.title}</strong>
+                <strong className="mt-3 block text-lg leading-snug" id="plan-adjustment-title">{proposal.suggestion.title}</strong>
                 <small className="mt-1 block font-semibold text-desk-muted">
                   {proposal.suggestion.projectTitle ?? "Flexible block"} · {formatSignedMinutes(proposal.suggestion.deltaMinutes)}
                 </small>
-                <p className="mt-3 line-clamp-2 text-sm leading-5 text-desk-muted">{proposal.suggestion.reason}</p>
+                <p className="mt-2 line-clamp-2 text-sm leading-5 text-desk-muted">{proposal.suggestion.reason}</p>
                 <span className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-paper bg-desk-sunk px-3 py-2 text-center text-xs">
                   <span><small className="block text-desk-muted">Before</small><strong>{formatMinutes(proposal.beforeMetrics.plannedMinutes)}</strong></span>
                   <Icon name="chevronRight" className="size-4 text-desk-subtle" />
                   <span><small className="block text-desk-muted">After</small><strong>{formatMinutes(proposal.afterMetrics.plannedMinutes)}</strong></span>
                 </span>
               </button>
-            ) : workspace.suggestionStatus === "applied" ? (
-              <button className="flex min-h-14 items-center gap-3 rounded-paper border border-desk-line bg-desk-accent-soft px-3 text-left text-desk-accent" type="button" onClick={() => setDetail("suggestion")}>
-                <Icon name="check" className="size-5" />
-                <span className="flex-1"><strong className="block text-sm">Adjustment applied</strong><small>Saved in this week</small></span>
-                <Icon name="chevronRight" className="size-4" />
-              </button>
-            ) : workspace.suggestionStatus === "dismissed" && workspace.suggestion ? (
-              <button className="flex min-h-14 items-center gap-3 rounded-paper border border-desk-line bg-desk-raised px-3 text-left" type="button" onClick={() => setDetail("suggestion")}>
-                <Icon name="x" className="size-5 text-desk-muted" />
-                <span className="flex-1"><strong className="block text-sm">Suggestion dismissed</strong><small className="text-desk-muted">Restore when useful</small></span>
-                <Icon name="chevronRight" className="size-4 text-desk-muted" />
-              </button>
-            ) : (
-              <section className="rounded-paper border border-desk-line bg-desk-raised p-4">
-                <h2 className="m-0 text-base font-bold">Set this week up</h2>
-                <p className="mt-1 text-sm text-desk-muted">Start manually or review last week first.</p>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <button className="min-h-10 rounded-paper border-0 bg-desk-accent px-3 text-sm font-bold text-white" type="button" onClick={() => setDetail("edit")}>Edit plan</button>
-                  <button className="min-h-10 rounded-paper border border-desk-line bg-transparent px-3 text-sm font-bold text-desk-muted" type="button" onClick={onReview}>Open review</button>
-                </div>
-              </section>
-            )}
+              <div className="flex justify-end border-t border-desk-line px-3 py-2">
+                <button
+                  className="min-h-10 rounded-paper border border-desk-accent/25 bg-desk-accent-soft px-5 text-sm font-bold text-desk-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  type="button"
+                  aria-label="Apply adjustment"
+                  disabled={operation.phase === "saving" || operation.phase === "undoing"}
+                  onClick={() => void applySuggestion()}
+                >
+                  {operation.phase === "saving" ? "Saving" : "Apply"}
+                </button>
+              </div>
+            </section>
+          ) : workspace.suggestionStatus === "applied" ? (
+            <button className="flex min-h-14 items-center gap-3 rounded-paper border border-desk-line bg-desk-accent-soft px-3 text-left text-desk-accent" type="button" onClick={() => setDetail("suggestion")}>
+              <Icon name="check" className="size-5" />
+              <span className="flex-1"><strong className="block text-sm">Adjustment applied</strong><small>Saved in this week</small></span>
+              <Icon name="chevronRight" className="size-4" />
+            </button>
+          ) : workspace.suggestionStatus === "dismissed" && workspace.suggestion ? (
+            <button className="flex min-h-14 items-center gap-3 rounded-paper border border-desk-line bg-desk-raised px-3 text-left" type="button" onClick={() => setDetail("suggestion")}>
+              <Icon name="x" className="size-5 text-desk-muted" />
+              <span className="flex-1"><strong className="block text-sm">Suggestion dismissed</strong><small className="text-desk-muted">Restore when useful</small></span>
+              <Icon name="chevronRight" className="size-4 text-desk-muted" />
+            </button>
+          ) : workspace.persistedPlan ? (
+            <section className="flex min-h-14 items-center gap-3 rounded-paper border border-desk-line bg-desk-raised px-3">
+              <Icon name="check" className="size-5 text-desk-accent" />
+              <span className="min-w-0 flex-1"><strong className="block text-sm">No adjustment</strong><small className="text-desk-muted">Plan is ready</small></span>
+              <button className="min-h-9 rounded-paper border border-desk-line bg-transparent px-3 text-sm font-bold text-desk-muted" type="button" onClick={() => setDetail("edit")}>Edit</button>
+            </section>
+          ) : (
+            <section className="rounded-paper border border-desk-line bg-desk-raised p-4">
+              <h2 className="m-0 text-base font-bold">No plan yet</h2>
+              <p className="mt-1 text-sm text-desk-muted">Set capacity and blocks for this week.</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button className="min-h-10 rounded-paper border border-desk-accent/25 bg-desk-accent-soft px-3 text-sm font-bold text-desk-accent" type="button" onClick={() => setDetail("edit")}>New</button>
+                <button className="min-h-10 rounded-paper border border-desk-line bg-transparent px-3 text-sm font-bold text-desk-muted" type="button" onClick={onReview}>Review</button>
+              </div>
+            </section>
+          )}
 
-            <div className="grid grid-cols-3 gap-2" aria-label="Plan actions">
-              <PlanAction icon="plus" label="Edit plan" onClick={() => setDetail("edit")} />
-              <PlanAction icon="target" label="Focus" onClick={() => setDetail("focus")} />
-              <PlanAction icon="folder" label="Projects" onClick={() => setDetail("projects")} />
-            </div>
-          </div>
+          {workspace.draft.items.length > 0 ? (
+            <button
+              className="grid min-h-14 w-full grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 rounded-paper border border-desk-line bg-desk-raised px-3 text-left transition-colors hover:bg-desk-sunk"
+              type="button"
+              aria-label="Open plan blocks"
+              onClick={() => setDetail("focus")}
+            >
+              <span className="grid size-9 place-items-center rounded-full bg-desk-sunk text-desk-muted"><Icon name="layers" className="size-5" /></span>
+              <span className="min-w-0">
+                <strong className="block text-sm">Plan blocks</strong>
+                <small className="block text-desk-muted">{workspace.draft.items.length} blocks · {formatMinutes(metrics.plannedMinutes)}</small>
+              </span>
+              <Icon name="chevronRight" className="size-4 text-desk-muted" />
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -474,7 +473,13 @@ export function PlanScreen({
           />
         ) : null}
         {detail === "focus" ? (
-          <FocusDetail workspace={workspace} projectNames={projectNames} onReview={onReview} onFocusItem={onFocusItem} />
+          <FocusDetail
+            workspace={workspace}
+            projectNames={projectNames}
+            onEdit={() => setDetail("edit")}
+            onProjects={() => setDetail("projects")}
+            onFocusItem={onFocusItem}
+          />
         ) : null}
         {detail === "slack" ? <SlackDetail metrics={metrics} /> : null}
         {detail === "projects" ? <ProjectsDetail workspace={workspace} /> : null}
@@ -489,27 +494,6 @@ function Metric({ label, value }: { label: string; value: string }) {
       <small className="block text-xs text-desk-muted">{label}</small>
       <strong className="mt-1 block tabular-nums text-base">{value}</strong>
     </span>
-  );
-}
-
-function PlanAction({
-  icon,
-  label,
-  onClick
-}: {
-  icon: "plus" | "target" | "folder";
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className="flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-paper border border-desk-line bg-desk-raised px-2 text-xs font-bold text-desk-muted transition-colors duration-150 hover:bg-desk-sunk hover:text-desk-ink"
-      type="button"
-      onClick={onClick}
-    >
-      <Icon name={icon} className="size-5" />
-      <span>{label}</span>
-    </button>
   );
 }
 
@@ -576,7 +560,7 @@ function PlanEditor({
   }
 
   return (
-    <form className="grid gap-5" onSubmit={submit}>
+    <form className="grid min-w-0 gap-5 overflow-x-clip" onSubmit={submit}>
       <section className="rounded-paper bg-desk-sunk p-3">
         <div className="flex items-center justify-between gap-4">
           <span>
@@ -590,9 +574,9 @@ function PlanEditor({
         </div>
       </section>
 
-      <label className="grid gap-1 text-sm font-semibold">
+      <label className="grid min-w-0 gap-1 text-sm font-semibold">
         <span>Weekly capacity</span>
-        <span className="flex items-center rounded-paper border border-desk-line bg-desk-raised px-3">
+        <span className="flex min-w-0 items-center rounded-paper border border-desk-line bg-desk-raised px-3">
           <input
             className="min-h-11 min-w-0 flex-1 border-0 bg-transparent outline-none"
             aria-label="Weekly capacity hours"
@@ -609,40 +593,43 @@ function PlanEditor({
         </span>
       </label>
 
-      <section>
+      <section className="min-w-0">
         <div className="mb-2 flex items-center justify-between">
-          <div>
+          <div className="min-w-0">
             <h2 className="m-0 text-sm font-bold">Plan blocks</h2>
             <p className="m-0 text-xs text-desk-muted">Task, project, duration</p>
           </div>
-          <button className="inline-flex min-h-9 items-center gap-1 rounded-paper border border-desk-line bg-desk-raised px-3 text-sm font-bold text-desk-muted" type="button" onClick={addItem}>
+          <button className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-paper border border-desk-line bg-desk-raised px-3 text-sm font-bold text-desk-muted" type="button" onClick={addItem}>
             <Icon name="plus" className="size-4" /> Add block
           </button>
         </div>
-        <div className="grid gap-3">
+        <div className="grid min-w-0 gap-3">
           {editor.items.map((item, index) => (
-            <section className="rounded-paper border border-desk-line bg-desk-raised p-3" key={item.id ?? `new-${index}`}>
+            <section className="min-w-0 rounded-paper border border-desk-line bg-desk-raised p-3" key={item.id ?? `new-${index}`}>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <strong className="text-sm">Block {index + 1}</strong>
                 <button className="grid size-8 place-items-center rounded-full border-0 bg-transparent text-desk-danger hover:bg-desk-danger-soft" type="button" aria-label={`Remove ${item.title || "block"}`} onClick={() => removeItem(index)}>
                   <Icon name="trash" className="size-4" />
                 </button>
               </div>
-              <div className="grid gap-3">
-                <label className="grid gap-1 text-xs font-semibold text-desk-muted">
+              <div className="grid min-w-0 gap-3">
+                <label className="grid min-w-0 gap-1 text-xs font-semibold text-desk-muted">
                   <span>Title</span>
                   <input
-                    className="min-h-10 rounded-paper border border-desk-line bg-desk-paper px-3 text-sm text-desk-ink"
+                    className="min-h-10 w-full min-w-0 max-w-full rounded-paper border border-desk-line bg-desk-paper px-3 text-sm text-desk-ink"
                     aria-label={`Plan block ${index + 1} title`}
                     value={item.title}
                     onChange={(event) => updateItem(index, { title: event.currentTarget.value })}
                   />
                 </label>
-                <div className="grid grid-cols-[1fr_110px] gap-3">
-                  <label className="grid gap-1 text-xs font-semibold text-desk-muted">
+                <div
+                  className="grid min-w-0 grid-cols-1 gap-3 min-[390px]:grid-cols-[minmax(0,1fr)_96px]"
+                  data-testid={`plan-block-fields-${index + 1}`}
+                >
+                  <label className="grid min-w-0 gap-1 text-xs font-semibold text-desk-muted">
                     <span>Project</span>
                     <select
-                      className="min-h-10 rounded-paper border border-desk-line bg-desk-paper px-2 text-sm text-desk-ink"
+                      className="min-h-10 w-full min-w-0 max-w-full rounded-paper border border-desk-line bg-desk-paper px-2 text-sm text-desk-ink"
                       aria-label={`Plan block ${index + 1} project`}
                       value={item.projectId ?? ""}
                       onChange={(event) => updateItem(index, {
@@ -653,10 +640,10 @@ function PlanEditor({
                       {projects.map((project) => <option value={project.id} key={project.id}>{project.title}</option>)}
                     </select>
                   </label>
-                  <label className="grid gap-1 text-xs font-semibold text-desk-muted">
+                  <label className="grid min-w-0 gap-1 text-xs font-semibold text-desk-muted">
                     <span>Minutes</span>
                     <input
-                      className="min-h-10 rounded-paper border border-desk-line bg-desk-paper px-3 text-sm text-desk-ink"
+                      className="min-h-10 w-full min-w-0 max-w-full rounded-paper border border-desk-line bg-desk-paper px-3 text-sm text-desk-ink"
                       aria-label={`Plan block ${index + 1} duration`}
                       min="5"
                       step="5"
@@ -795,12 +782,14 @@ function DiffRow({ label, before, after }: { label: string; before: string; afte
 function FocusDetail({
   workspace,
   projectNames,
-  onReview,
+  onEdit,
+  onProjects,
   onFocusItem
 }: {
   workspace: PlanWorkspace;
   projectNames: Map<number, string>;
-  onReview: () => void;
+  onEdit: () => void;
+  onProjects: () => void;
   onFocusItem?: (item: PlanItem, projectTitle: string | null) => void;
 }) {
   const items = [...workspace.draft.items].sort((a, b) => a.priority - b.priority);
@@ -809,34 +798,43 @@ function FocusDetail({
       <StateSurface
         icon="target"
         title="No focus block yet"
-        actionLabel="Open review"
-        actionIcon="book"
-        onAction={onReview}
+        actionLabel="New"
+        actionIcon="plus"
+        onAction={onEdit}
       />
     );
   }
   return (
-    <div className="divide-y divide-desk-line border-y border-desk-line">
-      {items.map((item, index) => (
-        <button
-          className="grid min-h-14 w-full grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 border-0 bg-transparent py-2 text-left hover:bg-desk-sunk disabled:cursor-default"
-          type="button"
-          key={item.id ?? `${item.title}-${index}`}
-          aria-label={`Focus ${item.title}`}
-          disabled={!onFocusItem}
-          onClick={() => onFocusItem?.(item, item.projectId ? projectNames.get(item.projectId) ?? null : null)}
-        >
-          <span className="grid size-7 place-items-center rounded-full bg-desk-sunk text-xs font-bold text-desk-muted">{item.priority}</span>
-          <span className="min-w-0">
-            <strong className="block truncate text-sm">{item.title}</strong>
-            <small className="block truncate text-desk-muted">{item.projectId ? projectNames.get(item.projectId) ?? "Project" : "Flexible"}</small>
-          </span>
-          <span className="flex items-center gap-2 font-bold">
-            {formatMinutes(item.plannedMinutes)}
-            {onFocusItem ? <Icon name="play" className="size-4 text-desk-accent" /> : null}
-          </span>
-        </button>
-      ))}
+    <div className="grid gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold text-desk-muted">{items.length} blocks</span>
+        <div className="flex items-center gap-2">
+          <button className="min-h-9 rounded-paper border border-desk-line bg-desk-raised px-3 text-sm font-bold text-desk-muted" type="button" onClick={onProjects}>Projects</button>
+          <button className="min-h-9 rounded-paper border border-desk-accent/25 bg-desk-accent-soft px-3 text-sm font-bold text-desk-accent" type="button" onClick={onEdit}>Edit</button>
+        </div>
+      </div>
+      <div className="divide-y divide-desk-line border-y border-desk-line">
+        {items.map((item, index) => (
+          <button
+            className="grid min-h-14 w-full grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 border-0 bg-transparent py-2 text-left hover:bg-desk-sunk disabled:cursor-default"
+            type="button"
+            key={item.id ?? `${item.title}-${index}`}
+            aria-label={`Focus ${item.title}`}
+            disabled={!onFocusItem}
+            onClick={() => onFocusItem?.(item, item.projectId ? projectNames.get(item.projectId) ?? null : null)}
+          >
+            <span className="grid size-7 place-items-center rounded-full bg-desk-sunk text-xs font-bold text-desk-muted">{item.priority}</span>
+            <span className="min-w-0">
+              <strong className="block truncate text-sm">{item.title}</strong>
+              <small className="block truncate text-desk-muted">{item.projectId ? projectNames.get(item.projectId) ?? "Project" : "Flexible"}</small>
+            </span>
+            <span className="flex items-center gap-2 font-bold">
+              {formatMinutes(item.plannedMinutes)}
+              {onFocusItem ? <Icon name="play" className="size-4 text-desk-accent" /> : null}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

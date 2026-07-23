@@ -111,6 +111,28 @@ allocated by the account timezone, and a session crossing local midnight is
 stored as an atomic batch of daily TimeLogs rather than being assigned wholly
 to its end date.
 
+### Plan information depth and creation
+
+Plan keeps one question at each depth while preserving formal WeeklyPlan
+creation and persistence:
+
+1. Level 1 shows a compact Planned/Capacity/Slack balance, one evidence-linked
+   adjustment with its before/after preview and `Apply`, then one collapsed
+   Plan-block summary. Individual blocks, Projects, and parallel action tiles do
+   not compete with the adjustment on this screen.
+2. Level 2 lists the complete Plan blocks and exposes `Edit` and `Projects`.
+   Selecting a block may hand it to Focus without duplicating the task model.
+3. Level 3 owns manual capacity/block editing, proposal evidence, save,
+   conflict, and Undo behavior. Editor controls must remain inside the phone
+   viewport: flexible grid tracks use `minmax(0, ...)`, fields can shrink to
+   their container, and Project/Minutes stack below 390px rather than creating
+   horizontal scrolling.
+
+When the target week has no persisted WeeklyPlan, the header and empty state
+retain a clear `New` entry. It opens the same editor used by `Edit`; saving a
+draft with no persisted ID creates the real user-scoped plan through the API.
+Do not replace this path with view-local state or require Review first.
+
 ## 4. Frontend Architecture
 
 Tailwind CSS v4 is the default styling path for new and migrated screens.
