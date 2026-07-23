@@ -2,11 +2,11 @@
 
 ## 1. Core Entities
 
-The tree below is the accepted Agent-foundation target. Schema version 4 is the
-currently implemented baseline. `Task`, `FocusSession`,
-`FocusSessionSegment`, and the correction/audit extensions are accepted
-contracts for later versioned migrations; their presence here does not mean
-the current runtime already exposes them.
+The tree below is the accepted Agent-foundation target. Schema version 5 is the
+currently implemented candidate. `Task` and its nullable PlannedItem/TimeLog
+links are implemented by STORY-036. `FocusSession`, `FocusSessionSegment`, and
+the correction/audit extensions remain contracts for later versioned
+migrations; their presence here does not mean the current runtime exposes them.
 
 ```text
 Account (users + auth_credentials)
@@ -192,7 +192,7 @@ There is intentionally no unapproved `ai_created` value.
 | created_at | datetime | System timestamp |
 | updated_at | datetime | System timestamp |
 
-### tasks (accepted for schema v5)
+### tasks (implemented in schema v5)
 
 | Field | Type | Notes |
 |---|---|---|
@@ -227,7 +227,7 @@ not change lifecycle status. An open FocusSession prevents Task archive.
 | description | text | Optional |
 | activity_type | text enum | Required after classification |
 | type_source | text enum | User or AI source |
-| version | integer | Accepted v5 optimistic-concurrency version |
+| version | integer | Schema-v5 optimistic-concurrency version |
 | created_at | datetime | System timestamp |
 | updated_at | datetime | System timestamp |
 
@@ -252,7 +252,7 @@ not change lifecycle status. An open FocusSession prevents Task archive.
 | id | integer pk | Internal ID |
 | weekly_plan_id | integer fk | Required |
 | project_id | integer fk | Optional |
-| task_id | integer fk | Optional accepted v5 reference |
+| task_id | integer fk | Optional schema-v5 reference |
 | title | text | Required |
 | planned_minutes | integer | Required |
 | priority | integer | Optional |
@@ -346,7 +346,7 @@ TimeLog mutations do not expire while their target record is retained.
 | id | integer pk | Internal ID |
 | user_id | integer fk | Required owner; linked activity/project must have the same owner |
 | activity_id | integer fk | Optional if activity is ad hoc |
-| task_id | integer fk | Optional accepted v5 link |
+| task_id | integer fk | Optional schema-v5 link |
 | focus_session_id | integer fk | Optional accepted v6 provenance link |
 | project_id | integer fk | Optional |
 | date | date | Required |
@@ -357,7 +357,7 @@ TimeLog mutations do not expire while their target record is retained.
 | activity_name | text | Raw user-visible name |
 | activity_type | text enum | Copied for easier review queries |
 | type_source | text enum | User or AI source |
-| task_title | text | Optional accepted v5 Task-title snapshot |
+| task_title | text | Optional schema-v5 Task-title snapshot |
 | note | text | Optional |
 | version | integer | Accepted v7 optimistic-concurrency version |
 | deleted_at | datetime | Accepted v7 soft-delete marker |
@@ -457,13 +457,15 @@ payloads are user-owned personal data and cascade on account deletion.
 - Foreign keys and database triggers reject cross-user goal, project, activity,
   task, planned-item, FocusSession, and TimeLog references.
 - Schema version 2 adds local ownership; version 3 adds formal credentials and
-  sessions; version 4 removes the unused recovery-code column without changing
-  accounts or personal records. Initializing a version 1 database
+  sessions; version 4 removes the unused recovery-code column; version 5 adds
+  durable Tasks, Activity versions, and nullable Task references/snapshots
+  without rewriting existing personal records. Initializing a version 1 database
   migrates existing records to a generated `Local User` profile with ID `1`.
 
 ## 5. Accepted Migration Sequence
 
-The following versions are contracts, not current implementation claims:
+Version 5 is implemented by the STORY-036 candidate. Versions 6 and 7 remain
+accepted contracts rather than current implementation claims:
 
 | Version | Story | Additive behavior |
 |---|---|---|

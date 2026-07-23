@@ -10,6 +10,8 @@ ActivityType = Literal["consuming", "neutral", "restore", "destroy"]
 ActivityTypeSource = Literal["user_selected", "ai_suggested", "user_corrected"]
 ProjectStage = Literal["startup", "stable", "sprint", "dormant", "wake_up"]
 ProjectStatus = Literal["active", "paused", "archived"]
+TaskStatus = Literal["open", "in_progress", "completed", "cancelled"]
+TaskCreationSource = Literal["user", "assistant_approved", "imported"]
 ReviewMode = Literal["deterministic_first", "supportive_text"]
 RiskType = Literal[
     "alignment_gap",
@@ -183,6 +185,72 @@ class ProjectRead(Project):
     updated_at: datetime
 
 
+class TaskCreate(APIModel):
+    project_id: int
+    title: str = Field(min_length=1, max_length=240)
+    description: str = Field(default="", max_length=4000)
+    priority: int = Field(ge=1, default=3)
+    estimated_minutes: int | None = Field(default=None, gt=0)
+    due_date: date | None = None
+
+    @field_validator("title")
+    @classmethod
+    def strip_task_title(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+
+class TaskUpdate(APIModel):
+    expected_version: int = Field(ge=1)
+    title: str | None = Field(default=None, min_length=1, max_length=240)
+    description: str | None = Field(default=None, max_length=4000)
+    priority: int | None = Field(default=None, ge=1)
+    estimated_minutes: int | None = Field(default=None, gt=0)
+    due_date: date | None = None
+    status: TaskStatus | None = None
+    archived: bool | None = None
+
+    @field_validator("title")
+    @classmethod
+    def strip_optional_task_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+    @model_validator(mode="after")
+    def validate_task_patch(self) -> TaskUpdate:
+        changed = self.model_fields_set - {"expected_version"}
+        if not changed:
+            raise ValueError("at least one task field is required")
+        required_values = ("title", "priority", "status", "archived")
+        if any(field in changed and getattr(self, field) is None for field in required_values):
+            raise ValueError("title, priority, status, and archived cannot be null")
+        return self
+
+
+class TaskRead(APIModel):
+    id: int
+    user_id: int
+    project_id: int
+    title: str
+    description: str
+    status: TaskStatus
+    priority: int
+    estimated_minutes: int | None
+    due_date: date | None
+    created_source: TaskCreationSource
+    completed_at: datetime | None
+    archived_at: datetime | None
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
 class ActivityCreate(APIModel):
     project_id: int | None = None
     name: str = Field(min_length=1)
@@ -194,12 +262,14 @@ class ActivityCreate(APIModel):
 class ActivityRead(ActivityCreate):
     id: int
     user_id: int
+    version: int
     created_at: datetime
     updated_at: datetime
 
 
 class PlannedItemCreate(APIModel):
     project_id: int | None = None
+    task_id: int | None = None
     title: str = Field(min_length=1)
     planned_minutes: int = Field(gt=0)
     priority: int = Field(ge=1, default=1)
@@ -247,6 +317,7 @@ class WeeklyPlanRead(WeeklyPlanCreate):
 class TimeLogCreate(APIModel):
     activity_id: int | None = None
     project_id: int | None = None
+    task_id: int | None = None
     date: date
     start_time: time | None = None
     end_time: time | None = None
@@ -274,6 +345,7 @@ class TimeLog(TimeLogCreate):
 class TimeLogRead(TimeLogCreate):
     id: int
     user_id: int
+    task_title: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -282,6 +354,7 @@ class MobileTimeLogImportRecord(APIModel):
     source_record_id: str | None = None
     activity_id: int | None = None
     project_id: int | None = None
+    task_id: int | None = None
     date: date
     start_time: time | None = None
     end_time: time | None = None

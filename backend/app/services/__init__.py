@@ -18,6 +18,13 @@ from .review_writer import (
     review_writer_from_environment,
 )
 from .sample_import import SampleImportResult, import_sample_week, load_sample_payload
+from .planning import InvalidPlanTaskReference, WeeklyPlanService
+from .tasks import (
+    InvalidTaskTransition,
+    TaskNotFound,
+    TaskService,
+    TaskVersionConflict,
+)
 
 __all__ = [
     "AccountLocked",
@@ -27,6 +34,8 @@ __all__ = [
     "InvalidAuthToken",
     "InvalidCredentials",
     "InvalidCSRFToken",
+    "InvalidPlanTaskReference",
+    "InvalidTaskTransition",
     "ReviewService",
     "RefreshTokenReuse",
     "OpenCodeGoReviewWriter",
@@ -34,7 +43,11 @@ __all__ = [
     "ReviewWriterError",
     "SampleImportResult",
     "TemplateSupportiveReviewWriter",
+    "TaskNotFound",
+    "TaskService",
+    "TaskVersionConflict",
     "WeeklyPlanNotFound",
+    "WeeklyPlanService",
     "build_structured_review_prompt",
     "import_sample_week",
     "load_sample_payload",

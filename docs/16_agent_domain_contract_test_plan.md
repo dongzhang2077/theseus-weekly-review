@@ -1,8 +1,8 @@
 # Agent Domain Contract Test Plan
 
 - Story: STORY-035
-- Status: accepted test outline; implementation pending
-- Baseline schema: version 4
+- Status: accepted test outline; version 5 automatically verified
+- Baseline schema: version 5 STORY-036 acceptance candidate
 - Target migrations: versions 5, 6, and 7
 - Owner: Dong Zhang
 
@@ -41,6 +41,13 @@ npm run build
 
 Tests use temporary databases and sanitized fixtures. Local personal databases,
 credentials, channel identifiers, and raw conversation exports are prohibited.
+
+STORY-036 checkpoint (2026-07-22 PDT): v1-v4 migration/rollback, schema
+constraints, TaskService lifecycle/version behavior, authenticated Task/Plan/
+TimeLog API behavior, account isolation, restart persistence, focused browser
+state tests, full backend/frontend suites, sample review, persisted review,
+compileall, and production build pass. Product-owner browser acceptance and
+screenshots remain pending.
 
 ## 2. Schema And Migration Matrix
 
@@ -226,6 +233,7 @@ When each frontend module is implemented, the handoff includes:
 - 430x932 screenshots for loading, ready, failure, and completed states;
 - keyboard and accessible-name checks for every new control;
 - no horizontal overflow at 320, 390, and 430 CSS pixels;
+- Task creation and Plan linkage persist across a full browser/backend restart;
 - Activity creation persists across a full browser/backend restart;
 - live Focus state survives refresh without double counting;
 - Today correction updates totals immediately and exposes Undo;

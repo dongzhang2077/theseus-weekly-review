@@ -35,6 +35,24 @@ const projects = demoWeek.plan.projects.map((project) => ({
   weekly_target_minutes: project.weeklyTargetMinutes
 }));
 
+const apiTask = {
+  id: 21,
+  user_id: 7,
+  project_id: 3,
+  title: "Draft applications",
+  description: "",
+  status: "open",
+  priority: 1,
+  estimated_minutes: 90,
+  due_date: "2026-06-20",
+  created_source: "user",
+  completed_at: null,
+  archived_at: null,
+  version: 1,
+  created_at: "2026-07-22T12:00:00Z",
+  updated_at: "2026-07-22T12:00:00Z"
+};
+
 describe("PlanScreen", () => {
   it("shows real balance values and a before/after adjustment without setup forms", async () => {
     renderPlan();
@@ -225,6 +243,39 @@ describe("PlanScreen", () => {
       "Theseus backend"
     );
   });
+
+  it("links a durable Task while preserving the editable weekly snapshot", async () => {
+    const calls: Array<{ input: string; init: RequestInit }> = [];
+    const fetchImpl: FetchLike = async (input, init) => {
+      calls.push({ input, init });
+      if (init.method === "GET" && input.endsWith("/weekly-plans")) return ok([reviewedPlan]);
+      if (init.method === "GET" && input.endsWith("/projects")) return ok(projects);
+      if (init.method === "GET" && input.includes("/tasks")) return ok([apiTask]);
+      if (init.method === "POST") return ok(targetPlan, 201);
+      return failed(500);
+    };
+    renderPlan({ apiBaseUrl: "http://127.0.0.1:8000", reviewSource: "api", fetchImpl });
+
+    expect(await screen.findByRole("button", { name: "Open tasks" })).toHaveTextContent("1 active");
+    fireEvent.click(screen.getByRole("button", { name: "New plan" }));
+    const editor = screen.getByRole("dialog", { name: "Edit plan" });
+    fireEvent.change(within(editor).getByLabelText("Plan block 1 task"), {
+      target: { value: "21" }
+    });
+    expect(within(editor).getByLabelText("Plan block 1 title")).toHaveValue("Draft applications");
+    fireEvent.change(within(editor).getByLabelText("Plan block 1 title"), {
+      target: { value: "Draft two applications" }
+    });
+    fireEvent.click(within(editor).getByRole("button", { name: "Save plan" }));
+
+    await waitFor(() => expect(calls.some((call) => call.init.method === "POST")).toBe(true));
+    const body = JSON.parse(String(calls.find((call) => call.init.method === "POST")?.init.body));
+    expect(body.items[0]).toMatchObject({
+      task_id: 21,
+      project_id: 3,
+      title: "Draft two applications"
+    });
+  });
 });
 
 function renderPlan(overrides: Partial<React.ComponentProps<typeof PlanScreen>> = {}) {
@@ -276,6 +327,7 @@ function apiItem(
     id,
     weekly_plan_id: planId,
     project_id: projectId,
+    task_id: null,
     title,
     planned_minutes: minutes,
     priority,

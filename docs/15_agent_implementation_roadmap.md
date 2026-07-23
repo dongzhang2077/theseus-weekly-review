@@ -497,14 +497,12 @@ weaken the August 1 course exit gate.
 ## 9. Current Gate
 
 Current status: roadmap and STORY-035 domain contract accepted by the product
-owner on 2026-07-22. The authoritative contract and test outline are frozen on
-`feature/035-agent-ready-domain-contract`; runtime implementation now begins
-with STORY-036 on its own branch.
+owner on 2026-07-22. STORY-036 is implemented and automatically verified on
+`feature/036-durable-tasks`; product-owner browser/API acceptance is pending.
 
 Next acceptance request:
 
-1. open `feature/036-durable-tasks` from the accepted contract baseline;
-2. implement and verify only durable Tasks and optional PlannedItem Task links;
-3. request product-owner API and browser acceptance;
-4. do not begin persisted Activities or FocusSession work before that
-   acceptance.
+1. run the local STORY-036 browser acceptance script;
+2. create, complete, reopen, archive, and restore a durable Task;
+3. link that Task to a Plan block and reload the app;
+4. accept or reject STORY-036 before persisted Activities or FocusSession work.

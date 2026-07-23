@@ -2,12 +2,13 @@
 
 Contract status:
 
-- Sections 1-9 describe the implemented schema-v4 HTTP surface.
+- Sections 1-9 describe the implemented schema-v5 HTTP surface.
 - Section 10 remains a planned evaluation endpoint.
-- Section 11 is the accepted STORY-035 Agent-foundation contract. Its routes
-  and fields are intentionally documented before implementation and must not
-  be presented as available until their owning stories pass verification and
-  merge.
+- Section 11 is the accepted STORY-035 Agent-foundation contract. STORY-036
+  implements Tasks, optional PlannedItem Task links, and TimeLog Task
+  snapshots on its acceptance candidate branch. Activity mutation,
+  FocusSession, correction, deletion, Undo, and idempotency routes remain
+  unavailable until their owning stories pass verification and merge.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -543,7 +544,10 @@ Request:
 
 ## 11. Accepted Agent-Foundation Contract
 
-Current implementation status: not implemented in schema version 4.
+Current implementation status: STORY-036 Task routes, Plan Task links, and
+TimeLog Task links are implemented and verified on the schema-v5 acceptance
+candidate. Sections 11.3 and 11.5-11.6 remain future runtime contracts except
+for the explicitly identified v5 TimeLog Task fields.
 
 Implementation is split across STORY-036, STORY-033, STORY-037, and STORY-034.
 Each story must update this status only for the routes it actually delivers.
@@ -588,6 +592,8 @@ New conflict responses use a stable detail shape:
 `current` is omitted when returning it would disclose unrelated data.
 
 ### 11.2 Tasks
+
+Implementation status: STORY-036 acceptance candidate.
 
 #### POST /tasks
 
@@ -736,6 +742,8 @@ return to product-owner review rather than being added implicitly.
 
 ### 11.4 WeeklyPlan Task References
 
+Implementation status: STORY-036 acceptance candidate.
+
 `POST /weekly-plans` and `PUT /weekly-plans/{plan_id}` accept optional
 `task_id` on each item:
 
@@ -754,7 +762,7 @@ Task. If both are supplied they must match. The Task, Project, and WeeklyPlan
 must have the same owner. The PlannedItem title remains a weekly snapshot and
 `is_completed` does not silently change durable Task status.
 
-Existing requests without `task_id` retain their schema-v4 behavior.
+Existing requests without `task_id` retain their pre-v5 behavior.
 
 ### 11.5 Focus Sessions
 
@@ -876,6 +884,12 @@ linked Task completed, and cancelling Focus does not silently cancel or reopen
 the Task.
 
 ### 11.6 TimeLog Read, Correction, Removal, And Undo
+
+STORY-036 implements only nullable `task_id` input/linkage and the server-owned
+`task_title` snapshot on the existing create, batch, mobile-import, and list
+paths. Focus provenance, exact seconds, TimeLog versions, correction, soft
+deletion, revisions, review invalidation, Undo, and mutation idempotency remain
+owned by schema v6/v7 stories below.
 
 The existing `TimeLogRead` shape gains nullable `task_id`,
 `focus_session_id`, `task_title`, `duration_seconds`, `deleted_at`, and required

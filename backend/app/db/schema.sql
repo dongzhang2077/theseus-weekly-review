@@ -59,6 +59,30 @@ CREATE TABLE IF NOT EXISTS projects (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS tasks (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    project_id INTEGER NOT NULL REFERENCES projects(id),
+    title TEXT NOT NULL CHECK (length(trim(title)) > 0),
+    description TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'open'
+        CHECK (status IN ('open', 'in_progress', 'completed', 'cancelled')),
+    priority INTEGER NOT NULL DEFAULT 3 CHECK (priority >= 1),
+    estimated_minutes INTEGER CHECK (estimated_minutes IS NULL OR estimated_minutes > 0),
+    due_date TEXT,
+    created_source TEXT NOT NULL DEFAULT 'user'
+        CHECK (created_source IN ('user', 'assistant_approved', 'imported')),
+    completed_at TEXT,
+    archived_at TEXT,
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    CHECK (
+        (status = 'completed' AND completed_at IS NOT NULL)
+        OR (status != 'completed' AND completed_at IS NULL)
+    )
+);
+
 CREATE TABLE IF NOT EXISTS activities (
     id INTEGER PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -67,6 +91,7 @@ CREATE TABLE IF NOT EXISTS activities (
     description TEXT NOT NULL DEFAULT '',
     activity_type TEXT NOT NULL CHECK (activity_type IN ('consuming', 'neutral', 'restore', 'destroy')),
     type_source TEXT NOT NULL DEFAULT 'user_selected' CHECK (type_source IN ('user_selected', 'ai_suggested', 'user_corrected')),
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -89,6 +114,7 @@ CREATE TABLE IF NOT EXISTS planned_items (
     id INTEGER PRIMARY KEY,
     weekly_plan_id INTEGER NOT NULL REFERENCES weekly_plans(id) ON DELETE CASCADE,
     project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+    task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
     title TEXT NOT NULL CHECK (length(trim(title)) > 0),
     planned_minutes INTEGER NOT NULL CHECK (planned_minutes > 0),
     priority INTEGER NOT NULL DEFAULT 1 CHECK (priority >= 1),
@@ -102,6 +128,7 @@ CREATE TABLE IF NOT EXISTS time_logs (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     activity_id INTEGER REFERENCES activities(id) ON DELETE SET NULL,
     project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+    task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
     date TEXT NOT NULL,
     start_time TEXT,
     end_time TEXT,
@@ -109,6 +136,7 @@ CREATE TABLE IF NOT EXISTS time_logs (
     activity_name TEXT NOT NULL CHECK (length(trim(activity_name)) > 0),
     activity_type TEXT NOT NULL CHECK (activity_type IN ('consuming', 'neutral', 'restore', 'destroy')),
     type_source TEXT NOT NULL DEFAULT 'user_selected' CHECK (type_source IN ('user_selected', 'ai_suggested', 'user_corrected')),
+    task_title TEXT,
     note TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -152,15 +180,20 @@ CREATE INDEX IF NOT EXISTS idx_auth_sessions_expiry ON auth_sessions(expires_at)
 CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id, id);
 CREATE INDEX IF NOT EXISTS idx_projects_goal_id ON projects(goal_id);
 CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_user_status ON tasks(user_id, status, archived_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(user_id, due_date);
 CREATE INDEX IF NOT EXISTS idx_activities_user_id ON activities(user_id, id);
 CREATE INDEX IF NOT EXISTS idx_activities_project_id ON activities(project_id);
 CREATE INDEX IF NOT EXISTS idx_activities_type ON activities(user_id, activity_type);
 CREATE INDEX IF NOT EXISTS idx_weekly_plans_dates ON weekly_plans(user_id, week_start, week_end);
 CREATE INDEX IF NOT EXISTS idx_planned_items_plan_id ON planned_items(weekly_plan_id);
 CREATE INDEX IF NOT EXISTS idx_planned_items_project_id ON planned_items(project_id);
+CREATE INDEX IF NOT EXISTS idx_planned_items_task_id ON planned_items(task_id);
 CREATE INDEX IF NOT EXISTS idx_time_logs_date ON time_logs(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_time_logs_project_id ON time_logs(project_id);
 CREATE INDEX IF NOT EXISTS idx_time_logs_activity_id ON time_logs(activity_id);
+CREATE INDEX IF NOT EXISTS idx_time_logs_task_id ON time_logs(task_id);
 CREATE INDEX IF NOT EXISTS idx_time_logs_activity_type ON time_logs(user_id, activity_type);
 CREATE INDEX IF NOT EXISTS idx_daily_reflections_date ON daily_reflections(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_weekly_reviews_dates ON weekly_reviews(user_id, week_start, week_end);
@@ -209,6 +242,26 @@ BEGIN
     SELECT RAISE(ABORT, 'activity project must belong to the same user');
 END;
 
+CREATE TRIGGER IF NOT EXISTS tasks_project_same_user_insert
+BEFORE INSERT ON tasks
+WHEN NOT EXISTS (
+    SELECT 1 FROM projects
+    WHERE id = NEW.project_id AND user_id = NEW.user_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'task project must belong to the same user');
+END;
+
+CREATE TRIGGER IF NOT EXISTS tasks_project_same_user_update
+BEFORE UPDATE OF project_id, user_id ON tasks
+WHEN NOT EXISTS (
+    SELECT 1 FROM projects
+    WHERE id = NEW.project_id AND user_id = NEW.user_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'task project must belong to the same user');
+END;
+
 CREATE TRIGGER IF NOT EXISTS planned_items_project_same_user_insert
 BEFORE INSERT ON planned_items
 WHEN NEW.project_id IS NOT NULL
@@ -237,6 +290,36 @@ BEGIN
     SELECT RAISE(ABORT, 'planned item project must belong to the plan user');
 END;
 
+CREATE TRIGGER IF NOT EXISTS planned_items_task_same_user_insert
+BEFORE INSERT ON planned_items
+WHEN NEW.task_id IS NOT NULL
+     AND NOT EXISTS (
+         SELECT 1
+         FROM weekly_plans AS plan
+         JOIN tasks AS task ON task.id = NEW.task_id
+         WHERE plan.id = NEW.weekly_plan_id
+           AND plan.user_id = task.user_id
+           AND NEW.project_id = task.project_id
+     )
+BEGIN
+    SELECT RAISE(ABORT, 'planned item task must match the plan user and project');
+END;
+
+CREATE TRIGGER IF NOT EXISTS planned_items_task_same_user_update
+BEFORE UPDATE OF weekly_plan_id, project_id, task_id ON planned_items
+WHEN NEW.task_id IS NOT NULL
+     AND NOT EXISTS (
+         SELECT 1
+         FROM weekly_plans AS plan
+         JOIN tasks AS task ON task.id = NEW.task_id
+         WHERE plan.id = NEW.weekly_plan_id
+           AND plan.user_id = task.user_id
+           AND NEW.project_id = task.project_id
+     )
+BEGIN
+    SELECT RAISE(ABORT, 'planned item task must match the plan user and project');
+END;
+
 CREATE TRIGGER IF NOT EXISTS time_logs_project_same_user_insert
 BEFORE INSERT ON time_logs
 WHEN NEW.project_id IS NOT NULL
@@ -246,6 +329,32 @@ WHEN NEW.project_id IS NOT NULL
      )
 BEGIN
     SELECT RAISE(ABORT, 'time log project must belong to the same user');
+END;
+
+CREATE TRIGGER IF NOT EXISTS time_logs_task_same_user_insert
+BEFORE INSERT ON time_logs
+WHEN NEW.task_id IS NOT NULL
+     AND NOT EXISTS (
+         SELECT 1 FROM tasks
+         WHERE id = NEW.task_id
+           AND user_id = NEW.user_id
+           AND project_id = NEW.project_id
+     )
+BEGIN
+    SELECT RAISE(ABORT, 'time log task must match the same user and project');
+END;
+
+CREATE TRIGGER IF NOT EXISTS time_logs_task_same_user_update
+BEFORE UPDATE OF task_id, project_id, user_id ON time_logs
+WHEN NEW.task_id IS NOT NULL
+     AND NOT EXISTS (
+         SELECT 1 FROM tasks
+         WHERE id = NEW.task_id
+           AND user_id = NEW.user_id
+           AND project_id = NEW.project_id
+     )
+BEGIN
+    SELECT RAISE(ABORT, 'time log task must match the same user and project');
 END;
 
 CREATE TRIGGER IF NOT EXISTS time_logs_project_same_user_update
@@ -281,4 +390,4 @@ BEGIN
     SELECT RAISE(ABORT, 'time log activity must belong to the same user');
 END;
 
-PRAGMA user_version = 4;
+PRAGMA user_version = 5;

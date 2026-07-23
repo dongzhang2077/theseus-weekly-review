@@ -133,6 +133,22 @@ retain a clear `New` entry. It opens the same editor used by `Edit`; saving a
 draft with no persisted ID creates the real user-scoped plan through the API.
 Do not replace this path with view-local state or require Review first.
 
+### Durable Task information depth
+
+STORY-036 adds durable Tasks without adding a fifth tab or turning Plan into a
+project-management dashboard:
+
+1. Plan Level 1 exposes one collapsed `Tasks` row with only the active count.
+2. Task Level 2 uses compact Active, Done, and Archive filters plus one
+   icon-only New action. Entity names may wrap; status tags do not.
+3. Task Level 3 owns create/edit, lifecycle, optimistic-conflict, archive, and
+   restore states. Project is immutable after creation in this story.
+
+Plan-block editing may select one active Task. Selection fills its Project and
+initial title, while the weekly title remains editable as a snapshot. `Ad hoc`
+keeps the pre-v5 behavior. Loading or failure of the Task list must not block
+the existing Plan surface.
+
 ## 4. Frontend Architecture
 
 Tailwind CSS v4 is the default styling path for new and migrated screens.

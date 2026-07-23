@@ -39,9 +39,10 @@ These concepts should remain stable:
 
 The backend schema and review engine should be built around these concepts, not around one demo JSON file.
 
-`Task` and `FocusSession` are accepted STORY-035 Agent-foundation additions,
-not implemented schema-v4 claims. Their authoritative target contracts are
-defined in `docs/03_data_model.md` and `docs/04_api_contract.md`.
+`Task` is implemented by the schema-v5 STORY-036 acceptance candidate.
+`FocusSession` remains an accepted STORY-035 contract for schema v6. Their
+authoritative contracts are defined in `docs/03_data_model.md` and
+`docs/04_api_contract.md`.
 
 ### Replaceable Interfaces
 
@@ -234,8 +235,8 @@ Current status: implemented.
 sample_week.json -> SQLite -> review_engine -> stored weekly_review
 ```
 
-Current status: implemented with SQLite schema version 4, atomic version
-1-through-3 migration paths, formal account ownership, user-scoped
+Current status: implemented with SQLite schema version 5, atomic version
+1-through-4 migration paths, formal account ownership, user-scoped
 repositories, and restart-path tests.
 
 ### Stage C: Web Input
@@ -276,8 +277,9 @@ Task + Activity
   -> correctable Evidence
 ```
 
-Accepted contract status: STORY-035. Runtime status: not implemented in schema
-version 4.
+Accepted contract status: STORY-035. Runtime status: schema v5 durable Tasks
+and nullable Task references are implemented on the STORY-036 acceptance
+candidate; later steps remain unavailable.
 
 Implementation sequence:
 

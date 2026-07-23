@@ -58,13 +58,14 @@ automation, and machine learning extend that kernel; they do not replace it.
 
 As of 2026-07-22, Theseus is a working weekly-review MVP foundation rather than
 a general life assistant. The product owner accepted the sequential Agent
-implementation roadmap and STORY-035 domain contract direction. That acceptance
-does not claim the target schema or endpoints are implemented.
+implementation roadmap and STORY-035 domain contract. STORY-036 durable Tasks
+are now a locally verified acceptance candidate; later Agent-domain endpoints
+remain unimplemented.
 
 | Capability | Current state | Direction |
 |---|---|---|
-| Stable review entities | Schema v4 ownership, credentials, and auth sessions are implemented and verified in STORY-030 | Preserve v4 while versioned Agent-domain migrations are implemented |
-| Durable Tasks and live Focus state | STORY-035 contracts Task, Activity, PlannedItem, FocusSession/segments, and TimeLog responsibilities; runtime remains schema v4 | Implement and accept STORY-036, STORY-033, STORY-037, and STORY-034 sequentially |
+| Stable review entities | Schema v5 preserves STORY-030 ownership, credentials, sessions, and existing review records | Preserve v5 while later Agent-domain migrations are implemented |
+| Durable Tasks and live Focus state | Durable Tasks and nullable Plan/TimeLog links are locally verified in STORY-036; live Focus remains local browser state | Accept STORY-036, then implement STORY-033, STORY-037, and STORY-034 sequentially |
 | Persistent review path | User-scoped sample data flows through SQLite, the review engine, and stored review; v1 migration and restart coverage are merged | Rehearse the browser-to-API restart path |
 | Review reasoning | Deterministic, evidence-first rules | Keep framework-independent |
 | AI wording | Evidence-bound writer adapters exist | Keep AI wording downstream of computed facts |

@@ -18,6 +18,7 @@ interface PlannedItemApiRecord {
   id: number;
   weekly_plan_id: number;
   project_id: number | null;
+  task_id: number | null;
   title: string;
   planned_minutes: number;
   priority: number;
@@ -107,6 +108,7 @@ function weeklyPlanPayload(draft: PlanDraft) {
     slack_target_percent: draft.slackTargetPercent,
     items: draft.items.map((item) => ({
       project_id: item.projectId,
+      task_id: item.taskId ?? null,
       title: item.title,
       planned_minutes: item.plannedMinutes,
       priority: item.priority,
@@ -171,6 +173,7 @@ function mapPlanItem(item: PlannedItemApiRecord): PlanItem {
   return {
     id: item.id,
     projectId: item.project_id,
+    taskId: item.task_id,
     title: item.title,
     plannedMinutes: item.planned_minutes,
     priority: item.priority,

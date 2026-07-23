@@ -7,11 +7,17 @@ import {
   savePlanDraft,
   type PlanApiStatus
 } from "../../shared/api/planApi";
+import { loadTasks } from "../../shared/api/tasks";
 import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
 import { DetailPanel } from "../../shared/components/DetailPanel";
 import { IconButton } from "../../shared/components/IconButton";
 import { StateSurface } from "../../shared/components/StateSurface";
+import type { TaskRecord } from "../../shared/domain/task";
 import { Icon } from "../../shared/icons/Icon";
+import {
+  TaskWorkspace,
+  type TaskLoadPhase
+} from "../tasks/TaskWorkspace";
 import {
   buildPlanProposal,
   calculatePlanMetrics,
@@ -27,7 +33,7 @@ import {
   type PlanWorkspace
 } from "./planModel";
 
-export type PlanDetail = "edit" | "suggestion" | "focus" | "slack" | "projects";
+export type PlanDetail = "edit" | "suggestion" | "focus" | "slack" | "projects" | "tasks";
 type LoadPhase = "loading" | "ready" | "error";
 type OperationPhase = "idle" | "saving" | "saved" | "conflict" | "error" | "undoing" | "undone";
 type OperationAction = "apply" | "manual" | "undo" | null;
@@ -88,6 +94,9 @@ export function PlanScreen({
       : initialWorkspace;
   });
   const [loadPhase, setLoadPhase] = useState<LoadPhase>(hasLiveApi ? "loading" : "ready");
+  const [taskLoadPhase, setTaskLoadPhase] = useState<TaskLoadPhase>(hasLiveApi ? "loading" : "ready");
+  const [tasks, setTasks] = useState<TaskRecord[]>([]);
+  const [taskReload, setTaskReload] = useState(0);
   const [detail, setDetail] = useState<PlanDetail | null>(null);
   const [operation, setOperation] = useState<OperationState>(idleOperation);
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
@@ -98,6 +107,11 @@ export function PlanScreen({
     () => new Map(workspace.projects.map((project) => [project.id, project.title])),
     [workspace.projects]
   );
+  const activeTaskCount = tasks.filter(
+    (task) =>
+      task.archivedAt === null &&
+      (task.status === "open" || task.status === "in_progress")
+  ).length;
 
   useEffect(() => {
     const seed = hasLiveApi && reviewSource !== "api"
@@ -135,6 +149,28 @@ export function PlanScreen({
       ignore = true;
     };
   }, [apiBaseUrl, fetchImpl, hasLiveApi, planData, reload, reviewSource]);
+
+  useEffect(() => {
+    if (!hasLiveApi) {
+      setTasks([]);
+      setTaskLoadPhase("ready");
+      return;
+    }
+    let ignore = false;
+    setTaskLoadPhase("loading");
+    loadTasks({ apiBaseUrl, fetchImpl, includeArchived: true }).then((result) => {
+      if (ignore) return;
+      if (result.status === "ok" && result.data) {
+        setTasks(result.data);
+        setTaskLoadPhase("ready");
+        return;
+      }
+      setTaskLoadPhase("error");
+    });
+    return () => {
+      ignore = true;
+    };
+  }, [apiBaseUrl, fetchImpl, hasLiveApi, taskReload]);
 
   useEffect(() => {
     if (!entryRequest) return;
@@ -454,12 +490,34 @@ export function PlanScreen({
               <Icon name="chevronRight" className="size-4 text-desk-muted" />
             </button>
           ) : null}
+
+          <button
+            className="grid min-h-14 w-full grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 rounded-paper border border-desk-line bg-desk-raised px-3 text-left transition-colors hover:bg-desk-sunk"
+            type="button"
+            aria-label="Open tasks"
+            onClick={() => setDetail("tasks")}
+          >
+            <span className="grid size-9 place-items-center rounded-full bg-desk-sunk text-desk-muted">
+              <Icon name="target" className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <strong className="block text-sm">Tasks</strong>
+              <small className="block text-desk-muted">
+                {taskLoadPhase === "loading"
+                  ? "Loading"
+                  : taskLoadPhase === "error"
+                    ? "Unavailable"
+                    : `${activeTaskCount} active`}
+              </small>
+            </span>
+            <Icon name="chevronRight" className="size-4 text-desk-muted" />
+          </button>
         </div>
       ) : null}
 
       <DetailPanel title={detailTitle(detail)} open={detail !== null && loadPhase === "ready"} onBack={() => setDetail(null)}>
         {detail === "edit" ? (
-          <PlanEditor draft={workspace.draft} projects={workspace.projects} operation={operation} onSave={saveManualPlan} />
+          <PlanEditor draft={workspace.draft} projects={workspace.projects} tasks={tasks} operation={operation} onSave={saveManualPlan} />
         ) : null}
         {detail === "suggestion" ? (
           <SuggestionDetail
@@ -483,6 +541,17 @@ export function PlanScreen({
         ) : null}
         {detail === "slack" ? <SlackDetail metrics={metrics} /> : null}
         {detail === "projects" ? <ProjectsDetail workspace={workspace} /> : null}
+        {detail === "tasks" ? (
+          <TaskWorkspace
+            apiBaseUrl={apiBaseUrl}
+            fetchImpl={fetchImpl}
+            phase={taskLoadPhase}
+            tasks={tasks}
+            projects={workspace.projects}
+            onTasksChange={setTasks}
+            onRetry={() => setTaskReload((value) => value + 1)}
+          />
+        ) : null}
       </DetailPanel>
     </section>
   );
@@ -500,11 +569,13 @@ function Metric({ label, value }: { label: string; value: string }) {
 function PlanEditor({
   draft,
   projects,
+  tasks,
   operation,
   onSave
 }: {
   draft: PlanDraft;
   projects: PlanWorkspace["projects"];
+  tasks: TaskRecord[];
   operation: OperationState;
   onSave: (draft: PlanDraft) => Promise<boolean>;
 }) {
@@ -528,6 +599,7 @@ function PlanEditor({
         ...current.items,
         {
           projectId: project?.id ?? null,
+          taskId: null,
           title: project ? `${project.title} block` : "New focus block",
           plannedMinutes: 30,
           priority: current.items.length + 1,
@@ -613,6 +685,43 @@ function PlanEditor({
                 </button>
               </div>
               <div className="grid min-w-0 gap-3">
+                <label className="grid min-w-0 gap-1 text-xs font-semibold text-desk-muted">
+                  <span>Task</span>
+                  <select
+                    className="min-h-10 w-full min-w-0 max-w-full rounded-paper border border-desk-line bg-desk-paper px-2 text-sm text-desk-ink"
+                    aria-label={`Plan block ${index + 1} task`}
+                    value={item.taskId ?? ""}
+                    onChange={(event) => {
+                      const taskId = event.currentTarget.value
+                        ? Number(event.currentTarget.value)
+                        : null;
+                      const task = tasks.find((candidate) => candidate.id === taskId);
+                      updateItem(index, task
+                        ? {
+                            taskId: task.id,
+                            projectId: task.projectId,
+                            title: task.title
+                          }
+                        : { taskId: null });
+                    }}
+                  >
+                    <option value="">Ad hoc</option>
+                    {item.taskId && !tasks.some((task) => task.id === item.taskId) ? (
+                      <option value={item.taskId}>Linked task #{item.taskId}</option>
+                    ) : null}
+                    {tasks
+                      .filter((task) =>
+                        task.id === item.taskId ||
+                        (
+                          task.archivedAt === null &&
+                          (task.status === "open" || task.status === "in_progress")
+                        )
+                      )
+                      .map((task) => (
+                        <option value={task.id} key={task.id}>{task.title}</option>
+                      ))}
+                  </select>
+                </label>
                 <label className="grid min-w-0 gap-1 text-xs font-semibold text-desk-muted">
                   <span>Title</span>
                   <input
@@ -990,5 +1099,6 @@ function detailTitle(detail: PlanDetail | null): string {
   if (detail === "focus") return "Focus";
   if (detail === "slack") return "Slack";
   if (detail === "projects") return "Projects";
+  if (detail === "tasks") return "Tasks";
   return "Plan";
 }
