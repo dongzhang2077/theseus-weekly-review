@@ -582,3 +582,111 @@ Acceptance criteria:
 - Confidence, correction, expiry, and deletion are visible to the user.
 - Optimization targets are bounded, such as usefulness, plan adherence,
   protected slack, or restart success.
+
+## Epic 9: Agent-Ready Domain And Integration
+
+These stories turn the personal-assistant strategy into independently
+verifiable modules. Their dependency order and product-owner acceptance gates
+are defined in `docs/15_agent_implementation_roadmap.md`.
+
+### STORY-035 Lock the agent-ready domain contract
+
+As a product owner, I want Task, Activity, PlannedItem, FocusSession, TimeLog,
+domain-service, idempotency, and migration responsibilities agreed before
+implementation so that Agent frameworks do not dictate or duplicate product
+data.
+
+Priority: P0 before Agent runtime work
+
+Acceptance criteria:
+
+- Task, Activity, PlannedItem, FocusSession, and TimeLog have non-overlapping
+  responsibilities and a documented lifecycle.
+- The data model and API contract define user ownership, timezone,
+  idempotency, correction, deletion, and Undo behavior.
+- Existing version-4 accounts, PlannedItems, TimeLogs, and sample fixtures have
+  a non-destructive migration path.
+- Routes, LangGraph nodes, and channel tools share user-scoped domain services
+  instead of duplicating SQL or business rules.
+- LangGraph runtime persistence remains separate from canonical domain truth.
+- The product owner approves the contract and lifecycle before schema code is
+  written.
+
+### STORY-036 Add durable Tasks
+
+As a user, I want a Task to persist across weekly plans so that the assistant
+can help me progress a finite outcome instead of recreating it as an unrelated
+plan block every week.
+
+Priority: P0 for Agent foundation
+
+Acceptance criteria:
+
+- A user can create, list, inspect, update, complete, reopen, and archive a
+  Task linked to one of their Projects.
+- PlannedItems may reference a Task while existing ad-hoc PlannedItems remain
+  valid.
+- Cross-account links and invalid lifecycle transitions are rejected.
+- Task history survives restart and remains distinct from reusable Activities.
+- Migration, API, persistence, sample-review, and frontend tests pass.
+
+### STORY-037 Persist resumable Focus sessions
+
+As a user, I want running and paused Focus state stored under my account so
+that the App and future conversation channels observe and finish the same
+execution without losing or duplicating time.
+
+Priority: P0 for Agent foundation
+
+Acceptance criteria:
+
+- Authenticated start, pause, resume, finish, and cancel transitions are
+  persisted and user-scoped.
+- Independent multi-Activity sessions remain supported.
+- Server timestamps and stored accumulated duration determine elapsed time.
+- Finishing creates cross-midnight TimeLog segments atomically and exactly
+  once.
+- Duplicate commands return the original result rather than double counting.
+- Browser refresh, backend restart, timezone rollover, and account isolation
+  have focused tests.
+
+### STORY-038 Build a bounded Assistant API
+
+As a user, I want language requests to use typed, evidence-backed operations so
+that an assistant can read context and draft changes without receiving direct
+database authority.
+
+Priority: P0 before LangGraph or OpenClaw
+
+Acceptance criteria:
+
+- Read, propose, approve, and execute operations have separate schemas and
+  permission checks.
+- Operations call authenticated domain services and never expose SQL or
+  provider-generated IDs as domain truth.
+- Ambiguous requests ask one focused clarification instead of guessing.
+- Proposals contain evidence and a before/after diff and cannot write before
+  approval.
+- Provider errors, invalid output, duplicate requests, and cross-account
+  attempts cannot leave partial changes.
+- A deterministic local path remains available without an external model key.
+
+### STORY-039 Bind a conversation channel to an account
+
+As a user, I want one external conversation identity securely paired with my
+Theseus account so that a channel can access only my approved capabilities
+without reusing browser credentials.
+
+Priority: P0 before OpenClaw
+
+Acceptance criteria:
+
+- Integration credentials are scoped, revocable, expiring, hashed at rest, and
+  displayed only once.
+- Channel identities are explicitly paired with one account and minimized in
+  storage and logs.
+- Read, propose, and approved-execution scopes are separable.
+- Replayed external message IDs are idempotent.
+- Revocation immediately blocks the integration without deleting domain data.
+- Pairing, expiry, scope, replay, revocation, redaction, and account-isolation
+  tests pass.

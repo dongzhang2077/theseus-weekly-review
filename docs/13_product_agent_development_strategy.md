@@ -16,6 +16,10 @@ Use it to decide what to build next, what to defer, and where new capabilities
 belong. It is a strategy and delivery guide, not a replacement for executable
 contracts.
 
+The sequential implementation branches, story dependencies, verification
+commands, and product-owner acceptance gates are maintained in
+[`15_agent_implementation_roadmap.md`](15_agent_implementation_roadmap.md).
+
 When sources disagree, use this order:
 
 1. `AGENTS.md` repository guidance.
