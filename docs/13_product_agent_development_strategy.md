@@ -56,16 +56,17 @@ automation, and machine learning extend that kernel; they do not replace it.
 
 ## 3. Current Reality
 
-As of 2026-07-22, Theseus is a working weekly-review MVP foundation rather than
+As of 2026-07-25, Theseus is a working weekly-review MVP foundation rather than
 a general life assistant. The product owner accepted the sequential Agent
 implementation roadmap and STORY-035 domain contract. STORY-036 durable Tasks
-are now locally verified and product-owner accepted; later Agent-domain
+and STORY-033 durable Activities are locally verified and product-owner
+accepted; later Agent-domain
 endpoints remain unimplemented.
 
 | Capability | Current state | Direction |
 |---|---|---|
 | Stable review entities | Schema v5 preserves STORY-030 ownership, credentials, sessions, and existing review records | Preserve v5 while later Agent-domain migrations are implemented |
-| Durable Tasks and live Focus state | Durable Tasks and nullable Plan/TimeLog links are accepted in STORY-036; durable Activity management is a locally verified STORY-033 candidate; live Focus remains local browser state | Accept STORY-033, then implement STORY-037 and STORY-034 sequentially |
+| Durable Tasks and live Focus state | Durable Tasks and nullable Plan/TimeLog links are accepted in STORY-036; durable Activity management is accepted in STORY-033; live Focus remains local browser state | Reconcile the accepted two-tap Start/End UX with the STORY-037 contract, then implement STORY-037 and STORY-034 sequentially |
 | Persistent review path | User-scoped sample data flows through SQLite, the review engine, and stored review; v1 migration and restart coverage are merged | Rehearse the browser-to-API restart path |
 | Review reasoning | Deterministic, evidence-first rules | Keep framework-independent |
 | AI wording | Evidence-bound writer adapters exist | Keep AI wording downstream of computed facts |
@@ -358,12 +359,13 @@ LangGraph and OpenClaw are explicitly excluded from this phase.
 
 Goal: make ownership, provenance, feedback, and reversible changes reliable.
 
-Status note (2026-07-22): the product owner accepted the gated implementation
+Status note (2026-07-25): the product owner accepted the gated implementation
 roadmap and the STORY-035 authoritative Task/Activity/Plan/Focus/TimeLog
 contract with its v5-v7 migration sequence. STORY-036 passed its runtime
-implementation and product-owner browser gate on 2026-07-22 PDT. STORY-033 is
-the next sequential gate; no later Agent runtime is complete merely because
-its contract is accepted.
+implementation and product-owner browser gate on 2026-07-22 PDT. STORY-033
+passed browser, stable-ID TimeLog linkage, and backend-restart acceptance on
+2026-07-25 PDT. STORY-037 is the next sequential gate; its public transition
+contract must first match the accepted two-tap Start/End UX.
 
 Exit gate:
 

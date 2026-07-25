@@ -475,13 +475,14 @@ records.
 
 Priority: P1 after the accepted Focus freeze
 
-Acceptance candidate checkpoint (2026-07-22 PDT): authenticated create, list,
+Accepted checkpoint (2026-07-25 PDT): authenticated create, list,
 detail, and optimistic correction routes; account/Project isolation; durable
 Focus loading and create/edit save states; restart persistence; stable
 `activity_id` TimeLog linkage and snapshots; and focused/full automated
 verification are implemented on `feature/033-persisted-activities`.
-Product-owner browser and backend-restart acceptance remains the story exit
-gate.
+The product owner verified creation and correction in the browser, automatic
+Session save, stable Activity-ID TimeLog linkage, and authenticated reload
+after a backend restart.
 
 Acceptance criteria:
 

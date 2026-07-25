@@ -8,7 +8,7 @@ Contract status:
   implements Tasks, optional PlannedItem Task links, and TimeLog Task
   snapshots on its product-owner accepted branch. STORY-033 implements
   authenticated Activity create, list, detail, and optimistic correction on
-  its acceptance-candidate branch. FocusSession, TimeLog correction, deletion,
+  its product-owner accepted branch. FocusSession, TimeLog correction, deletion,
   Undo, and idempotency routes remain unavailable until their owning stories
   pass verification and merge.
 
@@ -696,9 +696,9 @@ destructive operation.
 
 ### 11.3 Activities
 
-Implementation status: STORY-033 acceptance candidate on
-`feature/033-persisted-activities`; automated verification is green and
-product-owner browser acceptance is pending.
+Implementation status: STORY-033 product-owner accepted on
+`feature/033-persisted-activities` after browser, stable-ID TimeLog linkage,
+and backend-restart verification on 2026-07-25 PDT.
 
 #### POST /activities
 
