@@ -57,10 +57,10 @@ describe("TrackScreen", () => {
     const currentFocus = screen.getByRole("region", { name: "Current focus" });
     expect(currentFocus).toHaveTextContent("Backend polish");
     expect(currentFocus).toHaveTextContent("Project");
-    expect(screen.getAllByRole("button", { name: "Pause focus activity" })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: "End focus activity" })).toHaveLength(3);
   });
 
-  it("runs, pauses, and accumulates multiple activities independently", () => {
+  it("runs multiple activities independently and ends the selected session on its next tap", () => {
     vi.useFakeTimers();
     render(<TrackScreen track={demoWeek.track} />);
 
@@ -69,45 +69,39 @@ describe("TrackScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
     const chooser = screen.getByRole("dialog", { name: "Today" });
     expect(
-      within(within(chooser).getByRole("button", { name: "Pause Frontend build block" })).getByText(
+      within(within(chooser).getByRole("button", { name: "End Frontend build block" })).getByText(
         "00:01"
       )
     ).toBeInTheDocument();
     fireEvent.click(within(chooser).getByRole("button", { name: "Start Backend polish" }));
-    expect(within(chooser).getByRole("button", { name: "Pause Frontend build block" })).toHaveAttribute(
+    expect(within(chooser).getByRole("button", { name: "End Frontend build block" })).toHaveAttribute(
       "aria-pressed",
       "true"
     );
-    expect(within(chooser).getByRole("button", { name: "Pause Backend polish" })).toHaveAttribute(
+    expect(within(chooser).getByRole("button", { name: "End Backend polish" })).toHaveAttribute(
       "aria-pressed",
       "true"
     );
 
     act(() => vi.advanceTimersByTime(2_000));
-    fireEvent.click(within(chooser).getByRole("button", { name: "Pause Backend polish" }));
-    const pausedBackend = within(chooser).getByRole("button", { name: "Start Backend polish" });
-    expect(within(pausedBackend).getByText("24m")).toBeInTheDocument();
-    expect(within(pausedBackend).queryByText(/paused|running/i)).not.toBeInTheDocument();
+    fireEvent.click(within(chooser).getByRole("button", { name: "End Backend polish" }));
+    expect(screen.getByRole("dialog", { name: "Session result" })).toBeInTheDocument();
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Session result" })).getByRole("button", {
+        name: "Save result"
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
+    const reopenedChooser = screen.getByRole("dialog", { name: "Today" });
     expect(
-      within(within(chooser).getByRole("button", { name: "Pause Frontend build block" })).getByText(
+      within(reopenedChooser).getByRole("button", { name: "Start Backend polish" })
+    ).toBeInTheDocument();
+    expect(
+      within(within(reopenedChooser).getByRole("button", { name: "End Frontend build block" })).getByText(
         "00:03"
       )
     ).toBeInTheDocument();
-    expect(within(chooser).getByRole("button", { name: "Pause Frontend build block" })).toBeEnabled();
-
-    fireEvent.click(pausedBackend);
-    const resumedBackend = within(chooser).getByRole("button", { name: "Pause Backend polish" });
-    expect(within(resumedBackend).getByText("00:00")).toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(1_000));
-    expect(within(resumedBackend).getByText("00:01")).toBeInTheDocument();
-    fireEvent.click(resumedBackend);
-
-    fireEvent.click(within(chooser).getByRole("button", { name: "Close" }));
-    expect(screen.getByRole("region", { name: "Current focus" })).toHaveTextContent("Backend polish");
-    expect(screen.getAllByRole("button", { name: "Resume focus activity" })[0]).toBeEnabled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
-    expect(screen.getByRole("button", { name: "Pause Frontend build block" })).toBeInTheDocument();
   });
 
   it("keeps the session target and goal local to this view", () => {
@@ -122,9 +116,10 @@ describe("TrackScreen", () => {
     fireEvent.change(within(setup).getByLabelText("Goal for this session (optional)"), {
       target: { value: "Complete the mobile focus layout" }
     });
-    fireEvent.click(within(setup).getByRole("button", { name: "Use this setup" }));
+    fireEvent.click(within(setup).getByRole("button", { name: "Save" }));
 
     expect(fetchImpl).not.toHaveBeenCalled();
+    expect(screen.getByRole("region", { name: "Current focus" })).toHaveTextContent("00:45:00");
     openSessionSetup();
     expect(screen.getByRole("button", { name: "45 minute target" })).toHaveAttribute(
       "aria-pressed",
@@ -137,7 +132,7 @@ describe("TrackScreen", () => {
     unmount();
     render(<TrackScreen track={demoWeek.track} />);
     openSessionSetup();
-    expect(screen.getByRole("button", { name: "25 minute target" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Open" })).toHaveAttribute(
       "aria-pressed",
       "true"
     );
@@ -230,7 +225,6 @@ describe("TrackScreen", () => {
       name: "Frontend build block"
     });
     const editAction = within(contextualDetail).getByRole("button", { name: "Edit activity" });
-    expect(editAction).toHaveTextContent("Edit");
     fireEvent.click(editAction);
     const saveForm = screen.getByRole("dialog", { name: "Save activity" });
     expect(within(saveForm).getByLabelText("Activity name")).toHaveValue(
@@ -309,7 +303,7 @@ describe("TrackScreen", () => {
     fireEvent.change(within(setup).getByLabelText("Goal for this session (optional)"), {
       target: { value: "Keep the tab handoff stable" }
     });
-    fireEvent.click(within(setup).getByRole("button", { name: "Use this setup" }));
+    fireEvent.click(within(setup).getByRole("button", { name: "Save" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Leave Focus" }));
     fireEvent.click(screen.getByRole("button", { name: "Return to Focus" }));
@@ -440,7 +434,7 @@ describe("TrackScreen", () => {
                 "2026-07-18": 60,
                 "2026-07-19": 60
               },
-              running: false
+              running: true
             }
           : { ...activity, todayDate: "2026-07-19", todaySeconds: 0 }
       )
@@ -479,9 +473,7 @@ function openSessionSetup() {
 }
 
 function endCurrentFocus() {
-  fireEvent.click(screen.getByRole("button", { name: "Activity detail" }));
-  const detail = screen.getByRole("dialog", { name: "Frontend build block" });
-  fireEvent.click(within(detail).getByRole("button", { name: "End focus" }));
+  fireEvent.click(screen.getAllByRole("button", { name: "End focus activity" })[0]);
 }
 
 function trackWithSession(): AppWeekViewModel["track"] {
@@ -489,9 +481,9 @@ function trackWithSession(): AppWeekViewModel["track"] {
     activities: demoWeek.track.activities.map((activity, index) =>
       index === 0
         ? {
-            ...activity,
-            sessionSeconds: 61,
-            running: false
+              ...activity,
+              sessionSeconds: 61,
+              running: true
           }
         : { ...activity }
     )

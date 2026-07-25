@@ -4,6 +4,7 @@ import { currentRunSeconds, formatClock, formatDuration } from "./timerModel";
 
 interface FocusWorkspaceProps {
   focus: ActivityTimer;
+  targetMinutes: number | null;
   todayTotalSeconds: number;
   runningCount: number;
   notice: string | null;
@@ -14,6 +15,7 @@ interface FocusWorkspaceProps {
 
 export function FocusWorkspace({
   focus,
+  targetMinutes,
   todayTotalSeconds,
   runningCount,
   notice,
@@ -23,7 +25,7 @@ export function FocusWorkspace({
 }: FocusWorkspaceProps) {
   const hasSession = focus.sessionSeconds > 0;
   const actionLabel = focus.running
-    ? "Pause focus activity"
+    ? "End focus activity"
     : hasSession
       ? "Resume focus activity"
       : "Start focus activity";
@@ -35,6 +37,13 @@ export function FocusWorkspace({
         ? "Recommended now"
         : focus.projectTitle ?? focus.category;
   const softColor = activitySoftColor(focus.color);
+  const targetSeconds = targetMinutes === null ? null : targetMinutes * 60;
+  const targetDelta = targetSeconds === null ? null : targetSeconds - focus.sessionSeconds;
+  const timerText = targetDelta === null
+    ? formatClock(currentRunSeconds(focus))
+    : targetDelta >= 0
+      ? formatClock(targetDelta)
+      : `+${formatClock(Math.abs(targetDelta))}`;
 
   return (
     <div
@@ -80,7 +89,7 @@ export function FocusWorkspace({
           aria-hidden="true"
         />
         <span className="tabular-nums text-[60px] font-bold leading-[1.05] tracking-[-0.035em] text-desk-ink min-[390px]:text-[68px]">
-          {formatClock(currentRunSeconds(focus))}
+          {timerText}
         </span>
       </button>
 
@@ -92,7 +101,7 @@ export function FocusWorkspace({
         disabled={timerLocked}
         onClick={onToggle}
       >
-        <Icon name={focus.running ? "pause" : "play"} className="size-7" />
+        <Icon name={focus.running ? "stop" : "play"} className="size-7" />
       </button>
 
       <button

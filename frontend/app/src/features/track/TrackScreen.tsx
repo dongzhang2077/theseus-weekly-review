@@ -195,16 +195,11 @@ export function TrackScreen({
     updateActivities((current) => startActivity(current, activityId));
   }
 
-  function onPause(activityId: string) {
-    updateActivities((current) => pauseActivity(current, activityId));
-    showNotice("Session paused");
-  }
-
   function onToggleActivity(activity: ActivityTimer) {
     if (backgroundLocked) return;
     setManualFocusId(activity.id);
     if (activity.running) {
-      onPause(activity.id);
+      onEnd(activity.id);
       return;
     }
     onStart(activity.id);
@@ -435,6 +430,7 @@ export function TrackScreen({
       {focus ? (
         <FocusWorkspace
           focus={focus}
+          targetMinutes={targetMinutes}
           todayTotalSeconds={todayTotal}
           runningCount={runningCount}
           notice={recommendationNotice}
@@ -497,7 +493,7 @@ export function TrackScreen({
                       <button
                         className="grid min-h-[46px] min-w-0 grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-paper border-0 bg-transparent px-1 text-left transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                         type="button"
-                        aria-label={`${activity.running ? "Pause" : "Start"} ${activity.name}`}
+                        aria-label={`${activity.running ? "End" : activity.sessionSeconds > 0 ? "Resume" : "Start"} ${activity.name}`}
                         aria-describedby={`activity-time-${activity.id}`}
                         aria-pressed={activity.running}
                         disabled={backgroundLocked}
@@ -692,7 +688,7 @@ export function TrackScreen({
             type="button"
             onClick={() => setActiveSheet(null)}
           >
-            Use this setup
+            Save
           </button>
         </div>
       </Sheet>
@@ -767,17 +763,14 @@ export function TrackScreen({
                 {energyLabel(detailActivity.energy)}
               </span>
               <div className="flex items-center gap-2">
-                <button
-                  className="min-h-9 rounded-full border border-desk-line bg-desk-accent-soft px-4 text-sm font-bold text-desk-ink"
-                  type="button"
-                  aria-label="Edit activity"
+                <IconButton
+                  label="Edit activity"
+                  icon="edit"
                   onClick={() => {
                     openEditActivity(detailActivity);
                     setDetail(null);
                   }}
-                >
-                  Edit
-                </button>
+                />
                 <IconButton
                   label="Session setup"
                   icon="target"
@@ -787,16 +780,6 @@ export function TrackScreen({
                     setActiveSheet("setup");
                   }}
                 />
-                {detailActivity.sessionSeconds > 0 ? (
-                  <button
-                    className="min-h-9 rounded-full border border-desk-danger/30 bg-desk-danger-soft px-4 text-sm font-bold text-desk-danger"
-                    type="button"
-                    aria-label="End focus"
-                    onClick={() => onEnd(detailActivity.id)}
-                  >
-                    End
-                  </button>
-                ) : null}
               </div>
             </div>
             <dl className="divide-y divide-desk-line border-y border-desk-line">
@@ -924,6 +907,6 @@ function activitySoftColor(color: string): string {
 }
 
 const defaultSessionDraft: FocusSessionDraft = {
-  targetMinutes: 25,
+  targetMinutes: null,
   intent: ""
 };
