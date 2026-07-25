@@ -40,6 +40,7 @@ const targetOptions = [15, 25, 45, 60] as const;
 
 type TrackSheet = "logs" | "create" | "setup" | "complete";
 type SessionOutcome = "done" | "progress" | "stuck";
+type ActivityFormMode = "new" | "save" | "edit";
 
 interface TrackScreenProps {
   track: AppWeekViewModel["track"];
@@ -77,7 +78,9 @@ export function TrackScreen({
   const [newDescription, setNewDescription] = useState("");
   const [newProjectId, setNewProjectId] = useState<number | null>(null);
   const [newEnergy, setNewEnergy] = useState<ActivityTimer["energy"]>("neutral");
+  const [activityFormMode, setActivityFormMode] = useState<ActivityFormMode>("new");
   const [editingActivityId, setEditingActivityId] = useState<number | null>(null);
+  const [editingViewId, setEditingViewId] = useState<string | null>(null);
   const [activitySaveState, setActivitySaveState] = useState<
     "idle" | "saving" | "error" | "conflict"
   >("idle");
@@ -266,7 +269,9 @@ export function TrackScreen({
   }
 
   function openNewActivity() {
+    setActivityFormMode("new");
     setEditingActivityId(null);
+    setEditingViewId(null);
     setNewName("");
     setNewDescription("");
     setNewProjectId(null);
@@ -277,8 +282,9 @@ export function TrackScreen({
   }
 
   function openEditActivity(activity: ActivityTimer) {
-    if (!activity.activityId || !activity.activityVersion) return;
-    setEditingActivityId(activity.activityId);
+    setActivityFormMode(activity.activityId && activity.activityVersion ? "edit" : "save");
+    setEditingActivityId(activity.activityId ?? null);
+    setEditingViewId(activity.id);
     setNewName(activity.name);
     setNewDescription(activity.activityDescription ?? "");
     setNewProjectId(activity.projectId ?? null);
@@ -352,6 +358,13 @@ export function TrackScreen({
       const saved = activityRecordToTimer(result.data, projects);
       updateActivities((items) => {
         const existing = items.find((item) => item.activityId === saved.activityId);
+        if (!existing && editingViewId) {
+          return items.map((item) =>
+            item.id === editingViewId
+              ? preserveTimerState(saved, item)
+              : item
+          );
+        }
         if (!existing) return [...items, saved];
         return items.map((item) =>
           item.activityId === saved.activityId
@@ -360,7 +373,9 @@ export function TrackScreen({
         );
       });
       setManualFocusId(saved.id);
+      setActivityFormMode("new");
       setEditingActivityId(null);
+      setEditingViewId(null);
       setNewName("");
       setNewDescription("");
       setActivitySaveState("idle");
@@ -526,7 +541,13 @@ export function TrackScreen({
       </Sheet>
 
       <Sheet
-        title={editingActivityId === null ? "New activity" : "Edit activity"}
+        title={
+          activityFormMode === "edit"
+            ? "Edit activity"
+            : activityFormMode === "save"
+              ? "Save activity"
+              : "New activity"
+        }
         open={activeSheet === "create"}
         closeDisabled={activitySaveState === "saving"}
         onClose={() => setActiveSheet("logs")}
@@ -746,16 +767,14 @@ export function TrackScreen({
                 {energyLabel(detailActivity.energy)}
               </span>
               <div className="flex items-center gap-2">
-                {detailActivity.activityId && detailActivity.activityVersion ? (
-                  <IconButton
-                    label="Edit activity"
-                    icon="edit"
-                    onClick={() => {
-                      openEditActivity(detailActivity);
-                      setDetail(null);
-                    }}
-                  />
-                ) : null}
+                <IconButton
+                  label="Edit activity"
+                  icon="edit"
+                  onClick={() => {
+                    openEditActivity(detailActivity);
+                    setDetail(null);
+                  }}
+                />
                 <IconButton
                   label="Session setup"
                   icon="target"

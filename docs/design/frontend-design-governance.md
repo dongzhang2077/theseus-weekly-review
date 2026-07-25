@@ -127,8 +127,12 @@ view-local Activity boundary:
    labelled truthfully.
 
 Activity color is a stable visual derivation rather than a claimed persisted
-field. Activity detail owns the icon-only edit entry. No Activity dashboard,
-fifth navigation tab, archive, or delete behavior is introduced in this story.
+field. Every Activity detail owns the same icon-only pencil entry. For an
+already durable Activity it opens Edit; for a Plan, Review, or other contextual
+Activity the same form promotes that view to a durable Activity on its first
+successful Save. The visual surface does not expose different controls merely
+because the internal source differs. No Activity dashboard, fifth navigation
+tab, archive, or delete behavior is introduced in this story.
 
 ### Plan information depth and creation
 

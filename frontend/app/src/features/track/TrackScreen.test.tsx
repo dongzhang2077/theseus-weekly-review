@@ -202,6 +202,57 @@ describe("TrackScreen", () => {
     });
   });
 
+  it("uses the same pencil to promote a contextual Activity into a durable Activity", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
+      response(true, 201, {
+        id: 12,
+        user_id: 1,
+        project_id: null,
+        name: "Frontend build block",
+        description: "",
+        activity_type: "consuming",
+        type_source: "user_selected",
+        version: 1,
+        created_at: "2026-07-25T14:00:00Z",
+        updated_at: "2026-07-25T14:00:00Z"
+      })
+    );
+    render(
+      <TrackScreen
+        apiBaseUrl="http://127.0.0.1:8000"
+        fetchImpl={fetchImpl}
+        track={demoWeek.track}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Activity detail" }));
+    const contextualDetail = screen.getByRole("dialog", {
+      name: "Frontend build block"
+    });
+    fireEvent.click(
+      within(contextualDetail).getByRole("button", { name: "Edit activity" })
+    );
+    const saveForm = screen.getByRole("dialog", { name: "Save activity" });
+    expect(within(saveForm).getByLabelText("Activity name")).toHaveValue(
+      "Frontend build block"
+    );
+    fireEvent.click(within(saveForm).getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Activity saved");
+    expect(JSON.parse(String(fetchImpl.mock.calls[0][1].body))).toMatchObject({
+      name: "Frontend build block",
+      activity_type: "consuming"
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Activity detail" }));
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", { name: "Frontend build block" })
+      ).getByRole("button", { name: "Edit activity" })
+    );
+    expect(screen.getByRole("dialog", { name: "Edit activity" })).toBeInTheDocument();
+  });
+
   it("keeps the Activity draft visible after a save failure and allows retry", async () => {
     const fetchImpl = vi
       .fn<FetchLike>()
