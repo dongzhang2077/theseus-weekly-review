@@ -102,7 +102,7 @@ export function FocusWorkspace({
       <button
         className="inline-flex min-h-9 items-center gap-2 rounded-full border border-desk-line bg-desk-raised/75 px-4 text-sm font-semibold text-desk-muted shadow-[0_3px_12px_rgb(76_62_38/0.04)]"
         type="button"
-        aria-label="Open today's activity list"
+        aria-label="Open Today history"
         onClick={onOpenToday}
       >
         <span className="size-2 rounded-full" style={{ backgroundColor: focus.color }} aria-hidden="true" />

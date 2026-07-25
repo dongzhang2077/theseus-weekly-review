@@ -91,7 +91,7 @@ def test_v1_database_migrates_to_local_user_ownership(tmp_path) -> None:
         "weekly_reviews": (10, 1),
     }
     assert tuple(item) == (7, 6, 4)
-    assert version == 6
+    assert version == 7
     assert violations == []
 
 
@@ -155,7 +155,7 @@ def test_v2_database_adds_auth_tables_without_rewriting_personal_data(tmp_path) 
     assert tuple(goal) == (7, 4, "Existing goal")
     assert auth_tables == {"auth_credentials", "auth_sessions"}
     assert credential_count == 0
-    assert version == 6
+    assert version == 7
     assert violations == []
 
 
@@ -220,7 +220,7 @@ def test_v3_database_removes_recovery_code_without_rewriting_account(tmp_path) -
         "existing@example.com",
         "$argon2id$preserved-password-hash",
     )
-    assert version == 6
+    assert version == 7
     assert violations == []
 
 
@@ -411,7 +411,7 @@ def test_v4_database_adds_task_foundation_without_rewriting_personal_data(
         }
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 6
+    assert version == 7
     assert tuple(activity) == (6, 1)
     assert tuple(item) == (8, None, "Existing block")
     assert tuple(time_log) == (9, None, None)
@@ -595,7 +595,7 @@ def test_v5_database_adds_focus_foundation_and_preserves_time_logs(
         ).fetchone()
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 6
+    assert version == 7
     assert tables == {
         "focus_sessions",
         "focus_session_segments",
@@ -666,3 +666,144 @@ def test_v5_migration_failure_rolls_back_time_log_rebuild(
     assert time_log == (2, 1, 30)
     assert marker == 0
     assert version == 5
+
+
+def test_v6_database_adds_correction_history_and_preserves_evidence(tmp_path) -> None:
+    database_path = tmp_path / "focus-v6.db"
+    _create_v6_database(database_path)
+
+    database = Database(database_path)
+    database.initialize()
+    database.initialize()
+
+    with database.session() as migrated:
+        version = migrated.execute("PRAGMA user_version").fetchone()[0]
+        time_log = migrated.execute(
+            """
+            SELECT id, duration_seconds, version, deleted_at
+            FROM time_logs WHERE id = 9
+            """
+        ).fetchone()
+        review = migrated.execute(
+            "SELECT id, stale_at FROM weekly_reviews WHERE id = 10"
+        ).fetchone()
+        revision_table = migrated.execute(
+            """
+            SELECT 1 FROM sqlite_master
+            WHERE type = 'table' AND name = 'time_log_revisions'
+            """
+        ).fetchone()
+        violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
+
+    assert version == 7
+    assert tuple(time_log) == (9, 1800, 1, None)
+    assert tuple(review) == (10, None)
+    assert revision_table is not None
+    assert violations == []
+
+
+def test_v6_migration_failure_rolls_back_correction_columns(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    database_path = tmp_path / "broken-v6.db"
+    _create_v6_database(database_path)
+    broken_migration = tmp_path / "broken-v7.sql"
+    broken_migration.write_text(
+        """
+        ALTER TABLE time_logs ADD COLUMN version INTEGER NOT NULL DEFAULT 1;
+        CREATE TABLE migration_marker (id INTEGER PRIMARY KEY);
+        THIS IS NOT VALID SQL;
+        """,
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(connection_module, "V7_MIGRATION_PATH", broken_migration)
+
+    with pytest.raises(sqlite3.OperationalError):
+        Database(database_path).initialize()
+
+    check = sqlite3.connect(database_path)
+    columns = {
+        row[1] for row in check.execute("PRAGMA table_info(time_logs)").fetchall()
+    }
+    marker = check.execute(
+        """
+        SELECT COUNT(*) FROM sqlite_master
+        WHERE type = 'table' AND name = 'migration_marker'
+        """
+    ).fetchone()[0]
+    version = check.execute("PRAGMA user_version").fetchone()[0]
+    check.close()
+
+    assert "version" not in columns
+    assert marker == 0
+    assert version == 6
+
+
+def _create_v6_database(database_path: Path) -> None:
+    connection = sqlite3.connect(database_path)
+    connection.executescript(
+        """
+        PRAGMA foreign_keys = ON;
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY,
+            display_name TEXT NOT NULL,
+            timezone TEXT NOT NULL DEFAULT 'UTC',
+            locale TEXT NOT NULL DEFAULT 'en',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE time_logs (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            activity_id INTEGER,
+            project_id INTEGER,
+            task_id INTEGER,
+            focus_session_id INTEGER,
+            date TEXT NOT NULL,
+            start_time TEXT,
+            end_time TEXT,
+            duration_minutes INTEGER NOT NULL CHECK (duration_minutes >= 0),
+            duration_seconds INTEGER NOT NULL CHECK (duration_seconds > 0),
+            activity_name TEXT NOT NULL,
+            activity_type TEXT NOT NULL,
+            type_source TEXT NOT NULL DEFAULT 'user_selected',
+            task_title TEXT,
+            note TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE weekly_reviews (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            week_start TEXT NOT NULL,
+            week_end TEXT NOT NULL,
+            wins_json TEXT NOT NULL,
+            insights_json TEXT NOT NULL,
+            next_steps_json TEXT NOT NULL,
+            risk_flags_json TEXT NOT NULL,
+            evidence_json TEXT NOT NULL,
+            generated_text TEXT NOT NULL,
+            model_name TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (user_id, week_start, week_end)
+        );
+        INSERT INTO users (id, display_name) VALUES (4, 'Existing account');
+        INSERT INTO time_logs (
+            id, user_id, date, duration_minutes, duration_seconds,
+            activity_name, activity_type
+        ) VALUES (
+            9, 4, '2026-07-25', 30, 1800, 'Existing focus', 'consuming'
+        );
+        INSERT INTO weekly_reviews (
+            id, user_id, week_start, week_end, wins_json, insights_json,
+            next_steps_json, risk_flags_json, evidence_json, generated_text
+        ) VALUES (
+            10, 4, '2026-07-20', '2026-07-26',
+            '[]', '[]', '[]', '[]', '{}', 'Existing review'
+        );
+        PRAGMA user_version = 6;
+        """
+    )
+    connection.close()

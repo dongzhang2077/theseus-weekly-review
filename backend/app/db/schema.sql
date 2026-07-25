@@ -216,9 +216,24 @@ CREATE TABLE IF NOT EXISTS time_logs (
     type_source TEXT NOT NULL DEFAULT 'user_selected' CHECK (type_source IN ('user_selected', 'ai_suggested', 'user_corrected')),
     task_title TEXT,
     note TEXT NOT NULL DEFAULT '',
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+    deleted_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CHECK ((start_time IS NULL AND end_time IS NULL) OR (start_time IS NOT NULL AND end_time IS NOT NULL))
+);
+
+CREATE TABLE IF NOT EXISTS time_log_revisions (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    time_log_id INTEGER NOT NULL REFERENCES time_logs(id) ON DELETE CASCADE,
+    action TEXT NOT NULL CHECK (action IN ('update', 'delete', 'restore', 'undo')),
+    before_json TEXT NOT NULL CHECK (json_valid(before_json)),
+    after_json TEXT NOT NULL CHECK (json_valid(after_json)),
+    actor_type TEXT NOT NULL DEFAULT 'user'
+        CHECK (actor_type IN ('user', 'assistant_approved')),
+    reason TEXT NOT NULL DEFAULT '' CHECK (length(reason) <= 1000),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS daily_reflections (
@@ -245,6 +260,7 @@ CREATE TABLE IF NOT EXISTS weekly_reviews (
     evidence_json TEXT NOT NULL CHECK (json_valid(evidence_json)),
     generated_text TEXT NOT NULL,
     model_name TEXT,
+    stale_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, week_start, week_end),
@@ -290,6 +306,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_time_logs_focus_session_date
 ON time_logs(focus_session_id, date)
 WHERE focus_session_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_time_logs_activity_type ON time_logs(user_id, activity_type);
+CREATE INDEX IF NOT EXISTS idx_time_logs_active_date
+ON time_logs(user_id, deleted_at, date, start_time, id);
+CREATE INDEX IF NOT EXISTS idx_time_log_revisions_log
+ON time_log_revisions(user_id, time_log_id, id);
 CREATE INDEX IF NOT EXISTS idx_daily_reflections_date ON daily_reflections(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_weekly_reviews_dates ON weekly_reviews(user_id, week_start, week_end);
 
@@ -622,4 +642,4 @@ BEGIN
     SELECT RAISE(ABORT, 'time log focus provenance must match the same user');
 END;
 
-PRAGMA user_version = 6;
+PRAGMA user_version = 7;

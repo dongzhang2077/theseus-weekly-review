@@ -240,7 +240,7 @@ describe("timeLogs api helpers", () => {
 });
 
 function apiLog(overrides: Partial<ApiTimeLogRead>): ApiTimeLogRead {
-  return {
+  const merged = {
     id: 1,
     user_id: 1,
     project_id: 3,
@@ -253,5 +253,11 @@ function apiLog(overrides: Partial<ApiTimeLogRead>): ApiTimeLogRead {
     created_at: "2026-07-18T12:00:00Z",
     updated_at: "2026-07-18T12:00:00Z",
     ...overrides
+  } as ApiTimeLogRead;
+  return {
+    ...merged,
+    duration_seconds: merged.duration_seconds ?? merged.duration_minutes * 60,
+    version: merged.version ?? 1,
+    deleted_at: merged.deleted_at ?? null
   };
 }

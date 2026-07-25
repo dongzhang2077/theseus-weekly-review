@@ -26,8 +26,14 @@ import {
   updateActivity
 } from "../../shared/api/activities";
 import {
+  createTimeLogIdempotencyKey,
+  deleteTimeLog,
+  undoTimeLogMutation,
+  updateTimeLog,
   calendarDate,
-  splitElapsedSecondsByDate
+  splitElapsedSecondsByDate,
+  type ApiActivityType,
+  type ApiTimeLogRead
 } from "../../shared/api/timeLogs";
 import {
   applyFocusSession,
@@ -44,7 +50,7 @@ const categories = ["Project", "Study", "Health"];
 const energyOptions = ["consume", "restore", "neutral", "destroy"] as const;
 const targetOptions = [15, 25, 45, 60] as const;
 
-type TrackSheet = "logs" | "create" | "setup" | "complete";
+type TrackSheet = "activities" | "history" | "create" | "setup" | "complete";
 type ActivityFormMode = "new" | "save" | "edit";
 
 interface TrackScreenProps {
@@ -55,6 +61,8 @@ interface TrackScreenProps {
   fetchImpl?: FetchLike;
   activities?: ActivityTimer[];
   projects?: PlanProject[];
+  timeLogs?: ApiTimeLogRead[];
+  onTimeLogsChange?: Dispatch<SetStateAction<ApiTimeLogRead[]>>;
   onActivitiesChange?: Dispatch<SetStateAction<ActivityTimer[]>>;
   sessionDrafts?: Record<string, FocusSessionDraft>;
   onSessionDraftChange?: (activityId: string, draft: FocusSessionDraft | null) => void;
@@ -70,6 +78,8 @@ export function TrackScreen({
   track,
   activities: controlledActivities,
   projects = [],
+  timeLogs = [],
+  onTimeLogsChange,
   onActivitiesChange,
   sessionDrafts: controlledSessionDrafts,
   onSessionDraftChange,
@@ -96,11 +106,25 @@ export function TrackScreen({
   const [pendingSession, setPendingSession] = useState<ActivityTimer | null>(null);
   const [sessionSaveState, setSessionSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [sessionSaveError, setSessionSaveError] = useState<string | null>(null);
+  const [selectedTimeLog, setSelectedTimeLog] = useState<ApiTimeLogRead | null>(null);
+  const [historyMinutes, setHistoryMinutes] = useState("");
+  const [historyEnergy, setHistoryEnergy] = useState<ApiActivityType>("neutral");
+  const [historyNote, setHistoryNote] = useState("");
+  const [historyReason, setHistoryReason] = useState("");
+  const [removeConfirm, setRemoveConfirm] = useState(false);
+  const [historySaveState, setHistorySaveState] = useState<"idle" | "saving" | "error">("idle");
+  const [historySaveError, setHistorySaveError] = useState<string | null>(null);
+  const [undoMutation, setUndoMutation] = useState<{
+    timeLogId: number;
+    revisionId: number;
+    version: number;
+  } | null>(null);
   const noticeTimerRef = useRef<number | null>(null);
   const saveRequestIdRef = useRef(0);
   const saveInFlightRef = useRef(false);
   const startKeysRef = useRef(new Map<string, string>());
   const endKeyRef = useRef<string | null>(null);
+  const historyKeyRef = useRef<{ signature: string; key: string } | null>(null);
 
   const activities = controlledActivities ?? localActivities;
   const todayDate = controlledTodayDate ?? calendarDate(timeZone);
@@ -128,6 +152,9 @@ export function TrackScreen({
       .map((activity) => activity.category)
       .filter((category, index, all) => !categories.includes(category) && all.indexOf(category) === index)
   ];
+  const todayLogs = timeLogs.filter(
+    (timeLog) => timeLog.date === todayDate && timeLog.deleted_at === null
+  );
   const resultModalOpen = activeSheet === "complete";
   const backgroundLocked = pendingSession !== null || sessionSaveState === "saving";
 
@@ -137,6 +164,144 @@ export function TrackScreen({
       return;
     }
     setLocalActivities(update);
+  }
+
+  function openHistoryLog(timeLog: ApiTimeLogRead) {
+    setSelectedTimeLog(timeLog);
+    setHistoryMinutes(String(Math.max(1, Math.round(timeLog.duration_seconds / 60))));
+    setHistoryEnergy(timeLog.activity_type);
+    setHistoryNote(timeLog.note);
+    setHistoryReason("");
+    setRemoveConfirm(false);
+    setHistorySaveState("idle");
+    setHistorySaveError(null);
+  }
+
+  function applyTimeLogResult(timeLog: ApiTimeLogRead) {
+    onTimeLogsChange?.((current) => {
+      const remaining = current.filter((item) => item.id !== timeLog.id);
+      return timeLog.deleted_at === null
+        ? [...remaining, timeLog].sort(compareTimeLogs)
+        : remaining;
+    });
+  }
+
+  async function saveHistoryLog() {
+    if (!selectedTimeLog || historySaveState === "saving") return;
+    const minutes = Number(historyMinutes);
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      setHistorySaveState("error");
+      setHistorySaveError("Enter a positive duration.");
+      return;
+    }
+    setHistorySaveState("saving");
+    setHistorySaveError(null);
+    const signature = JSON.stringify({
+      operation: "update",
+      id: selectedTimeLog.id,
+      version: selectedTimeLog.version,
+      minutes,
+      historyEnergy,
+      historyNote,
+      historyReason
+    });
+    const result = await updateTimeLog({
+      apiBaseUrl,
+      timeLogId: selectedTimeLog.id,
+      expectedVersion: selectedTimeLog.version,
+      durationSeconds: Math.round(minutes * 60),
+      activityType: historyEnergy,
+      note: historyNote,
+      reason: historyReason,
+      idempotencyKey: historyKey(signature, "update"),
+      fetchImpl
+    });
+    if (result.status !== "ok" || !result.data) {
+      setHistorySaveState("error");
+      setHistorySaveError(result.error ?? "History could not be saved.");
+      return;
+    }
+    applyTimeLogResult(result.data.time_log);
+    historyKeyRef.current = null;
+    setUndoMutation({
+      timeLogId: result.data.time_log.id,
+      revisionId: result.data.revision_id,
+      version: result.data.time_log.version
+    });
+    setSelectedTimeLog(null);
+    setHistorySaveState("idle");
+  }
+
+  async function removeHistoryLog() {
+    if (!selectedTimeLog || historySaveState === "saving") return;
+    setHistorySaveState("saving");
+    setHistorySaveError(null);
+    const signature = JSON.stringify({
+      operation: "delete",
+      id: selectedTimeLog.id,
+      version: selectedTimeLog.version
+    });
+    const result = await deleteTimeLog({
+      apiBaseUrl,
+      timeLogId: selectedTimeLog.id,
+      expectedVersion: selectedTimeLog.version,
+      idempotencyKey: historyKey(signature, "delete"),
+      fetchImpl
+    });
+    if (result.status !== "ok" || !result.data) {
+      setHistorySaveState("error");
+      setHistorySaveError(result.error ?? "History could not be removed.");
+      return;
+    }
+    applyTimeLogResult(result.data.time_log);
+    historyKeyRef.current = null;
+    setUndoMutation({
+      timeLogId: result.data.time_log.id,
+      revisionId: result.data.revision_id,
+      version: result.data.time_log.version
+    });
+    setSelectedTimeLog(null);
+    setRemoveConfirm(false);
+    setHistorySaveState("idle");
+  }
+
+  async function undoHistoryMutation() {
+    if (!undoMutation || historySaveState === "saving") return;
+    setHistorySaveState("saving");
+    setHistorySaveError(null);
+    const signature = JSON.stringify({
+      operation: "undo",
+      ...undoMutation
+    });
+    const result = await undoTimeLogMutation({
+      apiBaseUrl,
+      timeLogId: undoMutation.timeLogId,
+      revisionId: undoMutation.revisionId,
+      expectedVersion: undoMutation.version,
+      idempotencyKey: historyKey(signature, "undo"),
+      fetchImpl
+    });
+    if (result.status !== "ok" || !result.data) {
+      setHistorySaveState("error");
+      setHistorySaveError(result.error ?? "History could not be restored.");
+      return;
+    }
+    applyTimeLogResult(result.data.time_log);
+    historyKeyRef.current = null;
+    setUndoMutation(null);
+    setHistorySaveState("idle");
+  }
+
+  function historyKey(
+    signature: string,
+    operation: "update" | "delete" | "undo"
+  ): string {
+    if (historyKeyRef.current?.signature === signature) {
+      return historyKeyRef.current.key;
+    }
+    const key = createTimeLogIdempotencyKey(operation);
+    historyKeyRef.current = { signature, key };
+    return key;
   }
 
   useEffect(() => {
@@ -543,7 +708,7 @@ export function TrackScreen({
           type="button"
           aria-label="Choose activity"
           disabled={recommendationLocked || backgroundLocked}
-          onClick={() => setActiveSheet("logs")}
+          onClick={() => setActiveSheet("activities")}
         >
           <Icon name="layers" className="size-5" />
         </button>
@@ -566,7 +731,10 @@ export function TrackScreen({
           notice={recommendationNotice}
           timerLocked={backgroundLocked}
           onToggle={() => onToggleActivity(focus)}
-          onOpenToday={() => setActiveSheet("logs")}
+          onOpenToday={() => {
+            setSelectedTimeLog(null);
+            setActiveSheet("history");
+          }}
         />
       ) : (
         <div className="mx-auto w-full max-w-[400px]">
@@ -581,8 +749,8 @@ export function TrackScreen({
       )}
 
       <Sheet
-        title="Today"
-        open={activeSheet === "logs"}
+        title="Activities"
+        open={activeSheet === "activities"}
         onClose={() => setActiveSheet(null)}
         actions={<IconButton label="New activity" icon="plus" onClick={openNewActivity} />}
       >
@@ -667,6 +835,174 @@ export function TrackScreen({
       </Sheet>
 
       <Sheet
+        title={selectedTimeLog ? "Edit record" : "Today history"}
+        open={activeSheet === "history"}
+        closeDisabled={historySaveState === "saving"}
+        onClose={() => {
+          if (selectedTimeLog) {
+            setSelectedTimeLog(null);
+            setRemoveConfirm(false);
+            setHistorySaveError(null);
+          } else {
+            setActiveSheet(null);
+          }
+        }}
+      >
+        {selectedTimeLog ? (
+          <div className="grid gap-4">
+            <div className="rounded-paper border border-desk-line bg-desk-raised px-3 py-3">
+              <strong className="block break-words text-sm">{selectedTimeLog.activity_name}</strong>
+              <span className="mt-1 block text-xs text-desk-muted">
+                {projectName(projects, selectedTimeLog.project_id)}
+              </span>
+            </div>
+            <label className="grid gap-1 text-sm font-semibold">
+              <span>Minutes</span>
+              <input
+                className="min-h-11 rounded-paper border border-desk-line bg-desk-raised px-3 tabular-nums disabled:opacity-60"
+                aria-label="Record minutes"
+                type="number"
+                min="1"
+                step="1"
+                value={historyMinutes}
+                disabled={historySaveState === "saving"}
+                onChange={(event) => setHistoryMinutes(event.currentTarget.value)}
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-semibold">
+              <span>Energy</span>
+              <select
+                className="min-h-11 rounded-paper border border-desk-line bg-desk-raised px-3 disabled:opacity-60"
+                aria-label="Record energy"
+                value={historyEnergy}
+                disabled={historySaveState === "saving"}
+                onChange={(event) => setHistoryEnergy(event.currentTarget.value as ApiActivityType)}
+              >
+                <option value="consuming">Focused</option>
+                <option value="neutral">Neutral</option>
+                <option value="restore">Restorative</option>
+                <option value="destroy">Draining</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm font-semibold">
+              <span>Note</span>
+              <textarea
+                className="min-h-20 resize-y rounded-paper border border-desk-line bg-desk-raised px-3 py-2 disabled:opacity-60"
+                aria-label="Record note"
+                value={historyNote}
+                disabled={historySaveState === "saving"}
+                onChange={(event) => setHistoryNote(event.currentTarget.value)}
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-semibold">
+              <span>Reason</span>
+              <input
+                className="min-h-11 rounded-paper border border-desk-line bg-desk-raised px-3 disabled:opacity-60"
+                aria-label="Correction reason"
+                value={historyReason}
+                disabled={historySaveState === "saving"}
+                onChange={(event) => setHistoryReason(event.currentTarget.value)}
+              />
+            </label>
+            {historySaveError ? (
+              <p className="m-0 rounded-paper bg-desk-warn-soft px-3 py-2 text-sm text-desk-muted" role="alert">
+                {historySaveError}
+              </p>
+            ) : null}
+            {removeConfirm ? (
+              <div className="grid gap-3 rounded-paper border border-desk-warn bg-desk-warn-soft p-3">
+                <p className="m-0 text-sm text-desk-muted">Remove this record from Today and Review?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    className="min-h-11 rounded-paper border border-desk-line bg-desk-raised px-3 font-semibold"
+                    type="button"
+                    disabled={historySaveState === "saving"}
+                    onClick={() => setRemoveConfirm(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="min-h-11 rounded-paper border border-desk-warn bg-desk-warn-soft px-3 font-semibold text-desk-ink"
+                    type="button"
+                    disabled={historySaveState === "saving"}
+                    onClick={removeHistoryLog}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-[44px_1fr] gap-2">
+                <IconButton
+                  label="Remove record"
+                  icon="trash"
+                  disabled={historySaveState === "saving"}
+                  onClick={() => setRemoveConfirm(true)}
+                />
+                <button
+                  className="min-h-11 rounded-paper border border-desk-accent/30 bg-desk-accent-soft px-4 font-semibold text-desk-ink disabled:opacity-60"
+                  type="button"
+                  disabled={historySaveState === "saving"}
+                  onClick={saveHistoryLog}
+                >
+                  Save
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {undoMutation ? (
+              <div className="flex min-h-12 items-center justify-between gap-3 rounded-paper border border-desk-accent/25 bg-desk-accent-soft px-3">
+                <span className="text-sm font-semibold">History updated</span>
+                <IconButton
+                  label="Undo history change"
+                  icon="undo"
+                  disabled={historySaveState === "saving"}
+                  onClick={undoHistoryMutation}
+                />
+              </div>
+            ) : null}
+            {historySaveError ? (
+              <p className="m-0 rounded-paper bg-desk-warn-soft px-3 py-2 text-sm text-desk-muted" role="alert">
+                {historySaveError}
+              </p>
+            ) : null}
+            {todayLogs.length > 0 ? (
+              <div className="divide-y divide-desk-line border-y border-desk-line">
+                {todayLogs.map((timeLog) => (
+                  <button
+                    className="grid min-h-[66px] w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 bg-transparent px-1 py-2 text-left"
+                    type="button"
+                    aria-label={`Edit ${timeLog.activity_name}`}
+                    key={timeLog.id}
+                    onClick={() => openHistoryLog(timeLog)}
+                  >
+                    <span className="min-w-0">
+                      <strong className="block break-words text-sm leading-5">{timeLog.activity_name}</strong>
+                      <span className="mt-0.5 block truncate text-xs text-desk-muted">
+                        {formatHistoryMeta(timeLog, projects)}
+                      </span>
+                    </span>
+                    <span className="grid justify-items-end gap-1">
+                      <strong className="whitespace-nowrap text-sm tabular-nums">
+                        {formatDuration(timeLog.duration_seconds)}
+                      </strong>
+                      <span className="whitespace-nowrap rounded-full bg-desk-sunk px-2 py-0.5 text-[10px] font-semibold text-desk-muted">
+                        {timeLog.focus_session_id ? "Focus" : "Manual"}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <StateSurface icon="fileText" title="No saved records today" />
+            )}
+          </div>
+        )}
+      </Sheet>
+
+      <Sheet
         title={
           activityFormMode === "edit"
             ? "Edit activity"
@@ -676,7 +1012,7 @@ export function TrackScreen({
         }
         open={activeSheet === "create"}
         closeDisabled={activitySaveState === "saving"}
-        onClose={() => setActiveSheet("logs")}
+        onClose={() => setActiveSheet("activities")}
       >
         <div className="grid gap-4">
           {!apiBaseUrl ? (
@@ -997,6 +1333,26 @@ function activityIcon(activityId: string): IconName {
 
 function activitySoftColor(color: string): string {
   return /^#[0-9a-f]{6}$/i.test(color) ? `${color}1f` : "rgba(231,240,227,0.74)";
+}
+
+function compareTimeLogs(left: ApiTimeLogRead, right: ApiTimeLogRead): number {
+  return left.date.localeCompare(right.date)
+    || String(left.start_time ?? "").localeCompare(String(right.start_time ?? ""))
+    || left.id - right.id;
+}
+
+function projectName(projects: PlanProject[], projectId?: number | null): string {
+  if (!projectId) return "Unlinked";
+  return projects.find((project) => project.id === projectId)?.title ?? "Project";
+}
+
+function formatHistoryMeta(timeLog: ApiTimeLogRead, projects: PlanProject[]): string {
+  const parts = [
+    timeLog.start_time ? timeLog.start_time.slice(0, 5) : null,
+    projectName(projects, timeLog.project_id),
+    timeLog.note.trim() || null
+  ].filter((value): value is string => Boolean(value));
+  return parts.join(" · ");
 }
 
 const defaultSessionDraft: FocusSessionDraft = {

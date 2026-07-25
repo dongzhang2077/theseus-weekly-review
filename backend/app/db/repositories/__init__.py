@@ -6,7 +6,12 @@ from .focus import (
     StoredFocusSession,
     StoredIdempotencyReceipt,
 )
-from .planning import FocusTimeLogInsert, TimeLogRepository, WeeklyPlanRepository
+from .planning import (
+    FocusTimeLogInsert,
+    StoredTimeLogRevision,
+    TimeLogRepository,
+    WeeklyPlanRepository,
+)
 from .reviews import WeeklyReviewRepository
 from .tasks import TaskRepository
 from .users import UserRepository
@@ -24,6 +29,7 @@ __all__ = [
     "StoredAuthSession",
     "StoredFocusSession",
     "StoredIdempotencyReceipt",
+    "StoredTimeLogRevision",
     "TimeLogRepository",
     "TaskRepository",
     "WeeklyPlanRepository",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
+from typing import Any
 
 from ...schemas import (
     ActivityType,
@@ -32,6 +33,19 @@ class FocusTimeLogInsert:
     type_source: ActivityTypeSource
     task_title: str | None
     note: str = ""
+
+
+@dataclass(frozen=True)
+class StoredTimeLogRevision:
+    id: int
+    user_id: int
+    time_log_id: int
+    action: str
+    before_json: str
+    after_json: str
+    actor_type: str
+    reason: str
+    created_at: str
 
 
 class WeeklyPlanRepository:
@@ -211,6 +225,7 @@ class TimeLogRepository:
             values,
         )
         self._update_project_last_activity(values["project_id"], values["date"])
+        self.invalidate_reviews_for_dates({values["date"]})
         return self.get(cursor.lastrowid)
 
     def create_from_focus(self, time_log: FocusTimeLogInsert) -> TimeLogRead:
@@ -231,19 +246,55 @@ class TimeLogRepository:
             values,
         )
         self._update_project_last_activity(time_log.project_id, time_log.date)
+        self.invalidate_reviews_for_dates({time_log.date})
         return self.get(cursor.lastrowid)
 
-    def get(self, time_log_id: int) -> TimeLogRead:
+    def get(self, time_log_id: int, *, include_deleted: bool = False) -> TimeLogRead:
+        deleted_clause = "" if include_deleted else "AND deleted_at IS NULL"
         row = self.connection.execute(
-            "SELECT * FROM time_logs WHERE id = ? AND user_id = ?",
+            f"""
+            SELECT * FROM time_logs
+            WHERE id = ? AND user_id = ? {deleted_clause}
+            """,
             (time_log_id, self.user_id),
         ).fetchone()
         return validate_row(TimeLogRead, require_row(row, "TimeLog", time_log_id))
 
-    def list(self) -> list[TimeLogRead]:
+    def list(
+        self,
+        *,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        project_id: int | None = None,
+        task_id: int | None = None,
+        activity_id: int | None = None,
+        include_deleted: bool = False,
+    ) -> list[TimeLogRead]:
+        clauses = ["user_id = :user_id"]
+        values: dict[str, object] = {"user_id": self.user_id}
+        for field, value in (
+            ("project_id", project_id),
+            ("task_id", task_id),
+            ("activity_id", activity_id),
+        ):
+            if value is not None:
+                clauses.append(f"{field} = :{field}")
+                values[field] = value
+        if date_from is not None:
+            clauses.append("date >= :date_from")
+            values["date_from"] = date_from
+        if date_to is not None:
+            clauses.append("date <= :date_to")
+            values["date_to"] = date_to
+        if not include_deleted:
+            clauses.append("deleted_at IS NULL")
         rows = self.connection.execute(
-            "SELECT * FROM time_logs WHERE user_id = ? ORDER BY date, start_time, id",
-            (self.user_id,),
+            f"""
+            SELECT * FROM time_logs
+            WHERE {' AND '.join(clauses)}
+            ORDER BY date, start_time, id
+            """,
+            values,
         ).fetchall()
         return [validate_row(TimeLogRead, row) for row in rows]
 
@@ -252,11 +303,159 @@ class TimeLogRepository:
             """
             SELECT * FROM time_logs
             WHERE user_id = ? AND date BETWEEN ? AND ?
+              AND deleted_at IS NULL
             ORDER BY date, start_time, id
             """,
             (self.user_id, start_date, end_date),
         ).fetchall()
         return [validate_row(TimeLogRead, row) for row in rows]
+
+    def update_if_version(
+        self,
+        time_log_id: int,
+        expected_version: int,
+        updates: dict[str, Any],
+    ) -> TimeLogRead | None:
+        allowed = {
+            "activity_id",
+            "project_id",
+            "task_id",
+            "date",
+            "start_time",
+            "end_time",
+            "duration_minutes",
+            "duration_seconds",
+            "activity_name",
+            "activity_type",
+            "type_source",
+            "task_title",
+            "note",
+            "deleted_at",
+        }
+        if not updates or not set(updates) <= allowed:
+            raise ValueError("TimeLog update contains unsupported fields")
+        assignments = [f"{field} = :{field}" for field in updates]
+        assignments.extend(
+            (
+                "version = version + 1",
+                "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+            )
+        )
+        values = {
+            **updates,
+            "id": time_log_id,
+            "user_id": self.user_id,
+            "expected_version": expected_version,
+        }
+        cursor = self.connection.execute(
+            f"""
+            UPDATE time_logs
+            SET {', '.join(assignments)}
+            WHERE id = :id
+              AND user_id = :user_id
+              AND version = :expected_version
+            """,
+            values,
+        )
+        if cursor.rowcount != 1:
+            return None
+        return self.get(time_log_id, include_deleted=True)
+
+    def append_revision(
+        self,
+        *,
+        time_log_id: int,
+        action: str,
+        before: TimeLogRead,
+        after: TimeLogRead,
+        reason: str = "",
+        actor_type: str = "user",
+    ) -> int:
+        cursor = self.connection.execute(
+            """
+            INSERT INTO time_log_revisions (
+                user_id, time_log_id, action, before_json, after_json,
+                actor_type, reason
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                self.user_id,
+                time_log_id,
+                action,
+                before.model_dump_json(),
+                after.model_dump_json(),
+                actor_type,
+                reason,
+            ),
+        )
+        return int(cursor.lastrowid)
+
+    def get_revision(self, time_log_id: int, revision_id: int) -> StoredTimeLogRevision:
+        row = self.connection.execute(
+            """
+            SELECT *
+            FROM time_log_revisions
+            WHERE id = ? AND time_log_id = ? AND user_id = ?
+            """,
+            (revision_id, time_log_id, self.user_id),
+        ).fetchone()
+        if row is None:
+            raise LookupError(f"TimeLog revision {revision_id} was not found")
+        return StoredTimeLogRevision(**dict(row))
+
+    def recalculate_project_last_activity(self, project_id: int | None) -> None:
+        if project_id is None:
+            return
+        self.connection.execute(
+            """
+            UPDATE projects
+            SET last_activity_date = (
+                    SELECT MAX(date)
+                    FROM time_logs
+                    WHERE user_id = :user_id
+                      AND project_id = :project_id
+                      AND deleted_at IS NULL
+                ),
+                updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            WHERE id = :project_id AND user_id = :user_id
+            """,
+            {"project_id": project_id, "user_id": self.user_id},
+        )
+
+    def invalidate_reviews_for_dates(
+        self,
+        dates: set[str],
+    ) -> list[dict[str, str]]:
+        affected: dict[tuple[str, str], dict[str, str]] = {}
+        for log_date in dates:
+            rows = self.connection.execute(
+                """
+                SELECT week_start, week_end
+                FROM weekly_reviews
+                WHERE user_id = ?
+                  AND ? BETWEEN week_start AND week_end
+                ORDER BY week_start, week_end
+                """,
+                (self.user_id, log_date),
+            ).fetchall()
+            for row in rows:
+                key = (row["week_start"], row["week_end"])
+                affected[key] = {
+                    "week_start": row["week_start"],
+                    "week_end": row["week_end"],
+                }
+        if affected:
+            for week_start, week_end in affected:
+                self.connection.execute(
+                    """
+                    UPDATE weekly_reviews
+                    SET stale_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+                        updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+                    WHERE user_id = ? AND week_start = ? AND week_end = ?
+                    """,
+                    (self.user_id, week_start, week_end),
+                )
+        return list(affected.values())
 
     def _update_project_last_activity(
         self,

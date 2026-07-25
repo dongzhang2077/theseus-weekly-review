@@ -17,6 +17,7 @@ EXPECTED_TABLES = {
     "planned_items",
     "projects",
     "tasks",
+    "time_log_revisions",
     "time_logs",
     "users",
     "weekly_plans",

@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FetchLike } from "../../shared/api/loadAppWeek";
+import type { ApiTimeLogRead } from "../../shared/api/timeLogs";
 import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
 import { demoWeek } from "../../shared/demo/demoWeek";
 import type { FocusSessionDraft } from "../../shared/domain/track";
@@ -32,7 +33,7 @@ describe("TrackScreen", () => {
     render(<TrackScreen track={demoWeek.track} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
-    const chooser = screen.getByRole("dialog", { name: "Today" });
+    const chooser = screen.getByRole("dialog", { name: "Activities" });
     expect(within(chooser).getByRole("heading", { name: "Project" })).toBeInTheDocument();
     expect(within(chooser).getByRole("heading", { name: "Study" })).toBeInTheDocument();
     expect(within(chooser).getByRole("heading", { name: "Health" })).toBeInTheDocument();
@@ -51,7 +52,7 @@ describe("TrackScreen", () => {
     render(<TrackScreen track={demoWeek.track} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
-    const chooser = screen.getByRole("dialog", { name: "Today" });
+    const chooser = screen.getByRole("dialog", { name: "Activities" });
     fireEvent.click(within(chooser).getByRole("button", { name: "Start Backend polish" }));
     fireEvent.click(within(chooser).getByRole("button", { name: "Close" }));
     const currentFocus = screen.getByRole("region", { name: "Current focus" });
@@ -107,7 +108,7 @@ describe("TrackScreen", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Start focus activity" })[0]);
     act(() => vi.advanceTimersByTime(1_000));
     fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
-    const chooser = screen.getByRole("dialog", { name: "Today" });
+    const chooser = screen.getByRole("dialog", { name: "Activities" });
     expect(
       within(within(chooser).getByRole("button", { name: "End Frontend build block" })).getByText(
         "00:01"
@@ -129,7 +130,7 @@ describe("TrackScreen", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
-    const reopenedChooser = screen.getByRole("dialog", { name: "Today" });
+    const reopenedChooser = screen.getByRole("dialog", { name: "Activities" });
     expect(
       within(reopenedChooser).getByRole("button", { name: "Start Backend polish" })
     ).toBeInTheDocument();
@@ -523,6 +524,75 @@ describe("TrackScreen", () => {
     });
     expect(screen.getByText("00:00:00")).toBeInTheDocument();
   });
+
+  it("opens persisted Today history separately and supports correction with Undo", async () => {
+    const original = historyLog();
+    const corrected = {
+      ...original,
+      duration_minutes: 20,
+      duration_seconds: 1200,
+      activity_type: "neutral" as const,
+      type_source: "user_corrected" as const,
+      note: "Corrected note",
+      version: 2
+    };
+    const restored = { ...original, version: 3 };
+    const fetchImpl = vi.fn<FetchLike>()
+      .mockResolvedValueOnce(response(true, 200, {
+        time_log: corrected,
+        revision_id: 41,
+        affected_review_weeks: []
+      }))
+      .mockResolvedValueOnce(response(true, 200, {
+        time_log: restored,
+        revision_id: 42,
+        affected_review_weeks: []
+      }))
+      .mockResolvedValueOnce(response(true, 200, {
+        time_log: {
+          ...restored,
+          version: 4,
+          deleted_at: "2026-07-25T17:00:00Z"
+        },
+        revision_id: 43,
+        affected_review_weeks: []
+      }));
+
+    render(<HistoryHarness fetchImpl={fetchImpl} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Today history" }));
+    const history = screen.getByRole("dialog", { name: "Today history" });
+    expect(within(history).getByRole("button", { name: "Edit Backend work" })).toHaveTextContent(
+      "30m"
+    );
+    expect(within(history).getByText("Focus")).toBeInTheDocument();
+
+    fireEvent.click(within(history).getByRole("button", { name: "Edit Backend work" }));
+    fireEvent.change(screen.getByLabelText("Record minutes"), { target: { value: "20" } });
+    fireEvent.change(screen.getByLabelText("Record energy"), { target: { value: "neutral" } });
+    fireEvent.change(screen.getByLabelText("Record note"), { target: { value: "Corrected note" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("History updated")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Backend work" })).toHaveTextContent("20m");
+    expect(fetchImpl.mock.calls[0][0]).toBe("http://127.0.0.1:8000/time-logs/71");
+    expect(fetchImpl.mock.calls[0][1]?.method).toBe("PATCH");
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo history change" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Edit Backend work" })).toHaveTextContent("30m");
+    });
+    expect(fetchImpl.mock.calls[1][0]).toBe(
+      "http://127.0.0.1:8000/time-logs/71/revisions/41/undo"
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Backend work" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove record" }));
+    expect(screen.getByText("Remove this record from Today and Review?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(await screen.findByText("No saved records today")).toBeInTheDocument();
+    expect(fetchImpl.mock.calls[2][1]?.method).toBe("DELETE");
+  });
 });
 
 function openSessionSetup() {
@@ -643,4 +713,53 @@ function SessionDraftHarness() {
       ) : null}
     </>
   );
+}
+
+function HistoryHarness({ fetchImpl }: { fetchImpl: FetchLike }) {
+  const [logs, setLogs] = useState<ApiTimeLogRead[]>([historyLog()]);
+  return (
+    <TrackScreen
+      apiBaseUrl="http://127.0.0.1:8000"
+      todayDate="2026-07-25"
+      fetchImpl={fetchImpl}
+      track={demoWeek.track}
+      timeLogs={logs}
+      onTimeLogsChange={setLogs}
+      projects={[
+        {
+          id: 3,
+          title: "Theseus backend",
+          stage: "sprint",
+          status: "active",
+          weeklyMinMinutes: 120,
+          weeklyTargetMinutes: 300
+        }
+      ]}
+    />
+  );
+}
+
+function historyLog(): ApiTimeLogRead {
+  return {
+    id: 71,
+    user_id: 1,
+    activity_id: 7,
+    project_id: 3,
+    task_id: null,
+    focus_session_id: 31,
+    task_title: null,
+    date: "2026-07-25",
+    start_time: "09:00:00",
+    end_time: "09:30:00",
+    duration_minutes: 30,
+    duration_seconds: 1800,
+    activity_name: "Backend work",
+    activity_type: "consuming",
+    type_source: "user_selected",
+    note: "Initial note",
+    version: 1,
+    deleted_at: null,
+    created_at: "2026-07-25T16:00:00Z",
+    updated_at: "2026-07-25T16:30:00Z"
+  };
 }

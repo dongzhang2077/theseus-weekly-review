@@ -43,6 +43,7 @@ class WeeklyReviewRepository:
                 evidence_json = excluded.evidence_json,
                 generated_text = excluded.generated_text,
                 model_name = excluded.model_name,
+                stale_at = NULL,
                 updated_at = CURRENT_TIMESTAMP
             """,
             values,

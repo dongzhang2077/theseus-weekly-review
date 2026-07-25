@@ -20,7 +20,14 @@ def test_persisted_context_matches_sample_semantics(
     )
     actual = stored.model_dump(
         mode="json",
-        exclude={"id", "user_id", "model_name", "created_at", "updated_at"},
+        exclude={
+            "id",
+            "user_id",
+            "model_name",
+            "stale_at",
+            "created_at",
+            "updated_at",
+        },
     )
 
     assert actual == expected
