@@ -527,7 +527,12 @@ foundation. Schema v8, repositories, domain services, focused tests, and full
 regression verification pass on `feature/025-trust-ledger`; product-owner
 acceptance is recorded.
 
-Current sequential gate: STORY-025B authenticated preference and ledger APIs.
-The route and error-contract candidate is implemented and focused tests pass
-on `feature/025-trust-ledger`. Product-owner acceptance remains open.
+Completed sequential gate: STORY-025B authenticated preference and ledger
+APIs. The route and error contract are implemented, automatically verified,
+and product-owner accepted on `feature/025-trust-ledger` on 2026-07-25 PDT.
 Arbitrary action execution remains private until the bounded Assistant API.
+
+Current sequential gate: STORY-025C compact authenticated Pending, History,
+and Memory control surfaces. The interface remains outside the four primary
+bottom-navigation tabs and must expose explicit loading, empty, error,
+approval, correction, deletion, and restore states before browser acceptance.

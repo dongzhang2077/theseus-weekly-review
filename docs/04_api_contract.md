@@ -1061,8 +1061,9 @@ failure tests, migration tests, and current-story acceptance gate pass.
 ## 12. Trust, Memory, And Action Ledger
 
 STORY-025A is the accepted schema-v8 repository/domain-service foundation.
-STORY-025B implements the following authenticated API as an automatically
-verified candidate. Product-owner acceptance remains required.
+STORY-025B implements the following authenticated API and was product-owner
+accepted on 2026-07-25 PDT after automated contract and persistence
+verification.
 
 ### 12.1 Preferences
 
