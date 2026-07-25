@@ -767,14 +767,17 @@ export function TrackScreen({
                 {energyLabel(detailActivity.energy)}
               </span>
               <div className="flex items-center gap-2">
-                <IconButton
-                  label="Edit activity"
-                  icon="edit"
+                <button
+                  className="min-h-9 rounded-full border border-desk-line bg-desk-accent-soft px-4 text-sm font-bold text-desk-ink"
+                  type="button"
+                  aria-label="Edit activity"
                   onClick={() => {
                     openEditActivity(detailActivity);
                     setDetail(null);
                   }}
-                />
+                >
+                  Edit
+                </button>
                 <IconButton
                   label="Session setup"
                   icon="target"

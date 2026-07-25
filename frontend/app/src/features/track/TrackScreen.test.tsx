@@ -229,9 +229,9 @@ describe("TrackScreen", () => {
     const contextualDetail = screen.getByRole("dialog", {
       name: "Frontend build block"
     });
-    fireEvent.click(
-      within(contextualDetail).getByRole("button", { name: "Edit activity" })
-    );
+    const editAction = within(contextualDetail).getByRole("button", { name: "Edit activity" });
+    expect(editAction).toHaveTextContent("Edit");
+    fireEvent.click(editAction);
     const saveForm = screen.getByRole("dialog", { name: "Save activity" });
     expect(within(saveForm).getByLabelText("Activity name")).toHaveValue(
       "Frontend build block"
