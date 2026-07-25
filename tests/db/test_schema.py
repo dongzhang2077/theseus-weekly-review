@@ -13,6 +13,7 @@ EXPECTED_TABLES = {
     "goals",
     "planned_items",
     "projects",
+    "tasks",
     "time_logs",
     "users",
     "weekly_plans",
@@ -116,6 +117,13 @@ def test_schema_rejects_cross_user_references(database: Database) -> None:
             """,
             (first,),
         ).lastrowid
+        second_task = connection.execute(
+            """
+            INSERT INTO tasks (user_id, project_id, title)
+            VALUES (?, ?, 'Second task')
+            """,
+            (second, second_project),
+        ).lastrowid
 
         with pytest.raises(sqlite3.IntegrityError):
             connection.execute(
@@ -148,6 +156,25 @@ def test_schema_rejects_cross_user_references(database: Database) -> None:
         with pytest.raises(sqlite3.IntegrityError):
             connection.execute(
                 """
+                INSERT INTO tasks (user_id, project_id, title)
+                VALUES (?, ?, 'Cross-user task')
+                """,
+                (first, second_project),
+            )
+
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                """
+                INSERT INTO planned_items (
+                    weekly_plan_id, project_id, task_id, title, planned_minutes
+                ) VALUES (?, ?, ?, 'Cross-user task item', 30)
+                """,
+                (first_plan, first_project, second_task),
+            )
+
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                """
                 INSERT INTO time_logs (
                     user_id, activity_id, project_id, date, duration_minutes,
                     activity_name, activity_type
@@ -157,6 +184,20 @@ def test_schema_rejects_cross_user_references(database: Database) -> None:
                 )
                 """,
                 (first, second_activity, first_project),
+            )
+
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                """
+                INSERT INTO time_logs (
+                    user_id, project_id, task_id, date, duration_minutes,
+                    activity_name, activity_type
+                ) VALUES (
+                    ?, ?, ?, '2026-06-10', 30,
+                    'Cross-user task log', 'consuming'
+                )
+                """,
+                (first, first_project, second_task),
             )
 
 
@@ -200,3 +241,25 @@ def test_date_uniqueness_is_scoped_to_each_user(database: Database) -> None:
         assert connection.execute("SELECT COUNT(*) FROM weekly_plans").fetchone()[0] == 2
         assert connection.execute("SELECT COUNT(*) FROM daily_reflections").fetchone()[0] == 2
         assert connection.execute("SELECT COUNT(*) FROM weekly_reviews").fetchone()[0] == 2
+
+
+def test_account_deletion_cascades_tasks_without_orphaning_projects(
+    database: Database,
+) -> None:
+    with database.session() as connection:
+        user_id = connection.execute(
+            "INSERT INTO users (display_name) VALUES ('Delete owner')"
+        ).lastrowid
+        project_id = connection.execute(
+            "INSERT INTO projects (user_id, title) VALUES (?, 'Private project')",
+            (user_id,),
+        ).lastrowid
+        connection.execute(
+            "INSERT INTO tasks (user_id, project_id, title) VALUES (?, ?, 'Private task')",
+            (user_id, project_id),
+        )
+        connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+        assert connection.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 0
+        assert connection.execute("SELECT COUNT(*) FROM projects").fetchone()[0] == 0
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []

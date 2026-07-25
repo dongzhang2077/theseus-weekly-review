@@ -7,7 +7,7 @@ from typing import Iterator
 
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 LEGACY_TABLES = (
     "weekly_reviews",
@@ -66,11 +66,13 @@ class Database:
                 self._migrate_v2_schema(connection)
             elif version == 3:
                 self._migrate_v3_schema(connection)
+            elif version == 4:
+                self._migrate_v4_schema(connection)
             elif version == SCHEMA_VERSION:
                 self._apply_schema(connection)
             else:
                 raise RuntimeError(
-                    f"Unsupported Theseus schema version {version}; expected 1, 2, 3, or {SCHEMA_VERSION}"
+                    f"Unsupported Theseus schema version {version}; expected 1, 2, 3, 4, or {SCHEMA_VERSION}"
                 )
             version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version != SCHEMA_VERSION:
@@ -81,7 +83,8 @@ class Database:
     def _migrate_v2_schema(self, connection: sqlite3.Connection) -> None:
         self._run_atomic_migration(
             connection,
-            SCHEMA_PATH.read_text(encoding="utf-8"),
+            self._v5_extension_sql(connection)
+            + SCHEMA_PATH.read_text(encoding="utf-8"),
             "The Theseus v2 database could not be migrated safely",
         )
 
@@ -89,9 +92,53 @@ class Database:
         self._run_atomic_migration(
             connection,
             "ALTER TABLE auth_credentials DROP COLUMN recovery_code_hash;\n"
+            + self._v5_extension_sql(connection)
             + SCHEMA_PATH.read_text(encoding="utf-8"),
             "The Theseus v3 database could not be migrated safely",
         )
+
+    def _migrate_v4_schema(self, connection: sqlite3.Connection) -> None:
+        self._run_atomic_migration(
+            connection,
+            self._v5_extension_sql(connection)
+            + SCHEMA_PATH.read_text(encoding="utf-8"),
+            "The Theseus v4 database could not be migrated safely",
+        )
+
+    @staticmethod
+    def _v5_extension_sql(connection: sqlite3.Connection) -> str:
+        additions = {
+            "activities": (
+                ("version", "INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1)"),
+            ),
+            "planned_items": (
+                ("task_id", "INTEGER REFERENCES tasks(id) ON DELETE SET NULL"),
+            ),
+            "time_logs": (
+                ("task_id", "INTEGER REFERENCES tasks(id) ON DELETE SET NULL"),
+                ("task_title", "TEXT"),
+            ),
+        }
+        statements: list[str] = []
+        existing_tables = {
+            row["name"]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+        for table, columns in additions.items():
+            if table not in existing_tables:
+                continue
+            existing_columns = {
+                row["name"]
+                for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+            statements.extend(
+                f"ALTER TABLE {table} ADD COLUMN {name} {definition};"
+                for name, definition in columns
+                if name not in existing_columns
+            )
+        return "\n".join(statements) + ("\n" if statements else "")
 
     def _apply_schema(self, connection: sqlite3.Connection) -> None:
         self._run_atomic_migration(

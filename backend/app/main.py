@@ -7,12 +7,14 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .api.activities import router as activities_router
 from .api.auth import router as auth_router
 from .api.goals import router as goals_router
 from .api.imports import router as imports_router
 from .api.projects import router as projects_router
 from .api.reviews import router as reviews_router
 from .api.time_logs import router as time_logs_router
+from .api.tasks import router as tasks_router
 from .api.weekly_plans import router as weekly_plans_router
 from .db import Database
 from .services import AuthService, AuthSettings
@@ -62,11 +64,13 @@ def create_app(
     application.state.auth_settings = auth_settings
     application.state.auth_service = None
     application.include_router(auth_router)
+    application.include_router(activities_router)
     application.include_router(goals_router)
     application.include_router(imports_router)
     application.include_router(projects_router)
     application.include_router(reviews_router)
     application.include_router(time_logs_router)
+    application.include_router(tasks_router)
     application.include_router(weekly_plans_router)
 
     @application.get("/health")

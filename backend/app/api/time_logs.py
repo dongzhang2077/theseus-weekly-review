@@ -5,7 +5,7 @@ import sqlite3
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ..db.repositories import TimeLogRepository
-from ..schemas import AccountRead, TimeLogCreate, TimeLogRead
+from ..schemas import AccountRead, TimeLogBatchCreate, TimeLogCreate, TimeLogRead
 from .dependencies import get_connection, get_current_user
 
 
@@ -24,6 +24,26 @@ async def create_time_log(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="The time log could not be persisted",
+        ) from exc
+
+
+@router.post(
+    "/batch",
+    response_model=list[TimeLogRead],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_time_log_batch(
+    payload: TimeLogBatchCreate,
+    user: AccountRead = Depends(get_current_user),
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> list[TimeLogRead]:
+    try:
+        repository = TimeLogRepository(connection, user.id)
+        return [repository.create(time_log) for time_log in payload.time_logs]
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The time-log batch could not be persisted",
         ) from exc
 
 

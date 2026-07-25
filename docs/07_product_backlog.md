@@ -417,6 +417,118 @@ Acceptance criteria:
 - Two-context restore, 401 recovery, logout, and reuse cases have automated
   browser/API tests and documented security reasoning.
 
+### STORY-032 Correct the mobile execution and review feedback loops
+
+As a user, I want Focus, Review, Signals, and Plan to form one clear mobile
+workflow so that an observed problem can become a contextual, reversible plan
+change without duplicated status cards or hidden state.
+
+Priority: P0 corrective work for the 2026-07-18 demo
+
+Local implementation checkpoint (2026-07-18 PDT): implemented and verified on
+`feature/032-focus-ux-v2`, but not merged or released. This candidate remains
+subject to product-owner browser approval. The implementation keeps the 430px
+Warm Stationery shell, replaces repeated category summaries with concrete
+issues, and carries a selected Risk or Signal into a contextual Plan change.
+The full frontend suite passes 102 tests across 19 files, TypeScript and the
+production build pass, and the final diff check is clean.
+
+Focus freeze checkpoint (2026-07-21 PDT): the product owner accepted the
+restored midterm-style Focus hierarchy and Activity-bar state treatment. The
+frozen candidate preserves independent multi-Activity timers, separate live-run
+and accumulated-session values, account-scoped refresh checkpoints, local-date
+rollover, and atomic cross-midnight TimeLog persistence. Verification passes
+113 frontend tests across 20 files, 103 backend tests, TypeScript, the
+production build, compileall, and the sample review path. Persisted creation of
+new Activities, an inspectable/correctable Today history, and cross-tab session
+coordination remain non-blocking follow-up work in STORY-033, STORY-034, and
+STORY-031 respectively.
+
+Acceptance criteria:
+
+- the primary workspace stays phone-sized at 430px and detail views are opaque
+  full-screen surfaces rather than transparent layers over the source page;
+- Focus preserves an in-progress draft across tab changes, records a completed
+  result exactly once, and determines Today using the user's local date;
+- Review browses real Monday-to-Sunday weeks, including an empty week, without
+  a stale response replacing the currently selected week;
+- Signals lists only concrete attention or risk items, collapses normal checks,
+  avoids repeating a priority category, and keeps Evidence optional;
+- a Risk or Signal reaches the correct contextual Plan draft in one action and
+  can be applied or saved as the second action; unknown project context opens
+  editing instead of guessing;
+- Energy signals use the same deterministic thresholds as the review engine:
+  restoration below 20% of consuming time, or destructive activity at least
+  120 minutes and at least 25% of total time;
+- Plan shows one clear adjustment path, one primary edit action, and truthful
+  loading, conflict, saved, undo, empty, and error states;
+- semantic Tailwind tokens and existing shared components remain the default;
+  large page-specific CSS or decoration-only animation is not introduced;
+- focused and full frontend tests, TypeScript, production build, diff check,
+  and 430x932 browser review pass before merge.
+
+### STORY-033 Persist user-created Focus activities
+
+As a local account user, I want an Activity created in Focus to be stored under
+my account so that it remains available after restart and can own later TimeLog
+records.
+
+Priority: P1 after the accepted Focus freeze
+
+Accepted checkpoint (2026-07-25 PDT): authenticated create, list,
+detail, and optimistic correction routes; account/Project isolation; durable
+Focus loading and create/edit save states; restart persistence; stable
+`activity_id` TimeLog linkage and snapshots; and focused/full automated
+verification are implemented on `feature/033-persisted-activities`.
+The product owner verified creation and correction in the browser, automatic
+Session save, stable Activity-ID TimeLog linkage, and authenticated reload
+after a backend restart.
+
+Acceptance criteria:
+
+- authenticated Activity create, list, and correction routes use the existing
+  `activities` table and `ActivityRepository` rather than route-level SQL;
+- Activity reads expose an optimistic version and stale corrections are
+  rejected without overwriting a newer user change;
+- ownership comes only from the validated JWT, and project links belonging to
+  another account are rejected;
+- Focus loads persisted activities and saves a newly created Activity before
+  presenting it as durable;
+- later TimeLogs reference the persisted `activity_id` while preserving the raw
+  activity name and normalized type snapshot;
+- Project reassignment is rejected while that Activity has an open
+  FocusSession;
+- loading, saving, validation, retry, restart, and cross-account isolation have
+  focused API and frontend tests;
+- view-local fallback behavior, if retained for a demo, is labelled truthfully
+  and is never presented as persisted data.
+
+### STORY-034 Add an inspectable and correctable Today history
+
+As a local account user, I want Today total to open the records that produced
+the number so that I can inspect and correct mistakes instead of seeing only an
+activity picker.
+
+Priority: P1 after the accepted Focus freeze
+
+Acceptance criteria:
+
+- Today total is calculated from authenticated persisted TimeLogs plus open
+  local sessions without double counting completed sessions;
+- opening Today shows chronological records and their Activity, Project,
+  duration, energy type, and note provenance;
+- a user can correct a mistaken record or remove it through user-scoped API
+  behavior, with confirmation and immediate total refresh;
+- removal is a versioned soft delete; every correction, removal, restore, and
+  Undo appends an owned revision rather than erasing history;
+- corrections flow into project progress, Evidence, and Weekly Review through
+  the existing normalized TimeLog path;
+- overlapping stored reviews are marked stale until successful regeneration;
+- empty, loading, error, retry, save, and undo or confirmation states are
+  explicit;
+- local-date boundaries follow the account timezone and have cross-midnight,
+  restart, and account-isolation tests.
+
 ## Epic 8: Personal Assistant Evolution
 
 These stories are roadmap work. They are not part of the 2026-07-18 demo and
@@ -486,3 +598,128 @@ Acceptance criteria:
 - Confidence, correction, expiry, and deletion are visible to the user.
 - Optimization targets are bounded, such as usefulness, plan adherence,
   protected slack, or restart success.
+
+## Epic 9: Agent-Ready Domain And Integration
+
+These stories turn the personal-assistant strategy into independently
+verifiable modules. Their dependency order and product-owner acceptance gates
+are defined in `docs/15_agent_implementation_roadmap.md`.
+
+### STORY-035 Lock the agent-ready domain contract
+
+As a product owner, I want Task, Activity, PlannedItem, FocusSession, TimeLog,
+domain-service, idempotency, and migration responsibilities agreed before
+implementation so that Agent frameworks do not dictate or duplicate product
+data.
+
+Priority: P0 before Agent runtime work
+
+Accepted contract checkpoint (2026-07-22 PDT): the product owner accepted the
+authoritative data/API contracts, atomic v5-v7 migration sequence,
+Task-to-corrected-Review lifecycle, service boundaries, decision record, and
+executable test outline on `feature/035-agent-ready-domain-contract`. No SQL,
+Python, frontend runtime, LangGraph, or OpenClaw behavior is included. This
+accepted contract is the baseline for STORY-036.
+
+Acceptance criteria:
+
+- Task, Activity, PlannedItem, FocusSession, and TimeLog have non-overlapping
+  responsibilities and a documented lifecycle.
+- The data model and API contract define user ownership, timezone,
+  idempotency, correction, deletion, and Undo behavior.
+- Existing version-4 accounts, PlannedItems, TimeLogs, and sample fixtures have
+  a non-destructive migration path.
+- Routes, LangGraph nodes, and channel tools share user-scoped domain services
+  instead of duplicating SQL or business rules.
+- LangGraph runtime persistence remains separate from canonical domain truth.
+- The product owner approves the contract and lifecycle before schema code is
+  written.
+
+### STORY-036 Add durable Tasks
+
+As a user, I want a Task to persist across weekly plans so that the assistant
+can help me progress a finite outcome instead of recreating it as an unrelated
+plan block every week.
+
+Priority: P0 for Agent foundation
+
+Accepted checkpoint (2026-07-22 PDT): schema v5, atomic v1-v4
+migrations, authenticated Task lifecycle API, optimistic versions,
+PlannedItem/TimeLog Task links, restart isolation, and the focused mobile
+Plan -> Tasks -> Task detail flow are implemented on
+`feature/036-durable-tasks`. Automated verification is green, and the product
+owner completed the local browser acceptance flow for create, complete,
+reopen, archive, restore, Plan linkage, and reload persistence.
+
+Acceptance criteria:
+
+- A user can create, list, inspect, update, complete, reopen, and archive a
+  Task linked to one of their Projects.
+- Task updates use optimistic versions and never silently overwrite a newer
+  mutation.
+- PlannedItems may reference a Task while existing ad-hoc PlannedItems remain
+  valid.
+- Cross-account links and invalid lifecycle transitions are rejected.
+- Task history survives restart and remains distinct from reusable Activities.
+- Migration, API, persistence, sample-review, and frontend tests pass.
+
+### STORY-037 Persist resumable Focus sessions
+
+As a user, I want running and paused Focus state stored under my account so
+that the App and future conversation channels observe and finish the same
+execution without losing or duplicating time.
+
+Priority: P0 for Agent foundation
+
+Acceptance criteria:
+
+- Authenticated start, pause, resume, finish, and cancel transitions are
+  persisted and user-scoped.
+- Independent multi-Activity sessions remain supported.
+- Server timestamps and stored accumulated duration determine elapsed time.
+- Finishing creates cross-midnight TimeLog segments atomically and exactly
+  once.
+- Duplicate commands return the original result rather than double counting.
+- Browser refresh, backend restart, timezone rollover, and account isolation
+  have focused tests.
+
+### STORY-038 Build a bounded Assistant API
+
+As a user, I want language requests to use typed, evidence-backed operations so
+that an assistant can read context and draft changes without receiving direct
+database authority.
+
+Priority: P0 before LangGraph or OpenClaw
+
+Acceptance criteria:
+
+- Read, propose, approve, and execute operations have separate schemas and
+  permission checks.
+- Operations call authenticated domain services and never expose SQL or
+  provider-generated IDs as domain truth.
+- Ambiguous requests ask one focused clarification instead of guessing.
+- Proposals contain evidence and a before/after diff and cannot write before
+  approval.
+- Provider errors, invalid output, duplicate requests, and cross-account
+  attempts cannot leave partial changes.
+- A deterministic local path remains available without an external model key.
+
+### STORY-039 Bind a conversation channel to an account
+
+As a user, I want one external conversation identity securely paired with my
+Theseus account so that a channel can access only my approved capabilities
+without reusing browser credentials.
+
+Priority: P0 before OpenClaw
+
+Acceptance criteria:
+
+- Integration credentials are scoped, revocable, expiring, hashed at rest, and
+  displayed only once.
+- Channel identities are explicitly paired with one account and minimized in
+  storage and logs.
+- Read, propose, and approved-execution scopes are separable.
+- Replayed external message IDs are idempotent.
+- Revocation immediately blocks the integration without deleting domain data.
+- Pairing, expiry, scope, replay, revocation, redaction, and account-isolation
+  tests pass.

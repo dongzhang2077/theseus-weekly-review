@@ -173,3 +173,40 @@ Consequences:
 - Agent and personalization work remains outside the 2026-07-18 demo scope.
 - The detailed phase gates live in
   `docs/13_product_agent_development_strategy.md`.
+
+## 2026-07-22: Add Task and Durable Focus State Before Agent Runtime
+
+Decision:
+
+Accept the sequential Agent implementation roadmap and distinguish durable
+Task, reusable Activity, weekly PlannedItem, live FocusSession, and completed
+TimeLog before adding LangGraph or OpenClaw.
+
+Reason:
+
+The long-term product needs to manage finite outcomes across weeks and let the
+App and future conversation channels observe the same execution state. A
+PlannedItem cannot safely act as both a durable Task and one week's allocation.
+Browser-only timer state also cannot provide exactly-once, restart-safe,
+cross-channel execution.
+
+Consequences:
+
+- `Task` becomes a user-owned Project child with an explicit lifecycle.
+- `Activity` remains a reusable way of working rather than a finite outcome.
+- `PlannedItem` may reference a Task while preserving its weekly snapshot.
+- `FocusSession` and its timestamped segments become the durable live-timer
+  boundary; `auth_sessions` remain unrelated authentication records.
+- Completed Focus sessions create normalized TimeLogs exactly once and preserve
+  Task/Activity snapshots.
+- TimeLog correction uses optimistic versions, soft deletion, append-only
+  revisions, review invalidation, and reversible Undo.
+- Schema v5-v7 are additive, atomic migration contracts over the schema-v4
+  baseline; no implementation is claimed until its owning story passes tests
+  and product-owner acceptance.
+- FastAPI, future LangGraph nodes, and OpenClaw tools call shared authenticated
+  domain services. None may maintain competing transition rules or write SQLite
+  directly.
+- The accepted lifecycle and API shapes live in `docs/03_data_model.md` and
+  `docs/04_api_contract.md`; ordered delivery gates live in
+  `docs/15_agent_implementation_roadmap.md`.

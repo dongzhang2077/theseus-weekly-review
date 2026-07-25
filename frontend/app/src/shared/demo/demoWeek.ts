@@ -49,7 +49,18 @@ export const demoWeek = {
           { label: "Inactive", value: "5d" },
           { label: "Minimum", value: "3h" }
         ],
-        action: "Plan"
+        action: {
+          label: "Schedule restart",
+          detail: "suggestion",
+          suggestion: {
+            title: "Restart Resume and applications",
+            reason: "The project had no logged work this week.",
+            kind: "add",
+            projectId: 3,
+            projectTitle: "Resume and applications",
+            deltaMinutes: 60
+          }
+        }
       },
       {
         id: "risk-frontend",
@@ -61,7 +72,18 @@ export const demoWeek = {
           { label: "Logged", value: "2h" },
           { label: "Delta", value: "-6h" }
         ],
-        action: "Plan"
+        action: {
+          label: "Adjust plan",
+          detail: "suggestion",
+          suggestion: {
+            title: "Adjust Theseus frontend",
+            reason: "Frontend work landed below the planned target while backend took priority.",
+            kind: "reduce",
+            projectId: 2,
+            projectTitle: "Theseus frontend",
+            deltaMinutes: -60
+          }
+        }
       }
     ] satisfies DemoReviewItem[]
   },
@@ -110,7 +132,18 @@ export const demoWeek = {
           { label: "Logged", value: "0m" },
           { label: "Inactive", value: "6d" }
         ],
-        action: "Plan"
+        action: {
+          label: "Schedule restart",
+          detail: "suggestion",
+          suggestion: {
+            title: "Restart Resume and applications",
+            reason: "The project was planned, then received no active block.",
+            kind: "add",
+            projectId: 3,
+            projectTitle: "Resume and applications",
+            deltaMinutes: 60
+          }
+        }
       },
       {
         id: "backend-healthy",
@@ -139,7 +172,18 @@ export const demoWeek = {
           { label: "Resume", value: "-2h" },
           { label: "Review", value: "Done" }
         ],
-        action: "Plan"
+        action: {
+          label: "Adjust plan",
+          detail: "suggestion",
+          suggestion: {
+            title: "Adjust Theseus frontend",
+            reason: "Backend moved forward, but restart work fell out of the week.",
+            kind: "reduce",
+            projectId: 2,
+            projectTitle: "Theseus frontend",
+            deltaMinutes: -60
+          }
+        }
       },
       {
         id: "goal-aligned",
@@ -178,6 +222,10 @@ export const demoWeek = {
         category: "Project",
         energy: "consume",
         color: "#6f8f6b",
+        focusContext: {
+          source: "sample",
+          reason: "Sample recommendation: frontend work finished below its planned block."
+        },
         todaySeconds: 42 * 60,
         sessionSeconds: 0,
         running: false,

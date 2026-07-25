@@ -37,10 +37,22 @@ and quieter than an onboarding or celebration screen.
 
 ## 3. Navigation And Interaction
 
-- Primary navigation uses a familiar icon plus a one-word visible label:
-  `Review`, `Signals`, `Focus`, and `Plan`.
+- Primary navigation uses four familiar icons for `Review`, `Signals`, `Focus`,
+  and `Plan`. Visible labels are omitted in the accepted compact mobile
+  treatment; every control retains an accessible name, title, selected state,
+  and comfortable hit target.
 - Compact utility actions may remain icon-only when they have an accessible
   name and a familiar symbol.
+- Visible action labels use one English verb when the meaning remains clear,
+  such as `Restart`, `Adjust`, `Choose`, `Start`, or `Save`. Longer labels are
+  reserved for forms, destructive confirmation, or genuine ambiguity.
+- Routine actions use light semantic surfaces. Dark filled buttons are not the
+  default emphasis treatment for calm planning and review flows.
+- Tags are concise and never wrap. If a status label does not fit on one line,
+  shorten the label rather than increasing the tag height.
+- Goal, project, task, and activity names take priority over adjacent metadata.
+  They wrap and grow their row or card instead of being hidden behind a tag or
+  clipped into an unreadable fragment.
 - Every recommendation states why it is relevant now.
 - Recommendation controls distinguish `Next`, `Delay`, `Skip`, and `Choose`.
 - Timer state distinguishes start, pause/resume, end, and result capture.
@@ -48,6 +60,121 @@ and quieter than an onboarding or celebration screen.
   model.
 - Demo-only behavior must say that it is sample or view-local behavior. It must
   not imply server persistence.
+
+### Signals information depth
+
+Signals uses a strict three-level path so that evidence does not compete with
+the next action:
+
+1. The overview shows one complete priority signal, compact rows for other
+   issues, and a collapsed count for steady checks. It omits explanations and
+   raw evidence.
+2. The signal summary shows the issue, one reason, one key value, its affected
+   goal or project when known, the review period, one main action, and one
+   icon-only entry to evidence.
+3. The evidence page is read-only and shows the recorded source values, period,
+   and entity link available from the current API. It does not repeat the plan
+   action.
+
+Back navigation is equally strict: evidence returns to the signal summary, and
+the summary returns to the overview. Unknown entity or source metadata is
+omitted rather than inferred.
+
+### Focus information depth and timer behavior
+
+Focus keeps the presentation-proven tracker hierarchy while retaining the
+authenticated persistence path:
+
+1. The Today overview shows one current activity, its timer state, the primary
+   timer control, a compact running count, and today's total. It follows the
+   frozen midterm tracker structure; recommendation controls, target setup, and
+   result actions do not remain visible on Level 1.
+2. The activity sheet groups all available activities. Tapping an activity row
+   starts or ends that Activity Session directly; it does not stop another running
+   activity. The fixed, non-wrapping time at the right follows the midterm
+   semantics: a running row shows only its current uninterrupted run in live
+   `MM:SS`/`H:MM:SS`; an idle row shows the Activity's accumulated Today
+   duration in compact `Xm`/`Xh Ym` form. Do not repeat timer state as visible
+   row copy; row treatment, time format, `aria-pressed`, and the accessible
+   Start/End name carry that state.
+3. The opaque activity detail shows the selected activity's metadata, current
+   session, today's accumulated value, and evidence-backed recommendation
+   reason. It contains icon-only Edit and Session setup entries, but no
+   duplicate timer control. It does not duplicate the full activity list.
+
+Multiple activities may run concurrently. Each timer accumulates independently.
+The first tap starts an Activity Session and the next tap ends that Session,
+and saves it immediately; there is no separate confirmation or formal End
+action in Detail. A compact success notice confirms the write. A recovery sheet
+appears only when saving fails, preserving the unsaved Session for Retry. Today
+total and the eventual TimeLog use the complete Session. Session setup defaults
+to an open count-up timer; selecting 15, 25, 45, or 60 minutes changes the main
+timer to a target countdown and overtime display without changing the stored
+elapsed duration. Open timer state is checkpointed per local account without
+storing credentials. Elapsed time is allocated by the account timezone, and a
+session crossing local midnight is stored as an atomic batch of daily TimeLogs
+rather than being assigned wholly to its end date.
+
+### Durable Activity information depth
+
+STORY-033 keeps the accepted Focus hierarchy and replaces only the false
+view-local Activity boundary:
+
+1. Focus Level 1 remains the single current timer and Today total. Persistence
+   controls or catalog management do not move onto this surface.
+2. The Today sheet remains the Activity picker and exposes one icon-only New
+   action. Persisted and contextual Activities share the same compact row;
+   durable records are not duplicated by Project.
+3. New/Edit Activity is one focused sheet for name, optional Project, energy,
+   and note. The record appears as durable only after API success. Saving,
+   retry, version conflict, and validation are explicit; demo-only fallback is
+   labelled truthfully.
+
+Activity color is a stable visual derivation rather than a claimed persisted
+field. Every Activity detail owns the same icon-only pencil entry. For an
+already durable Activity it opens Edit; for a Plan, Review, or other contextual
+Activity the same form promotes that view to a durable Activity on its first
+successful Save. The visual surface does not expose different controls merely
+because the internal source differs. No Activity dashboard, fifth navigation
+tab, archive, or delete behavior is introduced in this story.
+
+### Plan information depth and creation
+
+Plan keeps one question at each depth while preserving formal WeeklyPlan
+creation and persistence:
+
+1. Level 1 shows a compact Planned/Capacity/Slack balance, one evidence-linked
+   adjustment with its before/after preview and `Apply`, then one collapsed
+   Plan-block summary. Individual blocks, Projects, and parallel action tiles do
+   not compete with the adjustment on this screen.
+2. Level 2 lists the complete Plan blocks and exposes `Edit` and `Projects`.
+   Selecting a block may hand it to Focus without duplicating the task model.
+3. Level 3 owns manual capacity/block editing, proposal evidence, save,
+   conflict, and Undo behavior. Editor controls must remain inside the phone
+   viewport: flexible grid tracks use `minmax(0, ...)`, fields can shrink to
+   their container, and Project/Minutes stack below 390px rather than creating
+   horizontal scrolling.
+
+When the target week has no persisted WeeklyPlan, the header and empty state
+retain a clear `New` entry. It opens the same editor used by `Edit`; saving a
+draft with no persisted ID creates the real user-scoped plan through the API.
+Do not replace this path with view-local state or require Review first.
+
+### Durable Task information depth
+
+STORY-036 adds durable Tasks without adding a fifth tab or turning Plan into a
+project-management dashboard:
+
+1. Plan Level 1 exposes one collapsed `Tasks` row with only the active count.
+2. Task Level 2 uses compact Active, Done, and Archive filters plus one
+   icon-only New action. Entity names may wrap; status tags do not.
+3. Task Level 3 owns create/edit, lifecycle, optimistic-conflict, archive, and
+   restore states. Project is immutable after creation in this story.
+
+Plan-block editing may select one active Task. Selection fills its Project and
+initial title, while the weekly title remains editable as a snapshot. `Ad hoc`
+keeps the pre-v5 behavior. Loading or failure of the Task list must not block
+the existing Plan surface.
 
 ## 4. Frontend Architecture
 

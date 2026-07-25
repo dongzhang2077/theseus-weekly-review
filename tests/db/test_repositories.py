@@ -8,6 +8,7 @@ from backend.app.db.repositories import (
     DailyReflectionRepository,
     GoalRepository,
     ProjectRepository,
+    TaskRepository,
     TimeLogRepository,
     UserRepository,
     WeeklyPlanRepository,
@@ -19,6 +20,7 @@ from backend.app.schemas import (
     LocalUserCreate,
     PlannedItemCreate,
     ProjectCreate,
+    TaskCreate,
     TimeLogCreate,
     WeeklyPlanCreate,
 )
@@ -169,3 +171,42 @@ def test_user_repositories_keep_records_isolated(connection) -> None:
     assert [goal.title for goal in GoalRepository(connection, second.id).list()] == [
         "Second goal"
     ]
+
+
+def test_task_repository_orders_due_work_and_isolates_accounts(connection) -> None:
+    users = UserRepository(connection)
+    first = users.create(LocalUserCreate(display_name="First"))
+    second = users.create(LocalUserCreate(display_name="Second"))
+    first_project = ProjectRepository(connection, first.id).create(
+        ProjectCreate(title="First project")
+    )
+    second_project = ProjectRepository(connection, second.id).create(
+        ProjectCreate(title="Second project")
+    )
+    first_tasks = TaskRepository(connection, first.id)
+    later = first_tasks.create(
+        TaskCreate(
+            project_id=first_project.id,
+            title="Later",
+            priority=1,
+            due_date=date(2026, 8, 2),
+        )
+    )
+    earlier = first_tasks.create(
+        TaskCreate(
+            project_id=first_project.id,
+            title="Earlier",
+            priority=3,
+            due_date=date(2026, 8, 1),
+        )
+    )
+    unscheduled = first_tasks.create(
+        TaskCreate(project_id=first_project.id, title="Unscheduled", priority=1)
+    )
+    private = TaskRepository(connection, second.id).create(
+        TaskCreate(project_id=second_project.id, title="Private")
+    )
+
+    assert first_tasks.list() == [earlier, later, unscheduled]
+    with pytest.raises(LookupError):
+        first_tasks.get(private.id)

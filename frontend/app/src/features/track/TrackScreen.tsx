@@ -1,78 +1,127 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { DetailPanel } from "../../shared/components/DetailPanel";
 import { Icon } from "../../shared/icons/Icon";
 import type { IconName } from "../../shared/icons/Icon";
 import { IconButton } from "../../shared/components/IconButton";
 import { Sheet } from "../../shared/components/Sheet";
+import { StateSurface } from "../../shared/components/StateSurface";
 import {
   chooseFocusActivity,
   completeActivity,
-  formatCompactClock,
+  currentRunSeconds,
   formatDuration,
+  formatLiveClock,
   pauseActivity,
   startActivity,
-  tickActivities,
+  tickActivitiesByDate,
+  todayActivitySeconds,
   type ActivityTimer
 } from "./timerModel";
 import type { AppWeekViewModel } from "../../shared/api/weeklyReview";
 import type { FetchLike } from "../../shared/api/loadAppWeek";
-import { saveActivitySession } from "../../shared/api/timeLogs";
+import {
+  activityRecordToTimer,
+  createActivity,
+  updateActivity
+} from "../../shared/api/activities";
+import {
+  calendarDate,
+  saveActivitySession,
+  splitElapsedSecondsByDate
+} from "../../shared/api/timeLogs";
+import { FocusWorkspace } from "./FocusWorkspace";
+import type { FocusSessionDraft } from "../../shared/domain/track";
+import type { PlanProject } from "../../shared/domain/plan";
 
 const categories = ["Project", "Study", "Health"];
-const energyOptions = ["consume", "restore", "neutral"] as const;
-const colorOptions = [
-  { name: "Green", value: "#6f8f6b" },
-  { name: "Blue", value: "#8aa9c0" },
-  { name: "Amber", value: "#c8a25f" },
-  { name: "Pink", value: "#d69a9a" }
-];
+const energyOptions = ["consume", "restore", "neutral", "destroy"] as const;
+const targetOptions = [15, 25, 45, 60] as const;
 
-type TrackSheet = "logs" | "create" | "complete";
-type SessionOutcome = "done" | "progress" | "stuck";
+type TrackSheet = "logs" | "create" | "setup" | "complete";
+type ActivityFormMode = "new" | "save" | "edit";
 
 interface TrackScreenProps {
   track: AppWeekViewModel["track"];
   apiBaseUrl?: string;
+  timeZone?: string;
+  todayDate?: string;
   fetchImpl?: FetchLike;
   activities?: ActivityTimer[];
+  projects?: PlanProject[];
   onActivitiesChange?: Dispatch<SetStateAction<ActivityTimer[]>>;
+  sessionDrafts?: Record<string, FocusSessionDraft>;
+  onSessionDraftChange?: (activityId: string, draft: FocusSessionDraft | null) => void;
+  onResultModalChange?: (open: boolean) => void;
   onSessionSaved?: () => void;
 }
 
 export function TrackScreen({
   apiBaseUrl,
+  timeZone,
+  todayDate: controlledTodayDate,
   fetchImpl,
   track,
   activities: controlledActivities,
+  projects = [],
   onActivitiesChange,
+  sessionDrafts: controlledSessionDrafts,
+  onSessionDraftChange,
+  onResultModalChange,
   onSessionSaved
 }: TrackScreenProps) {
   const [localActivities, setLocalActivities] = useState(track.activities);
   const [activeSheet, setActiveSheet] = useState<TrackSheet | null>(null);
   const [detail, setDetail] = useState<ActivityTimer | null>(null);
-  const [newName, setNewName] = useState("Design polish block");
-  const [newCategory, setNewCategory] = useState("Project");
-  const [newEnergy, setNewEnergy] = useState<ActivityTimer["energy"]>("consume");
-  const [newColor, setNewColor] = useState(colorOptions[0].value);
-  const [savedActivityId, setSavedActivityId] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newProjectId, setNewProjectId] = useState<number | null>(null);
+  const [newEnergy, setNewEnergy] = useState<ActivityTimer["energy"]>("neutral");
+  const [activityFormMode, setActivityFormMode] = useState<ActivityFormMode>("new");
+  const [editingActivityId, setEditingActivityId] = useState<number | null>(null);
+  const [editingViewId, setEditingViewId] = useState<string | null>(null);
+  const [activitySaveState, setActivitySaveState] = useState<
+    "idle" | "saving" | "error" | "conflict"
+  >("idle");
+  const [activitySaveError, setActivitySaveError] = useState<string | null>(null);
   const [manualFocusId, setManualFocusId] = useState<string | null>(null);
   const [recommendationNotice, setRecommendationNotice] = useState<string | null>(null);
-  const [targetMinutes, setTargetMinutes] = useState(25);
+  const [localSessionDrafts, setLocalSessionDrafts] = useState<Record<string, FocusSessionDraft>>({});
   const [pendingSession, setPendingSession] = useState<ActivityTimer | null>(null);
-  const [sessionOutcome, setSessionOutcome] = useState<SessionOutcome>("progress");
-  const [sessionNote, setSessionNote] = useState("");
-  const [sessionSaveState, setSessionSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [sessionSaveState, setSessionSaveState] = useState<"idle" | "saving" | "error">("idle");
+  const [sessionSaveError, setSessionSaveError] = useState<string | null>(null);
+  const noticeTimerRef = useRef<number | null>(null);
+  const saveRequestIdRef = useRef(0);
+  const saveInFlightRef = useRef(false);
+
   const activities = controlledActivities ?? localActivities;
+  const todayDate = controlledTodayDate ?? calendarDate(timeZone);
   const focus = useMemo(
     () => chooseFocusActivity(activities, { preferredId: manualFocusId }),
     [activities, manualFocusId]
   );
+  const detailActivity = detail
+    ? activities.find((activity) => activity.id === detail.id) ?? detail
+    : null;
+  const sessionDrafts = controlledSessionDrafts ?? localSessionDrafts;
+  const sessionDraft = focus ? sessionDrafts[focus.id] ?? defaultSessionDraft : defaultSessionDraft;
+  const targetMinutes = sessionDraft.targetMinutes;
+  const sessionIntent = sessionDraft.intent;
   const hasRunningActivity = activities.some((activity) => activity.running);
+  const runningCount = activities.filter((activity) => activity.running).length;
+  const recommendationLocked = pendingSession !== null || sessionSaveState === "saving";
   const todayTotal = activities.reduce(
-    (total, activity) => total + activity.todaySeconds + activity.sessionSeconds,
+    (total, activity) => total + todayActivitySeconds(activity, todayDate),
     0
   );
+  const activityCategories = [
+    ...categories.filter((category) => activities.some((activity) => activity.category === category)),
+    ...activities
+      .map((activity) => activity.category)
+      .filter((category, index, all) => !categories.includes(category) && all.indexOf(category) === index)
+  ];
+  const resultModalOpen = activeSheet === "complete";
+  const backgroundLocked = pendingSession !== null || sessionSaveState === "saving";
 
   function updateActivities(update: SetStateAction<ActivityTimer[]>) {
     if (onActivitiesChange) {
@@ -89,119 +138,284 @@ export function TrackScreen({
       const now = Date.now();
       const elapsedSeconds = Math.floor((now - lastTick) / 1000);
       if (elapsedSeconds <= 0) return;
+      const elapsedByDate = splitElapsedSecondsByDate(lastTick, elapsedSeconds, timeZone);
       lastTick += elapsedSeconds * 1000;
-      setLocalActivities((current) => tickActivities(current, elapsedSeconds));
+      setLocalActivities((current) => tickActivitiesByDate(current, elapsedByDate));
     }, 250);
 
     return () => window.clearInterval(interval);
-  }, [hasRunningActivity, onActivitiesChange]);
+  }, [hasRunningActivity, onActivitiesChange, timeZone]);
 
   useEffect(() => {
     if (onActivitiesChange) return;
     setLocalActivities((current) =>
-      current.some((activity) => activity.running) ? current : track.activities
+      current.some((activity) => activity.running || activity.sessionSeconds > 0)
+        ? current
+        : track.activities
     );
   }, [onActivitiesChange, track.activities]);
 
+  useEffect(
+    () => () => {
+      if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
+    },
+    []
+  );
+
   useEffect(() => {
-    setTargetMinutes(25);
-  }, [focus.id]);
+    onResultModalChange?.(resultModalOpen);
+    return () => {
+      if (resultModalOpen) onResultModalChange?.(false);
+    };
+  }, [onResultModalChange, resultModalOpen]);
 
-  function showNotice(message: string) {
-    setRecommendationNotice(message);
-    window.setTimeout(() => setRecommendationNotice(null), 1400);
-  }
-
-  function selectNext(message: string) {
-    if (activities.length < 2) {
-      showNotice("No other activity yet");
+  function updateSessionDraft(activityId: string, draft: FocusSessionDraft | null) {
+    if (onSessionDraftChange) {
+      onSessionDraftChange(activityId, draft);
       return;
     }
-    const currentIndex = activities.findIndex((activity) => activity.id === focus.id);
-    const next = activities[(currentIndex + 1) % activities.length];
-    setManualFocusId(next.id);
-    showNotice(message);
+    setLocalSessionDrafts((current) => {
+      if (draft) return { ...current, [activityId]: draft };
+      const next = { ...current };
+      delete next[activityId];
+      return next;
+    });
+  }
+
+  function showNotice(message: string) {
+    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
+    setRecommendationNotice(message);
+    noticeTimerRef.current = window.setTimeout(() => setRecommendationNotice(null), 1800);
   }
 
   function onStart(activityId: string) {
     updateActivities((current) => startActivity(current, activityId));
   }
 
-  function onPause(activityId: string) {
-    updateActivities((current) => pauseActivity(current, activityId));
-    showNotice("Paused");
+  function onToggleActivity(activity: ActivityTimer) {
+    if (backgroundLocked) return;
+    setManualFocusId(activity.id);
+    if (activity.running) {
+      onEnd(activity.id);
+      return;
+    }
+    onStart(activity.id);
+    showNotice("Session started");
   }
 
   function onEnd(activityId: string) {
     const activity = activities.find((item) => item.id === activityId);
-    if (!activity || activity.sessionSeconds <= 0) return;
+    if (!activity) return;
+    if (activity.sessionSeconds <= 0) {
+      updateActivities((current) => pauseActivity(current, activityId));
+      showNotice("Session ended");
+      return;
+    }
+    const session = { ...activity, running: false };
     updateActivities((current) => pauseActivity(current, activityId));
-    setPendingSession({ ...activity, running: false });
-    setSessionOutcome("progress");
-    setSessionNote("");
+    setPendingSession(session);
+    setDetail(null);
+    setSessionSaveError(null);
     setSessionSaveState("idle");
-    setActiveSheet("complete");
+    setActiveSheet(null);
+    void onSaveSession(session);
   }
 
-  async function onSaveSession() {
-    if (!pendingSession) return;
+  async function onSaveSession(sessionOverride?: ActivityTimer) {
+    const session = sessionOverride ?? pendingSession;
+    if (!session || saveInFlightRef.current) return;
+    const requestId = ++saveRequestIdRef.current;
+    saveInFlightRef.current = true;
     setSessionSaveState("saving");
+    setSessionSaveError(null);
 
     if (apiBaseUrl) {
       const result = await saveActivitySession({
         apiBaseUrl,
-        activity: pendingSession,
-        note: buildSessionNote(sessionOutcome, sessionNote),
+        activity: session,
+        timeZone,
+        note: buildSessionNote(sessionIntent),
         fetchImpl
       });
+      if (requestId !== saveRequestIdRef.current) return;
       if (!result.saved) {
+        saveInFlightRef.current = false;
         setSessionSaveState("error");
+        setSessionSaveError(result.error);
+        setActiveSheet("complete");
         return;
       }
     }
 
-    updateActivities((current) => completeActivity(current, pendingSession.id));
+    if (requestId !== saveRequestIdRef.current) return;
+    updateActivities((current) => completeActivity(current, session.id, todayDate));
+    saveInFlightRef.current = false;
     setPendingSession(null);
-    setSessionSaveState("saved");
+    setSessionSaveState("idle");
     setActiveSheet(null);
+    updateSessionDraft(session.id, null);
     onSessionSaved?.();
     showNotice(apiBaseUrl ? "Session recorded" : "Session kept in this demo");
   }
 
-  function onCreateActivity() {
+  function closeResultSheet() {
+    if (sessionSaveState === "saving") return;
+    setPendingSession(null);
+    setSessionSaveError(null);
+    setSessionSaveState("idle");
+    setActiveSheet(null);
+  }
+
+  function openNewActivity() {
+    setActivityFormMode("new");
+    setEditingActivityId(null);
+    setEditingViewId(null);
+    setNewName("");
+    setNewDescription("");
+    setNewProjectId(null);
+    setNewEnergy("neutral");
+    setActivitySaveState("idle");
+    setActivitySaveError(null);
+    setActiveSheet("create");
+  }
+
+  function openEditActivity(activity: ActivityTimer) {
+    setActivityFormMode(activity.activityId && activity.activityVersion ? "edit" : "save");
+    setEditingActivityId(activity.activityId ?? null);
+    setEditingViewId(activity.id);
+    setNewName(activity.name);
+    setNewDescription(activity.activityDescription ?? "");
+    setNewProjectId(activity.projectId ?? null);
+    setNewEnergy(activity.energy);
+    setActivitySaveState("idle");
+    setActivitySaveError(null);
+    setActiveSheet("create");
+  }
+
+  async function onSaveActivity() {
     const name = newName.trim();
-    if (!name) return;
+    if (!name || recommendationLocked || activitySaveState === "saving") return;
+
+    if (apiBaseUrl) {
+      setActivitySaveState("saving");
+      setActivitySaveError(null);
+      const current = editingActivityId === null
+        ? null
+        : activities.find((activity) => activity.activityId === editingActivityId) ?? null;
+      const result = editingActivityId === null
+        ? await createActivity({
+            apiBaseUrl,
+            fetchImpl,
+            draft: {
+              projectId: newProjectId,
+              name,
+              description: newDescription.trim(),
+              activityType: energyToActivityType(newEnergy)
+            }
+          })
+        : current?.activityVersion
+          ? await updateActivity({
+              apiBaseUrl,
+              fetchImpl,
+              activityId: editingActivityId,
+              draft: {
+                expectedVersion: current.activityVersion,
+                projectId: newProjectId,
+                name,
+                description: newDescription.trim(),
+                activityType: energyToActivityType(newEnergy)
+              }
+            })
+          : {
+              status: "error" as const,
+              data: null,
+              current: null,
+              error: "Reload this activity before saving"
+            };
+
+      if (result.status !== "ok" || !result.data) {
+        if (result.current) {
+          const latest = activityRecordToTimer(result.current, projects);
+          updateActivities((items) =>
+            items.map((item) =>
+              item.activityId === latest.activityId
+                ? preserveTimerState(latest, item)
+                : item
+            )
+          );
+          setNewName(latest.name);
+          setNewDescription(latest.activityDescription ?? "");
+          setNewProjectId(latest.projectId ?? null);
+          setNewEnergy(latest.energy);
+        }
+        setActivitySaveState(result.status === "conflict" ? "conflict" : "error");
+        setActivitySaveError(result.error);
+        return;
+      }
+
+      const saved = activityRecordToTimer(result.data, projects);
+      updateActivities((items) => {
+        const existing = items.find((item) => item.activityId === saved.activityId);
+        if (!existing && editingViewId) {
+          return items.map((item) =>
+            item.id === editingViewId
+              ? preserveTimerState(saved, item)
+              : item
+          );
+        }
+        if (!existing) return [...items, saved];
+        return items.map((item) =>
+          item.activityId === saved.activityId
+            ? preserveTimerState(saved, item)
+            : item
+        );
+      });
+      setManualFocusId(saved.id);
+      setActivityFormMode("new");
+      setEditingActivityId(null);
+      setEditingViewId(null);
+      setNewName("");
+      setNewDescription("");
+      setActivitySaveState("idle");
+      setActiveSheet(null);
+      showNotice("Activity saved");
+      return;
+    }
 
     const activity: ActivityTimer = {
       id: `activity-${Date.now()}`,
       name,
-      category: newCategory,
+      category: newProjectId ? "Project" : "Activity",
+      ...(newProjectId ? { projectId: newProjectId } : {}),
       energy: newEnergy,
-      color: newColor,
+      color: "#6f8f6b",
+      todayDate,
       todaySeconds: 0,
       sessionSeconds: 0,
-      running: false
+      runSeconds: 0,
+      running: false,
+      focusContext: {
+        source: "manual",
+        reason: "Selected manually in this view"
+      }
     };
 
     updateActivities((current) => [...current, activity]);
     setManualFocusId(activity.id);
     setNewName("");
+    setNewDescription("");
     setActiveSheet(null);
-  }
-
-  function onSaveDetail() {
-    if (!detail) return;
-    setSavedActivityId(detail.id);
-    window.setTimeout(() => setSavedActivityId(null), 1200);
+    showNotice("Activity kept in this demo");
   }
 
   return (
-    <section className="relative min-h-full overflow-y-auto bg-desk-paper pb-6 font-work text-desk-ink">
+    <section className="relative h-full overflow-y-auto bg-desk-paper font-work text-desk-ink">
       <header className="grid h-[52px] grid-cols-[44px_1fr_44px] items-center border-b border-desk-line bg-desk-raised/90 px-3">
         <button
-          className="col-start-1 grid size-10 place-items-center rounded-full border-0 bg-transparent text-desk-muted hover:bg-desk-sunk"
+          className="col-start-1 grid size-10 place-items-center rounded-full border-0 bg-transparent text-desk-muted hover:bg-desk-sunk disabled:cursor-not-allowed disabled:text-desk-subtle"
           type="button"
           aria-label="Choose activity"
+          disabled={recommendationLocked || backgroundLocked}
           onClick={() => setActiveSheet("logs")}
         >
           <Icon name="layers" className="size-5" />
@@ -211,236 +425,294 @@ export function TrackScreen({
           className="col-start-3"
           label="Activity detail"
           icon="fileText"
+          disabled={!focus || backgroundLocked}
           onClick={() => setDetail(focus)}
         />
       </header>
 
-      <div className="mx-auto flex w-full flex-col gap-4 px-4 py-4">
-        <div className="flex flex-col gap-4">
-          <section className="rounded-paper border border-desk-line bg-desk-raised p-4 shadow-paper" aria-label="Recommended focus">
-            <div className="flex items-start gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-paper bg-desk-accent-soft text-desk-accent" aria-hidden="true">
-                <Icon name={activityIcon(focus.id)} className="size-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <span className="text-xs font-bold uppercase tracking-wide text-desk-accent">
-                  {focus.running ? "In focus" : "Recommended"}
-                </span>
-                <h2 className="mt-1 truncate text-xl font-bold leading-tight">{focus.name}</h2>
-                <p className="mt-1 text-sm leading-5 text-desk-muted">{recommendationReason(focus)}</p>
-              </div>
-            </div>
-            <dl className="mt-4 grid grid-cols-[100px_1fr] gap-x-3 gap-y-2 border-t border-desk-line pt-3 text-sm">
-              <dt className="text-desk-muted">Focus window</dt>
-              <dd className="m-0 font-semibold">{targetMinutes} min</dd>
-              <dt className="text-desk-muted">Done when</dt>
-              <dd className="m-0 font-semibold">One clear result is recorded</dd>
-            </dl>
-          </section>
-
-          <div className="grid grid-cols-4 gap-1 border-b border-desk-line pb-3" aria-label="Recommendation controls">
-            {[
-              ["Next", () => selectNext("Showing the next activity")],
-              ["Delay", () => selectNext("Delayed for this view")],
-              ["Skip", () => selectNext("Skipped for this view")],
-              ["Choose", () => setActiveSheet("logs")]
-            ].map(([label, action]) => (
-              <button
-                className="min-h-9 rounded-paper border-0 bg-transparent px-2 text-xs font-bold text-desk-muted transition-colors duration-150 hover:bg-desk-sunk hover:text-desk-ink disabled:cursor-not-allowed disabled:opacity-40"
-                type="button"
-                disabled={focus.running}
-                key={label as string}
-                onClick={action as () => void}
-              >
-                {label as string}
-              </button>
-            ))}
-          </div>
+      {focus ? (
+        <FocusWorkspace
+          focus={focus}
+          targetMinutes={targetMinutes}
+          todayTotalSeconds={todayTotal}
+          runningCount={runningCount}
+          notice={recommendationNotice}
+          timerLocked={backgroundLocked}
+          onToggle={() => onToggleActivity(focus)}
+          onOpenToday={() => setActiveSheet("logs")}
+        />
+      ) : (
+        <div className="mx-auto w-full max-w-[400px]">
+          <StateSurface
+            icon="timer"
+            title="No focus activity available"
+            actionLabel="Add a quick activity"
+            actionIcon="plus"
+            onAction={openNewActivity}
+          />
         </div>
-
-        <div className="flex flex-col gap-4">
-          <section className="border-y border-desk-line py-4" aria-label="Focus timer">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="tabular-nums text-[36px] font-semibold leading-none tracking-tight">
-                  {formatCompactClock(focus.sessionSeconds)}
-                </div>
-                <div className="mt-1 text-xs font-semibold text-desk-muted">of {targetMinutes}:00</div>
-              </div>
-              <button
-                className="inline-flex min-h-12 items-center gap-2 rounded-full border-0 bg-desk-accent px-5 font-bold text-white shadow-paper transition-colors duration-150 hover:bg-desk-accent/90"
-                type="button"
-                aria-label={focus.running ? "Pause" : focus.sessionSeconds > 0 ? "Resume" : "Start"}
-                onClick={() => (focus.running ? onPause(focus.id) : onStart(focus.id))}
-              >
-                <Icon name={focus.running ? "pause" : "play"} className="size-5" />
-                <span>{focus.running ? "Pause" : focus.sessionSeconds > 0 ? "Resume" : "Start"}</span>
-              </button>
-            </div>
-            <div className="mt-4 flex items-center gap-2">
-              <button
-                className="min-h-9 rounded-paper border border-desk-line bg-desk-raised px-3 text-sm font-bold text-desk-muted hover:bg-desk-sunk"
-                type="button"
-                aria-label="Add five minutes"
-                onClick={() => setTargetMinutes((minutes) => minutes + 5)}
-              >
-                +5 min
-              </button>
-              <button
-                className="min-h-9 rounded-paper border border-desk-line bg-transparent px-3 text-sm font-bold text-desk-danger hover:bg-desk-danger-soft disabled:cursor-not-allowed disabled:opacity-40"
-                type="button"
-                aria-label="End focus"
-                disabled={focus.sessionSeconds === 0}
-                onClick={() => onEnd(focus.id)}
-              >
-                End
-              </button>
-            </div>
-          </section>
-
-          <button
-            className="flex min-h-11 items-center justify-between rounded-paper border-0 bg-desk-sunk px-3 text-left"
-            type="button"
-            aria-label="Open today's activity list"
-            onClick={() => setActiveSheet("logs")}
-          >
-            <span className="flex items-center gap-2 text-sm font-semibold text-desk-muted">
-              <span className={`size-2 rounded-full ${hasRunningActivity ? "bg-desk-accent" : "bg-desk-subtle"}`} aria-hidden="true" />
-              Today total
-            </span>
-            <strong className="tabular-nums">{formatDuration(todayTotal)}</strong>
-          </button>
-          {recommendationNotice ? (
-            <div className="rounded-paper bg-desk-accent-soft px-3 py-2 text-center text-sm font-semibold text-desk-accent" role="status">
-              {recommendationNotice}
-            </div>
-          ) : null}
-        </div>
-      </div>
+      )}
 
       <Sheet
-        title="Choose activity"
+        title="Today"
         open={activeSheet === "logs"}
         onClose={() => setActiveSheet(null)}
-        actions={<IconButton label="New activity" icon="plus" onClick={() => setActiveSheet("create")} />}
+        actions={<IconButton label="New activity" icon="plus" onClick={openNewActivity} />}
       >
-        <div className="divide-y divide-desk-line">
-          {categories.map((category) => (
-            <section className="py-2" key={category}>
-              <h3 className="m-0 px-1 py-2 text-xs font-bold uppercase tracking-wide text-desk-muted">{category}</h3>
-              {activities
-                .filter((activity) => activity.category === category)
-                .map((activity) => (
-                  <div className="flex min-h-14 items-center gap-2" key={activity.id}>
-                    <button
-                      className="flex min-w-0 flex-1 items-center gap-3 rounded-paper border-0 bg-transparent px-1 py-2 text-left hover:bg-desk-sunk"
-                      type="button"
-                      aria-label={`Choose ${activity.name}`}
-                      onClick={() => {
-                        setManualFocusId(activity.id);
-                        setActiveSheet(null);
+        {activities.length > 0 ? (
+          <div className="grid gap-4">
+            {activityCategories.map((category) => {
+              const categoryActivities = activities.filter((activity) => activity.category === category);
+              return (
+              <section className="grid gap-2" key={category}>
+                <h3 className="m-0 flex items-center gap-2 px-1 text-xs font-bold text-desk-muted">
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ backgroundColor: categoryActivities[0]?.color ?? "#6f8f6b" }}
+                    aria-hidden="true"
+                  />
+                  {category}
+                </h3>
+                {activities
+                  .filter((activity) => activity.category === category)
+                  .map((activity) => {
+                    const activitySeconds = todayActivitySeconds(activity, todayDate);
+                    const activityTime = activity.running
+                      ? formatLiveClock(currentRunSeconds(activity))
+                      : formatDuration(activitySeconds);
+                    const selected = focus?.id === activity.id;
+
+                    return (
+                    <div
+                      className="grid min-h-14 grid-cols-[minmax(0,1fr)_34px] items-center gap-1 rounded-[16px] border p-1 shadow-[0_3px_10px_rgb(76_62_38/0.04)]"
+                      style={{
+                        borderColor: activity.running || selected ? activity.color : "rgba(231,222,208,0.76)",
+                        backgroundColor: activity.running || selected
+                          ? activitySoftColor(activity.color)
+                          : "rgba(255,253,248,0.76)"
                       }}
+                      key={activity.id}
                     >
-                      <span className="grid size-9 shrink-0 place-items-center rounded-paper bg-desk-sunk" style={{ color: activity.color }}>
-                        <Icon name={activityIcon(activity.id)} className="size-5" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <strong className="block truncate text-sm">{activity.name}</strong>
-                        <small className="text-desk-muted">{formatDuration(activity.todaySeconds + activity.sessionSeconds)}</small>
-                      </span>
-                    </button>
-                    <IconButton
-                      label={activity.running ? `Pause ${activity.name}` : `Start ${activity.name}`}
-                      icon={activity.running ? "pause" : "play"}
-                      onClick={() => (activity.running ? onPause(activity.id) : onStart(activity.id))}
-                    />
-                    <IconButton label={`View ${activity.name}`} icon="info" onClick={() => setDetail(activity)} />
-                  </div>
-                ))}
-            </section>
-          ))}
-        </div>
+                      <button
+                        className="grid min-h-[46px] min-w-0 grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-paper border-0 bg-transparent px-1 text-left transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                        type="button"
+                        aria-label={`${activity.running ? "End" : activity.sessionSeconds > 0 ? "Resume" : "Start"} ${activity.name}`}
+                        aria-describedby={`activity-time-${activity.id}`}
+                        aria-pressed={activity.running}
+                        disabled={backgroundLocked}
+                        onClick={() => onToggleActivity(activity)}
+                      >
+                        <span
+                          className="grid size-[34px] shrink-0 place-items-center rounded-full border border-desk-line bg-desk-raised/75"
+                          style={{ color: activity.color }}
+                        >
+                          <Icon name={activityIcon(activity.id)} className="size-5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <strong className="block break-words text-sm leading-5">{activity.name}</strong>
+                        </span>
+                        <span
+                          className={`min-w-[66px] shrink-0 whitespace-nowrap text-right text-xs font-bold tabular-nums ${
+                            activity.running || selected ? "text-desk-ink" : "text-desk-muted"
+                          }`}
+                          id={`activity-time-${activity.id}`}
+                        >
+                          {activityTime}
+                        </span>
+                      </button>
+                      <IconButton
+                        className="!size-8"
+                        label={`View ${activity.name}`}
+                        icon="info"
+                        style={{ color: activity.running || selected ? activity.color : undefined }}
+                        onClick={() => setDetail(activity)}
+                      />
+                    </div>
+                    );
+                  })}
+              </section>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="m-0 text-sm leading-6 text-desk-muted">Add a quick activity to start a local focus session.</p>
+        )}
       </Sheet>
 
-      <Sheet title="New activity" open={activeSheet === "create"} onClose={() => setActiveSheet("logs")}>
+      <Sheet
+        title={
+          activityFormMode === "edit"
+            ? "Edit activity"
+            : activityFormMode === "save"
+              ? "Save activity"
+              : "New activity"
+        }
+        open={activeSheet === "create"}
+        closeDisabled={activitySaveState === "saving"}
+        onClose={() => setActiveSheet("logs")}
+      >
         <div className="grid gap-4">
+          {!apiBaseUrl ? (
+            <p className="m-0 rounded-paper bg-desk-warn-soft px-3 py-2 text-sm leading-5 text-desk-muted">
+              Local preview only.
+            </p>
+          ) : null}
           <label className="grid gap-1 text-sm font-semibold">
             <span>Name</span>
             <input
-              className="min-h-11 rounded-paper border border-desk-line bg-desk-raised px-3"
+              className="min-h-11 rounded-paper border border-desk-line bg-desk-raised px-3 disabled:opacity-60"
               type="text"
               value={newName}
               aria-label="Activity name"
+              disabled={activitySaveState === "saving"}
               onChange={(event) => setNewName(event.currentTarget.value)}
             />
           </label>
-          <ChoiceGroup label="Category" options={categories} value={newCategory} onChange={setNewCategory} />
+          <label className="grid gap-1 text-sm font-semibold">
+            <span>Project</span>
+            <select
+              className="min-h-11 min-w-0 rounded-paper border border-desk-line bg-desk-raised px-3 disabled:opacity-60"
+              aria-label="Activity project"
+              value={newProjectId ?? ""}
+              disabled={activitySaveState === "saving"}
+              onChange={(event) =>
+                setNewProjectId(
+                  event.currentTarget.value
+                    ? Number(event.currentTarget.value)
+                    : null
+                )
+              }
+            >
+              <option value="">None</option>
+              {projects.map((project) => (
+                <option value={project.id} key={project.id}>
+                  {project.title}
+                </option>
+              ))}
+            </select>
+          </label>
           <ChoiceGroup
             label="Energy"
             options={energyOptions.map(energyLabel)}
             value={energyLabel(newEnergy)}
-            onChange={(value) => setNewEnergy(energyOptions.find((energy) => energyLabel(energy) === value) ?? "neutral")}
+            disabled={activitySaveState === "saving"}
+            onChange={(value) =>
+              setNewEnergy(energyOptions.find((energy) => energyLabel(energy) === value) ?? "neutral")
+            }
           />
-          <div className="flex gap-3" aria-label="Color">
-            {colorOptions.map((color) => (
-              <button
-                className={`size-9 rounded-full border-2 ${newColor === color.value ? "border-desk-ink" : "border-transparent"}`}
-                style={{ backgroundColor: color.value }}
-                key={color.name}
-                type="button"
-                aria-label={color.name}
-                aria-pressed={newColor === color.value}
-                onClick={() => setNewColor(color.value)}
-              />
-            ))}
-          </div>
+          <label className="grid gap-1 text-sm font-semibold">
+            <span>Note</span>
+            <textarea
+              className="rounded-paper border border-desk-line bg-desk-raised p-3 disabled:opacity-60"
+              rows={3}
+              value={newDescription}
+              disabled={activitySaveState === "saving"}
+              onChange={(event) => setNewDescription(event.currentTarget.value)}
+            />
+          </label>
+          {activitySaveState === "error" || activitySaveState === "conflict" ? (
+            <p
+              className="m-0 rounded-paper bg-desk-danger-soft px-3 py-2 text-sm font-semibold text-desk-danger"
+              role="alert"
+            >
+              {activitySaveState === "conflict"
+                ? "Activity changed elsewhere. Current values loaded."
+                : activitySaveError ?? "Activity could not be saved."}
+            </p>
+          ) : null}
           <button
             className="min-h-11 rounded-paper border-0 bg-desk-accent px-4 font-bold text-white disabled:opacity-40"
             type="button"
-            disabled={!newName.trim()}
-            onClick={onCreateActivity}
+            disabled={!newName.trim() || activitySaveState === "saving"}
+            onClick={() => void onSaveActivity()}
           >
-            Create activity
+            {activitySaveState === "saving"
+              ? "Saving"
+              : activitySaveState === "error" || activitySaveState === "conflict"
+                ? "Retry"
+                : "Save"}
           </button>
         </div>
       </Sheet>
 
-      <Sheet title="Session result" open={activeSheet === "complete"} onClose={() => setActiveSheet(null)}>
-        <div className="grid gap-4">
-          <div>
-            <p className="m-0 text-xs font-bold uppercase tracking-wide text-desk-muted">Focus completed</p>
-            <h2 className="mt-1 text-lg font-bold">{pendingSession?.name}</h2>
-            <p className="mt-1 text-sm text-desk-muted">{pendingSession ? formatDuration(pendingSession.sessionSeconds) : "0m"}</p>
-          </div>
-          <div className="grid grid-cols-3 gap-2" aria-label="Session outcome">
-            {(["done", "progress", "stuck"] as const).map((outcome) => (
+      <Sheet title="Session setup" open={activeSheet === "setup"} onClose={() => setActiveSheet(null)}>
+        <div className="grid gap-5">
+          <div className="grid gap-2">
+            <span className="text-sm font-semibold">Session target</span>
+            <div className="grid grid-cols-5 gap-2" aria-label="Session target">
+              {targetOptions.map((minutes) => (
+                <button
+                  className={`min-h-10 rounded-paper border text-sm font-bold ${
+                    targetMinutes === minutes
+                      ? "border-desk-accent bg-desk-accent-soft text-desk-accent"
+                      : "border-desk-line bg-desk-raised text-desk-muted"
+                  }`}
+                  type="button"
+                  key={minutes}
+                  aria-label={`${minutes} minute target`}
+                  aria-pressed={targetMinutes === minutes}
+                  onClick={() => {
+                    if (focus) updateSessionDraft(focus.id, { ...sessionDraft, targetMinutes: minutes });
+                  }}
+                >
+                  {minutes}
+                </button>
+              ))}
               <button
-                className={`min-h-10 rounded-paper border px-2 text-sm font-bold ${
-                  sessionOutcome === outcome
+                className={`min-h-10 rounded-paper border text-xs font-bold ${
+                  targetMinutes === null
                     ? "border-desk-accent bg-desk-accent-soft text-desk-accent"
                     : "border-desk-line bg-desk-raised text-desk-muted"
                 }`}
                 type="button"
-                key={outcome}
-                aria-pressed={sessionOutcome === outcome}
-                onClick={() => setSessionOutcome(outcome)}
+                aria-pressed={targetMinutes === null}
+                onClick={() => {
+                  if (focus) updateSessionDraft(focus.id, { ...sessionDraft, targetMinutes: null });
+                }}
               >
-                {outcomeLabel(outcome)}
+                Open
               </button>
-            ))}
+            </div>
           </div>
           <label className="grid gap-1 text-sm font-semibold">
-            <span>Result note</span>
+            <span>Goal for this session (optional)</span>
             <textarea
               className="rounded-paper border border-desk-line bg-desk-raised p-3"
               rows={3}
-              value={sessionNote}
-              onChange={(event) => setSessionNote(event.currentTarget.value)}
+              value={sessionIntent}
+              onChange={(event) => {
+                if (focus) updateSessionDraft(focus.id, { ...sessionDraft, intent: event.currentTarget.value });
+              }}
+              placeholder="What would count as useful progress?"
             />
           </label>
+          <button
+            className="min-h-11 rounded-paper border-0 bg-desk-accent px-4 font-bold text-white"
+            type="button"
+            onClick={() => setActiveSheet(null)}
+          >
+            Save
+          </button>
+        </div>
+      </Sheet>
+
+      <Sheet
+        title="Save failed"
+        open={activeSheet === "complete"}
+        closeDisabled={sessionSaveState === "saving"}
+        onClose={closeResultSheet}
+      >
+        <div className="grid gap-4">
+          <div>
+            <p className="m-0 text-xs font-bold uppercase tracking-wide text-desk-muted">Session kept locally</p>
+            <h2 className="mt-1 text-lg font-bold">{pendingSession?.name}</h2>
+            <p className="mt-1 text-sm text-desk-muted">
+              {pendingSession ? formatDuration(pendingSession.sessionSeconds) : "0m"}
+            </p>
+          </div>
           {sessionSaveState === "error" ? (
             <p className="m-0 rounded-paper bg-desk-danger-soft px-3 py-2 text-sm font-semibold text-desk-danger" role="alert">
-              Session could not be saved. Try again.
+              Session could not be saved{sessionSaveError ? `: ${sessionSaveError}` : ". Try again."}
             </p>
           ) : null}
           <button
@@ -449,29 +721,58 @@ export function TrackScreen({
             disabled={sessionSaveState === "saving"}
             onClick={() => void onSaveSession()}
           >
-            {sessionSaveState === "saving" ? "Saving" : "Save result"}
+            {sessionSaveState === "saving" ? "Saving" : "Retry"}
           </button>
         </div>
       </Sheet>
 
-      <DetailPanel title={detail?.name ?? "Activity"} open={detail !== null} onBack={() => setDetail(null)}>
-        {detail ? (
+      <DetailPanel
+        title={detailActivity?.name ?? "Activity"}
+        open={detailActivity !== null}
+        onBack={() => setDetail(null)}
+      >
+        {detailActivity ? (
           <div className="grid gap-4">
-            <span className="w-fit rounded-full bg-desk-accent-soft px-3 py-1 text-xs font-bold text-desk-accent">
-              {energyLabel(detail.energy)}
-            </span>
+            <div className="flex items-center justify-between gap-3">
+              <span className="w-fit rounded-full bg-desk-accent-soft px-3 py-1 text-xs font-bold text-desk-accent">
+                {energyLabel(detailActivity.energy)}
+              </span>
+              <div className="flex items-center gap-2">
+                <IconButton
+                  label="Edit activity"
+                  icon="edit"
+                  onClick={() => {
+                    openEditActivity(detailActivity);
+                    setDetail(null);
+                  }}
+                />
+                <IconButton
+                  label="Session setup"
+                  icon="target"
+                  onClick={() => {
+                    setManualFocusId(detailActivity.id);
+                    setDetail(null);
+                    setActiveSheet("setup");
+                  }}
+                />
+              </div>
+            </div>
             <dl className="divide-y divide-desk-line border-y border-desk-line">
-              <DetailRow label="Today" value={formatDuration(detail.todaySeconds + detail.sessionSeconds)} />
-              <DetailRow label="Type" value={detail.category} />
-              <DetailRow label="Energy" value={energyLabel(detail.energy)} />
+              <DetailRow label="Today" value={formatDuration(todayActivitySeconds(detailActivity, todayDate))} />
+              <DetailRow label="Session" value={formatDuration(detailActivity.sessionSeconds)} />
+              <DetailRow label="Type" value={detailActivity.category} />
+              <DetailRow label="Energy" value={energyLabel(detailActivity.energy)} />
+              {detailActivity.projectTitle ? <DetailRow label="Project" value={detailActivity.projectTitle} /> : null}
+              {detailActivity.focusContext?.plannedMinutes !== undefined ? (
+                <DetailRow label="Weekly plan" value={`${detailActivity.focusContext.plannedMinutes} min`} />
+              ) : null}
             </dl>
-            <label className="grid gap-1 text-sm font-semibold">
-              <span>Note</span>
-              <textarea className="rounded-paper border border-desk-line bg-desk-raised p-3" rows={3} defaultValue="Capture one clear result from this focus block." />
-            </label>
-            <button className="min-h-11 rounded-paper border-0 bg-desk-accent font-bold text-white" type="button" onClick={onSaveDetail}>
-              {savedActivityId === detail.id ? "Saved" : "Save"}
-            </button>
+            {detailActivity.focusContext?.reason ? (
+              <div className="rounded-paper bg-desk-sunk p-3">
+                <h3 className="m-0 text-xs font-bold uppercase tracking-wide text-desk-muted">Why this activity</h3>
+                <p className="mb-0 mt-1 text-sm leading-6">{detailActivity.focusContext.reason}</p>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </DetailPanel>
@@ -483,11 +784,13 @@ function ChoiceGroup({
   label,
   options,
   value,
+  disabled = false,
   onChange
 }: {
   label: string;
   options: readonly string[];
   value: string;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
@@ -496,7 +799,7 @@ function ChoiceGroup({
       <div className="flex flex-wrap gap-2" aria-label={label}>
         {options.map((option) => (
           <button
-            className={`min-h-9 rounded-full border px-3 text-sm font-semibold ${
+            className={`min-h-9 rounded-full border px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
               value === option
                 ? "border-desk-accent bg-desk-accent-soft text-desk-accent"
                 : "border-desk-line bg-desk-raised text-desk-muted"
@@ -504,6 +807,7 @@ function ChoiceGroup({
             type="button"
             key={option}
             aria-pressed={value === option}
+            disabled={disabled}
             onClick={() => onChange(option)}
           >
             {option}
@@ -518,27 +822,15 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex min-h-11 items-center justify-between gap-4 py-2">
       <dt className="text-sm text-desk-muted">{label}</dt>
-      <dd className="m-0 text-sm font-bold">{value}</dd>
+      <dd className="m-0 text-right text-sm font-bold">{value}</dd>
     </div>
   );
 }
 
-function recommendationReason(activity: ActivityTimer): string {
-  if (activity.running) return "Session in progress";
-  if (activity.recommended && activity.projectTitle) return `${activity.projectTitle} · planned this week`;
-  if (activity.recommended) return "Marked as a weekly priority";
-  return `${activity.category} · ${energyLabel(activity.energy)} energy`;
-}
-
-function buildSessionNote(outcome: SessionOutcome, note: string): string {
-  const prefix = `Outcome: ${outcomeLabel(outcome)}.`;
-  return note.trim() ? `${prefix} ${note.trim()}` : prefix;
-}
-
-function outcomeLabel(outcome: SessionOutcome): string {
-  if (outcome === "done") return "Completed";
-  if (outcome === "stuck") return "Stuck";
-  return "Progress";
+function buildSessionNote(intent: string): string {
+  const parts = ["Outcome: Progress."];
+  if (intent.trim()) parts.push(`Session goal: ${intent.trim()}.`);
+  return parts.join(" ");
 }
 
 function energyLabel(energy: ActivityTimer["energy"]): string {
@@ -548,9 +840,41 @@ function energyLabel(energy: ActivityTimer["energy"]): string {
   return "Neutral";
 }
 
+function energyToActivityType(
+  energy: ActivityTimer["energy"]
+): "consuming" | "neutral" | "restore" | "destroy" {
+  return energy === "consume" ? "consuming" : energy;
+}
+
+function preserveTimerState(
+  saved: ActivityTimer,
+  current: ActivityTimer
+): ActivityTimer {
+  return {
+    ...saved,
+    todayDate: current.todayDate,
+    todaySeconds: current.todaySeconds,
+    sessionSeconds: current.sessionSeconds,
+    sessionSecondsByDate: current.sessionSecondsByDate,
+    runSeconds: current.runSeconds,
+    running: current.running,
+    recommended: current.recommended,
+    focusContext: current.focusContext ?? saved.focusContext
+  };
+}
+
 function activityIcon(activityId: string): IconName {
   if (activityId === "frontend") return "code";
   if (activityId === "backend") return "briefcase";
   if (activityId === "walk") return "leaf";
   return "book";
 }
+
+function activitySoftColor(color: string): string {
+  return /^#[0-9a-f]{6}$/i.test(color) ? `${color}1f` : "rgba(231,240,227,0.74)";
+}
+
+const defaultSessionDraft: FocusSessionDraft = {
+  targetMinutes: null,
+  intent: ""
+};

@@ -1,5 +1,17 @@
 # API Contract
 
+Contract status:
+
+- Sections 1-9 describe the implemented schema-v5 HTTP surface.
+- Section 10 remains a planned evaluation endpoint.
+- Section 11 is the accepted STORY-035 Agent-foundation contract. STORY-036
+  implements Tasks, optional PlannedItem Task links, and TimeLog Task
+  snapshots on its product-owner accepted branch. STORY-033 implements
+  authenticated Activity create, list, detail, and optimistic correction on
+  its product-owner accepted branch. FocusSession, TimeLog correction, deletion,
+  Undo, and idempotency routes remain unavailable until their owning stories
+  pass verification and merge.
+
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
 
@@ -266,6 +278,41 @@ Status: `201 Created`.
 
 Returns time logs ordered by date, start time, and ID.
 
+### POST /time-logs/batch
+
+Creates between 1 and 32 time logs in one transaction:
+
+```json
+{
+  "time_logs": [
+    {
+      "project_id": 1,
+      "date": "2026-07-18",
+      "duration_minutes": 30,
+      "activity_name": "Backend schema design",
+      "activity_type": "consuming",
+      "type_source": "user_selected",
+      "note": "Cross-day focus session."
+    },
+    {
+      "project_id": 1,
+      "date": "2026-07-19",
+      "duration_minutes": 20,
+      "activity_name": "Backend schema design",
+      "activity_type": "consuming",
+      "type_source": "user_selected",
+      "note": "Cross-day focus session."
+    }
+  ]
+}
+```
+
+Status: `201 Created`. The response is the persisted list in request order.
+The Focus client uses this endpoint when one accumulated session crosses a
+local calendar-day boundary. If any record is invalid or references data
+outside the authenticated account, the entire batch is rolled back and the API
+returns a controlled `4xx` response.
+
 ## 7. Mobile Imports
 
 ### POST /imports/mobile-time-logs
@@ -496,3 +543,502 @@ Request:
   "comments": "The review was clear and realistic."
 }
 ```
+
+## 11. Accepted Agent-Foundation Contract
+
+Current implementation status: STORY-036 Task routes, Plan Task links, and
+TimeLog Task links are implemented, verified, and product-owner accepted on
+the schema-v5 runtime baseline. Sections 11.3 and 11.5-11.6 remain future
+runtime contracts except
+for the explicitly identified v5 TimeLog Task fields.
+
+Implementation is split across STORY-036, STORY-033, STORY-037, and STORY-034.
+Each story must update this status only for the routes it actually delivers.
+
+### 11.1 Mutation, Ownership, And Concurrency Rules
+
+- Browser requests continue using the formal Bearer session described above.
+- Request bodies never accept `user_id`. Every Task, Activity, FocusSession,
+  TimeLog, and referenced Project is resolved inside the authenticated account.
+- Cross-account references return `409` without revealing whether the foreign
+  record exists.
+- Focus commands and every TimeLog mutation/Undo require an opaque
+  `Idempotency-Key` header. Keys are scoped to the authenticated account.
+- A repeated key with the same normalized operation and payload returns the
+  original status and response. Reusing it with a different target or payload
+  returns `409 idempotency_conflict`.
+- Receipts for terminal Focus commands and TimeLog mutations remain available
+  while their target record is retained; cleanup cannot weaken exactly-once
+  replay behavior.
+- Versioned requests include `expected_version`. A new command against a stale
+  version returns `409 version_conflict` with the current safe read
+  representation. A replay using an already completed idempotency key still
+  returns the original result.
+- Services own validation, transactions, idempotency, and state transitions.
+  Routes contain no SQL. LangGraph and channel adapters later call the same
+  services rather than repositories.
+- UTC instants use ISO 8601 with `Z`. Task due dates and TimeLog `date` values
+  are account-local ISO dates.
+
+New conflict responses use a stable detail shape:
+
+```json
+{
+  "detail": {
+    "code": "version_conflict",
+    "message": "The record changed after it was loaded",
+    "current": {}
+  }
+}
+```
+
+`current` is omitted when returning it would disclose unrelated data.
+
+### 11.2 Tasks
+
+Implementation status: STORY-036 accepted on 2026-07-22 PDT.
+
+#### POST /tasks
+
+Creates one finite, durable outcome:
+
+```json
+{
+  "project_id": 1,
+  "title": "Draft final report",
+  "description": "Complete the findings and limitations sections.",
+  "priority": 1,
+  "estimated_minutes": 240,
+  "due_date": "2026-08-01"
+}
+```
+
+Status: `201 Created`.
+
+The server sets `status = open`, `created_source = user`,
+`completed_at = null`, and `archived_at = null`. Later approved Assistant
+operations may set `created_source = assistant_approved`; a public client
+cannot claim that provenance.
+
+Response:
+
+```json
+{
+  "id": 21,
+  "user_id": 1,
+  "project_id": 1,
+  "title": "Draft final report",
+  "description": "Complete the findings and limitations sections.",
+  "status": "open",
+  "priority": 1,
+  "estimated_minutes": 240,
+  "due_date": "2026-08-01",
+  "created_source": "user",
+  "completed_at": null,
+  "archived_at": null,
+  "version": 1,
+  "created_at": "2026-08-03T18:00:00Z",
+  "updated_at": "2026-08-03T18:00:00Z"
+}
+```
+
+#### GET /tasks
+
+Optional query parameters:
+
+- `project_id`
+- repeated `status`
+- `include_archived`, default `false`
+- `due_from` and `due_to`
+
+Ordering is archived last, then due date with null last, priority, and ID.
+
+#### GET /tasks/{task_id}
+
+Returns one user-owned Task. Missing, foreign, or normally hidden archived
+records return `404`; `include_archived=true` may be used by the management
+surface.
+
+#### PATCH /tasks/{task_id}
+
+Accepts one or more of:
+
+```json
+{
+  "expected_version": 1,
+  "title": "Draft and revise final report",
+  "description": null,
+  "priority": 1,
+  "estimated_minutes": 300,
+  "due_date": "2026-08-01",
+  "status": "in_progress",
+  "archived": false
+}
+```
+
+`description`, `estimated_minutes`, and `due_date` accept explicit `null` to
+clear them. `completed_at`, `archived_at`, and `version` are server-managed.
+Every successful mutation increments `version`.
+
+Allowed lifecycle transitions:
+
+```text
+open -> in_progress | completed | cancelled
+in_progress -> open | completed | cancelled
+completed -> in_progress
+cancelled -> open
+```
+
+Archive and restore are reversible visibility changes independent of status.
+Archiving a Task with an open FocusSession returns `409 task_in_use`. There is
+no normal hard-delete Task route; account deletion remains the ownership-level
+destructive operation.
+
+### 11.3 Activities
+
+Implementation status: STORY-033 product-owner accepted on
+`feature/033-persisted-activities` after browser, stable-ID TimeLog linkage,
+and backend-restart verification on 2026-07-25 PDT.
+
+#### POST /activities
+
+```json
+{
+  "project_id": 1,
+  "name": "Focused writing",
+  "description": "Drafting or revising report prose.",
+  "activity_type": "consuming",
+  "type_source": "user_selected"
+}
+```
+
+Status: `201 Created`.
+
+For the authenticated public route, `type_source` may be omitted or
+`user_selected`; the server rejects a client that claims `ai_suggested`.
+Future approved Assistant proposals may call the internal ActivityService with
+`ai_suggested` provenance.
+
+#### GET /activities
+
+Optional `project_id` filters project-scoped Activities. Global Activities have
+`project_id = null`. Results are ordered by name case-insensitively and ID.
+
+#### GET /activities/{activity_id}
+
+Returns one user-owned Activity.
+
+#### PATCH /activities/{activity_id}
+
+Requires `expected_version` and accepts one or more of `project_id`, `name`,
+`description`, and `activity_type`. Explicit null clears `project_id` or
+`description`. Activity reads include a server-managed `version`, beginning at
+1 and incremented by every correction.
+
+When the authenticated user changes `activity_type`, the server records
+`type_source = user_corrected`. The client cannot claim `ai_suggested`.
+Renaming or reclassifying an Activity does not rewrite historical
+FocusSession or TimeLog snapshots.
+
+Changing the Activity Project while its FocusSession is open returns
+`409 activity_in_use`; snapshot-safe name, description, and type correction may
+still proceed.
+
+Activities are not hard-deleted in STORY-033. A later archive contract must
+return to product-owner review rather than being added implicitly.
+
+### 11.4 WeeklyPlan Task References
+
+Implementation status: STORY-036 accepted on 2026-07-22 PDT.
+
+`POST /weekly-plans` and `PUT /weekly-plans/{plan_id}` accept optional
+`task_id` on each item:
+
+```json
+{
+  "task_id": 21,
+  "project_id": 1,
+  "title": "Draft findings section",
+  "planned_minutes": 120,
+  "priority": 1
+}
+```
+
+When `task_id` is present, `project_id` may be omitted and is filled from the
+Task. If both are supplied they must match. The Task, Project, and WeeklyPlan
+must have the same owner. The PlannedItem title remains a weekly snapshot and
+`is_completed` does not silently change durable Task status.
+
+Existing requests without `task_id` retain their pre-v5 behavior.
+
+### 11.5 Focus Sessions
+
+FocusSession is the durable live timer boundary. It is intentionally distinct
+from `auth_sessions`.
+
+#### POST /focus-sessions
+
+Requires `Idempotency-Key`.
+
+```json
+{
+  "activity_id": 7,
+  "task_id": 21
+}
+```
+
+`activity_id` is required. `task_id` is optional. The server derives the
+Project, captures Activity/Task snapshots and the account timezone, creates a
+`running` session, and opens its first segment in one transaction.
+
+An `open` Task becomes `in_progress` as part of that transaction. A completed,
+cancelled, or archived Task returns `409 task_not_runnable` until the user
+explicitly reopens or restores it.
+
+If the account timezone is not a valid IANA timezone, start returns
+`409 invalid_account_timezone` and creates nothing. The user must correct the
+account setting explicitly.
+
+Status: `201 Created`.
+
+Response:
+
+```json
+{
+  "id": 31,
+  "user_id": 1,
+  "activity_id": 7,
+  "task_id": 21,
+  "project_id": 1,
+  "activity_name": "Focused writing",
+  "activity_type": "consuming",
+  "type_source": "user_selected",
+  "task_title": "Draft final report",
+  "timezone": "America/Los_Angeles",
+  "status": "running",
+  "accumulated_seconds": 0,
+  "current_run_started_at": "2026-08-03T18:05:00Z",
+  "elapsed_seconds": 0,
+  "version": 1,
+  "started_at": "2026-08-03T18:05:00Z",
+  "completed_at": null,
+  "cancelled_at": null,
+  "created_at": "2026-08-03T18:05:00Z",
+  "updated_at": "2026-08-03T18:05:00Z"
+}
+```
+
+`elapsed_seconds` is calculated at response time from closed segments plus the
+open segment. It is not a background counter.
+
+A second non-terminal session for the same Activity returns
+`409 activity_already_open` with the existing same-user session ID. Different
+Activities may run concurrently.
+
+#### GET /focus-sessions
+
+Optional `state=open` returns running and paused sessions. Repeated `status`
+filters exact statuses. Ordering is non-terminal first, then start time and ID.
+
+#### GET /focus-sessions/{session_id}
+
+Returns the current user-owned session. Completed and cancelled sessions remain
+inspectable.
+
+#### POST /focus-sessions/{session_id}/commands
+
+Requires `Idempotency-Key`.
+
+Pause:
+
+```json
+{
+  "command": "pause",
+  "expected_version": 1
+}
+```
+
+Resume uses `command = resume`; finish and cancel may include a bounded `note`.
+Valid transitions are:
+
+```text
+running -> paused | completed | cancelled
+paused -> running | completed | cancelled
+completed -> no transitions
+cancelled -> no transitions
+```
+
+Status: `200 OK`.
+
+Command response:
+
+```json
+{
+  "session": {},
+  "time_logs": []
+}
+```
+
+`time_logs` is populated only by the first successful finish. Finishing closes
+the open segment, groups exact seconds by the session timezone, atomically
+creates at most one TimeLog per affected local date, marks the session
+completed, and stores the idempotency result. A replay returns the same session
+and TimeLogs without creating new rows.
+
+Cancelling produces no TimeLogs. A completed or cancelled session cannot be
+reopened; the user starts a new session. Finishing Focus never silently marks a
+linked Task completed, and cancelling Focus does not silently cancel or reopen
+the Task.
+
+### 11.6 TimeLog Read, Correction, Removal, And Undo
+
+STORY-036 implements only nullable `task_id` input/linkage and the server-owned
+`task_title` snapshot on the existing create, batch, mobile-import, and list
+paths. Focus provenance, exact seconds, TimeLog versions, correction, soft
+deletion, revisions, review invalidation, Undo, and mutation idempotency remain
+owned by schema v6/v7 stories below.
+
+The existing `TimeLogRead` shape gains nullable `task_id`,
+`focus_session_id`, `task_title`, `duration_seconds`, `deleted_at`, and required
+`version`. Legacy rows are represented with
+`duration_seconds = duration_minutes * 60`, `version = 1`, and null extension
+links.
+
+After schema v6, `duration_seconds` is positive and canonical.
+`duration_minutes` is a non-negative compatibility and Review value. A
+sub-minute local-day slice may legitimately expose zero minutes while retaining
+positive seconds.
+
+After their owning migrations:
+
+- `POST /time-logs`, `POST /time-logs/batch`, and mobile import accept optional
+  `task_id`;
+- manual and imported writes may accept either `duration_minutes` or
+  `duration_seconds` and the service derives the other representation;
+- `focus_session_id`, `task_title`, user ownership, and snapshot provenance are
+  always server-controlled;
+- Task, Activity, and explicit Project links must resolve to one same-user
+  Project.
+
+#### GET /time-logs
+
+The existing list adds optional:
+
+- `date_from` and `date_to`
+- `project_id`, `task_id`, and `activity_id`
+- `include_deleted`, default `false`
+
+Ordering remains local date, start time, and ID. Soft-deleted rows never appear
+in normal Today totals or review input.
+
+#### GET /time-logs/{time_log_id}
+
+Returns one user-owned record. A soft-deleted row returns `404` unless
+`include_deleted=true`.
+
+#### PATCH /time-logs/{time_log_id}
+
+Requires `Idempotency-Key`.
+
+Example correction:
+
+```json
+{
+  "expected_version": 1,
+  "duration_seconds": 3300,
+  "activity_type": "neutral",
+  "note": "Corrected an accidentally running timer.",
+  "reason": "Timer was left on."
+}
+```
+
+The request may correct Activity, Task, Project, date/times, duration, snapshots,
+type, or note. Link ownership and Project agreement are revalidated. Changing
+the type sets `type_source = user_corrected`.
+
+Status: `200 OK`.
+
+Response:
+
+```json
+{
+  "time_log": {},
+  "revision_id": 41,
+  "affected_review_weeks": [
+    {
+      "week_start": "2026-08-03",
+      "week_end": "2026-08-09"
+    }
+  ]
+}
+```
+
+`duration_minutes` is derived from the accepted exact seconds rule. A
+schema-v4 client may continue sending `duration_minutes`; sending both values
+with an inconsistent result returns `422`. Whole-session rounding uses
+`floor((total_seconds + 30) / 60)` before largest-remainder allocation across
+local dates.
+
+For a Focus-produced daily TimeLog, `start_time` and `end_time` are the earliest
+and latest local boundaries for that date. Paused intervals inside those bounds
+are represented by FocusSession segments and are not counted in
+`duration_seconds`.
+
+#### DELETE /time-logs/{time_log_id}?expected_version=2
+
+Requires `Idempotency-Key`.
+
+Soft-deletes one record and returns the same mutation-result shape with a new
+revision ID. Status: `200 OK`. Deleting an already deleted record with a new
+command returns `409 invalid_state`.
+
+#### POST /time-logs/{time_log_id}/revisions/{revision_id}/undo
+
+Requires `Idempotency-Key`.
+
+```json
+{
+  "expected_version": 3
+}
+```
+
+Restores the complete `before` representation when it still belongs to the
+same user and passes current link validation. Undo creates another audit
+revision and returns the mutation-result shape. It never erases history.
+
+Every correction, deletion, or Undo transaction:
+
+- recalculates `projects.last_activity_date` for both the old and new Project;
+- marks stored WeeklyReviews overlapping the old or new local date with
+  `stale_at`;
+- leaves unrelated users and weeks unchanged;
+- refreshes Today totals from the committed rows.
+
+Review generation ignores deleted rows, uses corrected values, preserves the
+WeeklyReview ID, and clears `stale_at`. Existing generated review content is
+not silently rewritten before regeneration.
+
+After schema v7, successful manual TimeLog creation, batch creation, mobile
+import, and Focus completion also mark overlapping stored WeeklyReviews stale
+in the same transaction. This prevents a previously generated review from
+appearing current after new evidence arrives.
+
+### 11.7 Implementation And Test Boundary
+
+The accepted service boundary is:
+
+```text
+FastAPI route or future Assistant tool
+  -> authenticated domain service
+  -> user-scoped repositories
+  -> SQLite transaction
+```
+
+Task lifecycle belongs to `TaskService`; Activity correction to
+`ActivityService`; Focus transitions and segment allocation to `FocusService`;
+TimeLog corrections, project-date recalculation, revision, and review
+invalidation to `TimeLogService`. The existing `ReviewService` remains the only
+persisted path into the framework-independent review engine.
+
+OpenAPI must not expose any Section 11 operation until its implementation,
+failure tests, migration tests, and current-story acceptance gate pass.

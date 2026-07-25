@@ -99,3 +99,68 @@ async def test_time_log_api_validates_references_types_and_times(database) -> No
     assert invalid_type.status_code == 422
     assert invalid_time_pair.status_code == 422
     assert invalid_duration.status_code == 422
+
+
+async def test_time_log_batch_is_ordered_authenticated_and_atomic(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client)
+        goal = (await client.post("/goals", json={"title": "Build MVP"})).json()
+        project = (
+            await client.post(
+                "/projects",
+                json={"goal_id": goal["id"], "title": "Frontend"},
+            )
+        ).json()
+        created = await client.post(
+            "/time-logs/batch",
+            json={
+                "time_logs": [
+                    {
+                        "project_id": project["id"],
+                        "date": "2026-07-18",
+                        "duration_minutes": 30,
+                        "activity_name": "Cross-day focus",
+                        "activity_type": "consuming",
+                    },
+                    {
+                        "project_id": project["id"],
+                        "date": "2026-07-19",
+                        "duration_minutes": 20,
+                        "activity_name": "Cross-day focus",
+                        "activity_type": "consuming",
+                    },
+                ]
+            },
+        )
+        rejected = await client.post(
+            "/time-logs/batch",
+            json={
+                "time_logs": [
+                    {
+                        "project_id": project["id"],
+                        "date": "2026-07-20",
+                        "duration_minutes": 10,
+                        "activity_name": "Valid first row",
+                        "activity_type": "neutral",
+                    },
+                    {
+                        "project_id": 999,
+                        "date": "2026-07-20",
+                        "duration_minutes": 10,
+                        "activity_name": "Invalid second row",
+                        "activity_type": "neutral",
+                    },
+                ]
+            },
+        )
+        listed = await client.get("/time-logs")
+
+    assert created.status_code == 201
+    assert [row["date"] for row in created.json()] == ["2026-07-18", "2026-07-19"]
+    assert rejected.status_code == 409
+    assert [row["activity_name"] for row in listed.json()] == [
+        "Cross-day focus",
+        "Cross-day focus",
+    ]

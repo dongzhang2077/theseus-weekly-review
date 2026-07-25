@@ -91,7 +91,7 @@ def test_v1_database_migrates_to_local_user_ownership(tmp_path) -> None:
         "weekly_reviews": (10, 1),
     }
     assert tuple(item) == (7, 6, 4)
-    assert version == 4
+    assert version == 5
     assert violations == []
 
 
@@ -155,7 +155,7 @@ def test_v2_database_adds_auth_tables_without_rewriting_personal_data(tmp_path) 
     assert tuple(goal) == (7, 4, "Existing goal")
     assert auth_tables == {"auth_credentials", "auth_sessions"}
     assert credential_count == 0
-    assert version == 4
+    assert version == 5
     assert violations == []
 
 
@@ -220,7 +220,7 @@ def test_v3_database_removes_recovery_code_without_rewriting_account(tmp_path) -
         "existing@example.com",
         "$argon2id$preserved-password-hash",
     )
-    assert version == 4
+    assert version == 5
     assert violations == []
 
 
@@ -288,3 +288,185 @@ def test_v3_migration_failure_rolls_back_schema_and_account(
     assert account == ("preserved@example.com", "preserved-recovery-code-hash")
     assert marker == 0
     assert version == 3
+
+
+def test_v4_database_adds_task_foundation_without_rewriting_personal_data(
+    tmp_path,
+) -> None:
+    database_path = tmp_path / "owned-v4.db"
+    connection = sqlite3.connect(database_path)
+    connection.executescript(
+        """
+        PRAGMA foreign_keys = ON;
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY,
+            display_name TEXT NOT NULL,
+            timezone TEXT NOT NULL DEFAULT 'UTC',
+            locale TEXT NOT NULL DEFAULT 'en',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE projects (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            goal_id INTEGER,
+            title TEXT NOT NULL,
+            stage TEXT NOT NULL DEFAULT 'startup',
+            deadline TEXT,
+            weekly_min_minutes INTEGER NOT NULL DEFAULT 0,
+            weekly_target_minutes INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'active',
+            last_activity_date TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE activities (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            activity_type TEXT NOT NULL,
+            type_source TEXT NOT NULL DEFAULT 'user_selected',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE weekly_plans (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            week_start TEXT NOT NULL,
+            week_end TEXT NOT NULL,
+            planned_capacity_minutes INTEGER NOT NULL DEFAULT 0,
+            slack_target_percent INTEGER NOT NULL DEFAULT 20,
+            note TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE planned_items (
+            id INTEGER PRIMARY KEY,
+            weekly_plan_id INTEGER NOT NULL REFERENCES weekly_plans(id) ON DELETE CASCADE,
+            project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+            title TEXT NOT NULL,
+            planned_minutes INTEGER NOT NULL,
+            priority INTEGER NOT NULL DEFAULT 1,
+            is_completed INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE time_logs (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            activity_id INTEGER REFERENCES activities(id) ON DELETE SET NULL,
+            project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+            date TEXT NOT NULL,
+            start_time TEXT,
+            end_time TEXT,
+            duration_minutes INTEGER NOT NULL,
+            activity_name TEXT NOT NULL,
+            activity_type TEXT NOT NULL,
+            type_source TEXT NOT NULL DEFAULT 'user_selected',
+            note TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO users (id, display_name) VALUES (4, 'Existing account');
+        INSERT INTO projects (id, user_id, title) VALUES (5, 4, 'Existing project');
+        INSERT INTO activities (
+            id, user_id, project_id, name, activity_type
+        ) VALUES (6, 4, 5, 'Existing activity', 'consuming');
+        INSERT INTO weekly_plans (
+            id, user_id, week_start, week_end
+        ) VALUES (7, 4, '2026-07-20', '2026-07-26');
+        INSERT INTO planned_items (
+            id, weekly_plan_id, project_id, title, planned_minutes
+        ) VALUES (8, 7, 5, 'Existing block', 60);
+        INSERT INTO time_logs (
+            id, user_id, activity_id, project_id, date, duration_minutes,
+            activity_name, activity_type
+        ) VALUES (
+            9, 4, 6, 5, '2026-07-22', 30, 'Existing activity', 'consuming'
+        );
+        PRAGMA user_version = 4;
+        """
+    )
+    connection.close()
+
+    database = Database(database_path)
+    database.initialize()
+    database.initialize()
+
+    with database.session() as migrated:
+        version = migrated.execute("PRAGMA user_version").fetchone()[0]
+        activity = migrated.execute(
+            "SELECT id, version FROM activities WHERE id = 6"
+        ).fetchone()
+        item = migrated.execute(
+            "SELECT id, task_id, title FROM planned_items WHERE id = 8"
+        ).fetchone()
+        time_log = migrated.execute(
+            "SELECT id, task_id, task_title FROM time_logs WHERE id = 9"
+        ).fetchone()
+        task_columns = {
+            row["name"] for row in migrated.execute("PRAGMA table_info(tasks)")
+        }
+        violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
+
+    assert version == 5
+    assert tuple(activity) == (6, 1)
+    assert tuple(item) == (8, None, "Existing block")
+    assert tuple(time_log) == (9, None, None)
+    assert {"project_id", "status", "archived_at", "version"} <= task_columns
+    assert violations == []
+
+
+def test_v4_migration_failure_rolls_back_all_added_columns(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    database_path = tmp_path / "broken-v4.db"
+    connection = sqlite3.connect(database_path)
+    connection.executescript(
+        """
+        CREATE TABLE users (id INTEGER PRIMARY KEY, display_name TEXT NOT NULL);
+        CREATE TABLE activities (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL
+        );
+        INSERT INTO users (id, display_name) VALUES (1, 'Preserved');
+        INSERT INTO activities (id, user_id, name) VALUES (2, 1, 'Existing');
+        PRAGMA user_version = 4;
+        """
+    )
+    connection.close()
+    broken_schema = tmp_path / "broken-v5-schema.sql"
+    broken_schema.write_text(
+        """
+        CREATE TABLE migration_marker (id INTEGER PRIMARY KEY);
+        PRAGMA user_version = 5;
+        THIS IS NOT VALID SQL;
+        """,
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(connection_module, "SCHEMA_PATH", broken_schema)
+
+    with pytest.raises(sqlite3.OperationalError):
+        Database(database_path).initialize()
+
+    check = sqlite3.connect(database_path)
+    activity_columns = {
+        row[1] for row in check.execute("PRAGMA table_info(activities)").fetchall()
+    }
+    activity = check.execute(
+        "SELECT id, user_id, name FROM activities WHERE id = 2"
+    ).fetchone()
+    marker = check.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'migration_marker'"
+    ).fetchone()[0]
+    version = check.execute("PRAGMA user_version").fetchone()[0]
+    check.close()
+
+    assert "version" not in activity_columns
+    assert activity == (2, 1, "Existing")
+    assert marker == 0
+    assert version == 4

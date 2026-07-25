@@ -93,6 +93,24 @@ describe("loadAppWeek", () => {
     );
   });
 
+  it("sends the user-selected week instead of the demo range", async () => {
+    let requestBody: Record<string, unknown> = {};
+    await loadAppWeek({
+      apiBaseUrl: "http://127.0.0.1:8000",
+      weekStart: "2026-07-13",
+      weekEnd: "2026-07-19",
+      fetchImpl: async (_input, init) => {
+        requestBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+        return { ok: true, status: 200, json: async () => apiReview };
+      }
+    });
+
+    expect(requestBody).toMatchObject({
+      week_start: "2026-07-13",
+      week_end: "2026-07-19"
+    });
+  });
+
   it("shows an empty week when the selected user has no weekly plan", async () => {
     let calls = 0;
     const fetchImpl: FetchLike = async () => {
@@ -107,7 +125,8 @@ describe("loadAppWeek", () => {
     const loaded = await loadAppWeek({ apiBaseUrl: "http://127.0.0.1:8000", fetchImpl });
 
     expect(loaded.source).toBe("empty");
-    expect(loaded.week).toBe(demoWeek);
+    expect(loaded.week).not.toBe(demoWeek);
+    expect(loaded.week.track.activities).toEqual([]);
     expect(loaded.error).toBeNull();
     expect(calls).toBe(1);
   });
@@ -123,7 +142,7 @@ describe("loadAppWeek", () => {
     });
 
     expect(loaded.source).toBe("error");
-    expect(loaded.week).toBe(demoWeek);
+    expect(loaded.week.track.activities).toEqual([]);
     expect(loaded.error).toBe("Backend returned 500");
   });
 

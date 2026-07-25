@@ -1,4 +1,5 @@
 import type { SignalId, SignalSeverity } from "../../shared/domain/signals";
+import type { AppSignalEvidence } from "../../shared/api/weeklyReview";
 export type { SignalId, SignalSeverity } from "../../shared/domain/signals";
 
 export interface SignalSummary {
@@ -9,19 +10,7 @@ export interface SignalSummary {
   reason: string;
 }
 
-export interface SignalEvidence {
-  id: string;
-  title: string;
-  severity: SignalSeverity;
-  status?: string;
-  value?: string;
-  reason: string;
-  rows: Array<{
-    label: string;
-    value: string;
-  }>;
-  action?: "Plan";
-}
+export type SignalEvidence = Omit<AppSignalEvidence, "signalId">;
 
 export const severityRank: Record<SignalSeverity, number> = {
   severe: 3,
@@ -47,6 +36,21 @@ export function sortSignalEvidence(rows: SignalEvidence[]): SignalEvidence[] {
     const severityDelta = severityRank[b.severity] - severityRank[a.severity];
     return severityDelta !== 0 ? severityDelta : a.title.localeCompare(b.title);
   });
+}
+
+export function selectSignalIssues(rows: AppSignalEvidence[]): AppSignalEvidence[] {
+  return [...rows]
+    .filter((row) => row.severity === "severe" || row.severity === "attention")
+    .sort((left, right) => {
+      const severityDelta = severityRank[right.severity] - severityRank[left.severity];
+      if (severityDelta !== 0) return severityDelta;
+      const signalDelta = signalPriorityOrder.indexOf(left.signalId) - signalPriorityOrder.indexOf(right.signalId);
+      return signalDelta !== 0 ? signalDelta : left.title.localeCompare(right.title);
+    });
+}
+
+export function countSteadyEvidence(rows: AppSignalEvidence[]): number {
+  return rows.filter((row) => row.severity === "normal").length;
 }
 
 export function orderSignalSummaries(signals: SignalSummary[]): SignalSummary[] {

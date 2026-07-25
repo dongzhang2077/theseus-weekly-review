@@ -23,6 +23,7 @@ export interface ProjectCreatePayload {
 
 export interface PlannedItemCreatePayload {
   project_id?: number | null;
+  task_id?: number | null;
   title: string;
   planned_minutes: number;
   priority?: number;

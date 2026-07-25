@@ -12,6 +12,7 @@ export interface PlanDateRange {
 export interface PlanItem {
   id?: number;
   projectId: number | null;
+  taskId?: number | null;
   title: string;
   plannedMinutes: number;
   priority: number;

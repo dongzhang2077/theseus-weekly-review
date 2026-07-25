@@ -71,6 +71,7 @@ def _as_time_log(record: MobileTimeLogImportRecord, activity_type: str) -> TimeL
     return TimeLogCreate(
         activity_id=record.activity_id,
         project_id=record.project_id,
+        task_id=record.task_id,
         date=record.date,
         start_time=record.start_time,
         end_time=record.end_time,

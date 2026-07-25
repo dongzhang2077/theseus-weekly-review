@@ -171,11 +171,31 @@ describe("weeklyReview mapper", () => {
     expect(mapped.review.status).toBe("Needs attention");
     expect(mapped.review.rhythm).toHaveLength(7);
     expect(mapped.review.wins[0].title).toBe("Prototype work started");
+    expect(mapped.review.wins[0].evidence).toEqual([
+      { label: "Finding", value: "Theseus MVP received 6.0 hours." },
+      { label: "Week logged", value: "7h 30m" },
+      { label: "Sources", value: "5 time logs" }
+    ]);
     expect(mapped.review.risks[0]).toMatchObject({
       title: "Dormancy risk",
       severity: "severe",
-      action: "Plan"
+      action: {
+        label: "Schedule restart",
+        detail: "suggestion",
+        suggestion: {
+          projectId: 3,
+          projectTitle: "Resume and applications",
+          deltaMinutes: 60
+        }
+      }
     });
+    expect(mapped.review.risks[0].evidence).toEqual([
+      { label: "Finding", value: "Resume and applications received no time." },
+      { label: "Project", value: "Resume and applications" },
+      { label: "Inactive", value: "30d" },
+      { label: "Logged", value: "0m" },
+      { label: "Sources", value: "5 time logs" }
+    ]);
   });
 
   it("maps evidence into signal summaries and compact details", () => {
@@ -192,7 +212,15 @@ describe("weeklyReview mapper", () => {
     expect(mapped.signals.evidence.find((row) => row.title === "Resume and applications")).toMatchObject({
       severity: "severe",
       status: "Wake-up",
-      action: "Plan"
+      action: {
+        label: "Schedule restart",
+        detail: "suggestion",
+        suggestion: {
+          projectId: 3,
+          projectTitle: "Resume and applications",
+          deltaMinutes: 30
+        }
+      }
     });
     expect(mapped.signals.evidence.find((row) => row.title === "Theseus backend" && row.signalId === "stage")).toMatchObject({
       severity: "normal",
@@ -206,7 +234,7 @@ describe("weeklyReview mapper", () => {
       signalId: "goal",
       severity: "attention",
       status: "No time",
-      action: "Plan"
+      action: { label: "Choose project", detail: "edit" }
     });
     expect(mapped.signals.evidence.filter((row) => row.signalId === "goal")).toHaveLength(2);
   });
@@ -228,6 +256,68 @@ describe("weeklyReview mapper", () => {
     expect(mapped.signals.summaries).toHaveLength(4);
     expect(mapped.signals.summaries.every((signal) => signal.severity === "nodata")).toBe(true);
     expect(mapped.signals.evidence).toEqual([]);
+    expect(mapped.track.activities).toEqual([]);
+  });
+
+  it("keeps recovery gaps in Energy instead of also lighting up a healthy Plan", () => {
+    const mapped = mapWeeklyReviewToAppWeek(
+      {
+        ...apiReview,
+        risk_flags: [
+          {
+            type: "slack_risk",
+            severity: "medium",
+            evidence: "Recovery time was below 20% of consuming time."
+          }
+        ],
+        evidence: {
+          ...apiReview.evidence,
+          plan: {
+            ...apiReview.evidence.plan,
+            slack_status: "healthy",
+            project_drift: apiReview.evidence.plan?.project_drift?.map((row) => ({
+              ...row,
+              difference_minutes: 0,
+              status: "on_track"
+            }))
+          },
+          activity: {
+            mix: { consuming: 100, restore: 19, destroy: 0 },
+            total_minutes: 119
+          }
+        }
+      },
+      demoWeek
+    );
+
+    expect(mapped.signals.summaries.find((signal) => signal.id === "plan")?.severity).toBe("normal");
+    expect(mapped.signals.summaries.find((signal) => signal.id === "energy")).toMatchObject({
+      severity: "attention",
+      reason: "Restore was 19% of focus time; the steady threshold is 20%."
+    });
+  });
+
+  it("does not call a small amount of drain a destroy pattern", () => {
+    const mapped = mapWeeklyReviewToAppWeek(
+      {
+        ...apiReview,
+        risk_flags: [],
+        evidence: {
+          ...apiReview.evidence,
+          activity: {
+            mix: { consuming: 100, restore: 20, destroy: 1 },
+            total_minutes: 121
+          }
+        }
+      },
+      demoWeek
+    );
+
+    expect(mapped.signals.summaries.find((signal) => signal.id === "energy")).toMatchObject({
+      severity: "normal",
+      status: "Balanced",
+      reason: "Restore was 20% of focus time and drain stayed below the 2h / 25% risk threshold."
+    });
   });
 
   it("reduces an under-plan block when drift is the only review risk", () => {
@@ -301,10 +391,107 @@ describe("weeklyReview mapper", () => {
     });
   });
 
-  it("preserves tracker demo data and prepares plan state from next step evidence", () => {
+  it("maps authenticated review evidence into truthful focus activities", () => {
     const mapped = mapWeeklyReviewToAppWeek(apiReview, demoWeek);
 
-    expect(mapped.track.activities).toBe(demoWeek.track.activities);
+    expect(mapped.track.activities.map((activity) => activity.name)).toEqual([
+      "Theseus frontend",
+      "Theseus backend"
+    ]);
+    expect(mapped.track.activities[0]).toMatchObject({
+      id: "review-project-2",
+      projectId: 2,
+      projectTitle: "Theseus frontend",
+      category: "Project",
+      energy: "neutral",
+      todaySeconds: 0,
+      sessionSeconds: 0,
+      running: false,
+      recommended: true,
+      focusContext: {
+        source: "review_evidence",
+        plannedMinutes: 240,
+        actualMinutes: 60,
+        reason: "240 min were planned in the reviewed week; 60 min were logged, leaving 180 min."
+      }
+    });
+    expect(mapped.track.activities[1]).toMatchObject({
+      id: "review-project-1",
+      recommended: false,
+      todaySeconds: 0,
+      focusContext: {
+        source: "review_evidence",
+        plannedMinutes: 420,
+        actualMinutes: 430,
+        reason: "420 min were planned in the reviewed week and 430 min were logged."
+      }
+    });
+    expect(mapped.track.activities.some((activity) => activity.id === "walk")).toBe(false);
+  });
+
+  it("uses real project evidence when a review omits the drift projection", () => {
+    const mapped = mapWeeklyReviewToAppWeek(
+      {
+        ...apiReview,
+        evidence: {
+          projects: [
+            {
+              id: 7,
+              title: "Portfolio refresh",
+              status: "active",
+              planned_minutes: 90,
+              actual_minutes: 30,
+              plan_status: "under_plan"
+            },
+            {
+              id: 8,
+              title: "Paused project",
+              status: "paused",
+              planned_minutes: 60,
+              actual_minutes: 0,
+              plan_status: "under_plan"
+            }
+          ],
+          plan: { project_drift: [] }
+        }
+      },
+      demoWeek
+    );
+
+    expect(mapped.track.activities).toHaveLength(1);
+    expect(mapped.track.activities[0]).toMatchObject({
+      id: "review-project-7",
+      name: "Portfolio refresh",
+      todaySeconds: 0,
+      recommended: true,
+      focusContext: {
+        source: "review_evidence",
+        plannedMinutes: 90,
+        actualMinutes: 30
+      }
+    });
+  });
+
+  it("does not surface fallback demo activities when review evidence has no real project rows", () => {
+    const mapped = mapWeeklyReviewToAppWeek(
+      {
+        ...apiReview,
+        evidence: {
+          projects: [{ title: "Missing persisted ID", planned_minutes: 60 }],
+          plan: {
+            project_drift: [{ project_title: "Missing persisted ID", planned_minutes: 60 }]
+          }
+        }
+      },
+      demoWeek
+    );
+
+    expect(mapped.track.activities).toEqual([]);
+  });
+
+  it("prepares plan state from next step evidence", () => {
+    const mapped = mapWeeklyReviewToAppWeek(apiReview, demoWeek);
+
     expect(mapped.plan).toMatchObject({
       reviewWeek: { start: "2026-06-08", end: "2026-06-14" },
       targetWeek: { start: "2026-06-15", end: "2026-06-21" },

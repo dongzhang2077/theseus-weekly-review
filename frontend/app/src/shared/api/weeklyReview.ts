@@ -127,7 +127,7 @@ export interface AppReviewItem {
     label: string;
     value: string;
   }>;
-  action?: "Plan";
+  action?: AppSignalAction;
 }
 
 export interface AppSignalSummary {
@@ -150,7 +150,13 @@ export interface AppSignalEvidence {
     label: string;
     value: string;
   }>;
-  action?: "Plan";
+  action?: AppSignalAction;
+}
+
+export interface AppSignalAction {
+  label: string;
+  detail: "suggestion" | "edit";
+  suggestion?: PlanSuggestion;
 }
 
 export interface AppWeekViewModel {
@@ -191,15 +197,15 @@ export function mapWeeklyReviewToAppWeek(response: WeeklyReviewApiResponse, fall
         id: `win-${index + 1}`,
         title: win.title,
         reason: win.evidence,
-        evidence: evidenceRowsFromText(win.evidence)
+        evidence: winEvidenceRows(response, win)
       })),
       risks: response.risk_flags.map((risk, index) => ({
         id: `risk-${risk.type}-${index + 1}`,
         title: titleFromRiskType(risk.type),
         severity: mapRiskSeverity(risk.severity),
         reason: risk.evidence,
-        evidence: evidenceRowsFromText(risk.evidence),
-        action: "Plan"
+        evidence: riskEvidenceRows(response, risk),
+        action: reviewRiskAction(response, risk)
       }))
     },
     signals: {
@@ -207,7 +213,9 @@ export function mapWeeklyReviewToAppWeek(response: WeeklyReviewApiResponse, fall
       evidence: buildSignalEvidence(response)
     },
     plan: buildPlanSeed(response),
-    track: fallback.track
+    track: {
+      activities: buildTrackActivities(response)
+    }
   };
 }
 
@@ -226,6 +234,106 @@ function buildNarrative(response: WeeklyReviewApiResponse): string[] {
     insight ? `${insight.title}. ${insight.evidence}` : response.generated_text,
     next ? `${next.title}. ${next.reason}` : ""
   ].filter(Boolean);
+}
+
+const trackProjectColors = ["#6f8f6b", "#8aa9c0", "#c8a25f", "#7f9f85"] as const;
+
+function buildTrackActivities(response: WeeklyReviewApiResponse): ActivityTimer[] {
+  const projectStatusById = new Map(
+    (response.evidence.projects ?? [])
+      .filter((project): project is typeof project & { id: number } => typeof project.id === "number")
+      .map((project) => [project.id, project.status] as const)
+  );
+  const driftRows = response.evidence.plan?.project_drift ?? [];
+  const sourceRows = driftRows.length > 0
+    ? driftRows
+    : (response.evidence.projects ?? []).map((project) => ({
+        project_id: project.id,
+        project_title: project.title,
+        planned_minutes: project.planned_minutes,
+        actual_minutes: project.actual_minutes,
+        status: project.plan_status
+      }));
+  const projects = new Map<number, {
+    projectId: number;
+    projectTitle: string;
+    plannedMinutes: number;
+    actualMinutes: number;
+  }>();
+
+  for (const row of sourceRows) {
+    if (
+      typeof row.project_id !== "number"
+      || !Number.isInteger(row.project_id)
+      || row.project_id <= 0
+      || typeof row.project_title !== "string"
+      || !row.project_title.trim()
+    ) {
+      continue;
+    }
+    const projectStatus = projectStatusById.get(row.project_id);
+    if (projectStatus && projectStatus !== "active") continue;
+
+    const plannedMinutes = normalizeEvidenceMinutes(row.planned_minutes);
+    const actualMinutes = normalizeEvidenceMinutes(row.actual_minutes);
+    if (plannedMinutes === 0 && actualMinutes === 0) continue;
+
+    projects.set(row.project_id, {
+      projectId: row.project_id,
+      projectTitle: row.project_title.trim(),
+      plannedMinutes,
+      actualMinutes
+    });
+  }
+
+  return [...projects.values()]
+    .sort((left, right) => {
+      const remainingDelta = remainingMinutes(right) - remainingMinutes(left);
+      if (remainingDelta !== 0) return remainingDelta;
+      return left.projectId - right.projectId;
+    })
+    .map((project) => {
+      const remaining = remainingMinutes(project);
+      return {
+        id: `review-project-${project.projectId}`,
+        projectId: project.projectId,
+        projectTitle: project.projectTitle,
+        name: project.projectTitle,
+        category: "Project",
+        energy: "neutral",
+        color: trackProjectColors[(project.projectId - 1) % trackProjectColors.length],
+        todaySeconds: 0,
+        sessionSeconds: 0,
+        running: false,
+        recommended: remaining > 0,
+        focusContext: {
+          source: "review_evidence",
+          plannedMinutes: project.plannedMinutes,
+          actualMinutes: project.actualMinutes,
+          reason: buildTrackReason(project.plannedMinutes, project.actualMinutes)
+        }
+      };
+    });
+}
+
+function normalizeEvidenceMinutes(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return 0;
+  return Math.round(value);
+}
+
+function remainingMinutes(project: { plannedMinutes: number; actualMinutes: number }): number {
+  return Math.max(0, project.plannedMinutes - project.actualMinutes);
+}
+
+function buildTrackReason(plannedMinutes: number, actualMinutes: number): string {
+  const remaining = Math.max(0, plannedMinutes - actualMinutes);
+  if (remaining > 0) {
+    return `${plannedMinutes} min were planned in the reviewed week; ${actualMinutes} min were logged, leaving ${remaining} min.`;
+  }
+  if (plannedMinutes > 0) {
+    return `${plannedMinutes} min were planned in the reviewed week and ${actualMinutes} min were logged.`;
+  }
+  return `${actualMinutes} min were logged without planned time in the reviewed week.`;
 }
 
 function buildPlanSeed(response: WeeklyReviewApiResponse): PlanSeed {
@@ -392,15 +500,16 @@ function buildSignalSummaries(response: WeeklyReviewApiResponse): AppSignalSumma
   const drift = [...planRows]
     .filter((row) => isPlanDrift(row.status))
     .sort((a, b) => Math.abs(b.difference_minutes ?? 0) - Math.abs(a.difference_minutes ?? 0))[0];
-  const planRisk = highestRisk(response, ["plan_drift", "overload_risk", "slack_risk"]);
+  const planRisk = highestRisk(response, ["plan_drift", "overload_risk"]);
   const hasPlanData = Boolean(
     plan &&
       (planRows.length > 0 ||
         typeof plan.planned_total_minutes === "number" ||
         typeof plan.planned_capacity_minutes === "number")
   );
+  const planSlackNeedsAttention = Boolean(plan?.slack_status && plan.slack_status !== "healthy");
   const planSeverity = hasPlanData
-    ? maxSignalSeverity(drift ? "attention" : "normal", riskSeverity(planRisk))
+    ? maxSignalSeverity(drift || planSlackNeedsAttention ? "attention" : "normal", riskSeverity(planRisk))
     : "nodata";
 
   const stageRows = response.evidence.stage_health?.projects ?? [];
@@ -441,9 +550,10 @@ function buildSignalSummaries(response: WeeklyReviewApiResponse): AppSignalSumma
   const neutral = activity?.mix?.neutral ?? 0;
   const activityTotal = activity?.total_minutes ?? consuming + restore + destroy + neutral;
   const energyRisk = highestRisk(response, ["destroy_pattern"]);
-  const recoveryIsThin = consuming > 0 && restore * 4 < consuming;
+  const recoveryIsThin = consuming > 0 && restore * 5 < consuming;
+  const destroyPattern = activityTotal > 0 && destroy >= 120 && destroy * 4 >= activityTotal;
   const energySeverity = activityTotal > 0
-    ? maxSignalSeverity(destroy > 0 || recoveryIsThin ? "attention" : "normal", riskSeverity(energyRisk))
+    ? maxSignalSeverity(destroyPattern || recoveryIsThin ? "attention" : "normal", riskSeverity(energyRisk))
     : "nodata";
 
   return [
@@ -451,7 +561,9 @@ function buildSignalSummaries(response: WeeklyReviewApiResponse): AppSignalSumma
       id: "plan",
       label: "Plan",
       severity: planSeverity,
-      status: hasPlanData ? (drift ? "Drift" : planRisk ? "Attention" : "Aligned") : "No data",
+      status: hasPlanData
+        ? (drift ? "Drift" : planSlackNeedsAttention || planRisk ? "Attention" : "Aligned")
+        : "No data",
       reason: drift
         ? planDriftReason(drift)
         : planRisk?.evidence ?? (hasPlanData ? planTotalsReason(response) : "No weekly plan evidence yet.")
@@ -487,9 +599,9 @@ function buildSignalSummaries(response: WeeklyReviewApiResponse): AppSignalSumma
       id: "energy",
       label: "Energy",
       severity: energySeverity,
-      status: activityTotal > 0 ? (destroy > 0 ? "Draining" : recoveryIsThin ? "Thin" : "Balanced") : "No data",
+      status: activityTotal > 0 ? (destroyPattern ? "Draining" : recoveryIsThin ? "Thin" : "Balanced") : "No data",
       reason: activityTotal > 0
-        ? `${formatMinutes(consuming)} focus, ${formatMinutes(restore)} restore, ${formatMinutes(destroy)} drain.`
+        ? energyBalanceReason(consuming, restore, destroy, activityTotal, recoveryIsThin, destroyPattern)
         : "No activity mix evidence yet."
     }
   ];
@@ -499,7 +611,7 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
   const rows: AppSignalEvidence[] = [];
   const plan = response.evidence.plan;
   const planRows = plan?.project_drift ?? [];
-  const planRisk = highestRisk(response, ["plan_drift", "overload_risk", "slack_risk"]);
+  const planRisk = highestRisk(response, ["plan_drift", "overload_risk"]);
   for (const drift of planRows) {
     const hasDrift = isPlanDrift(drift.status);
     const severity = hasDrift
@@ -518,7 +630,7 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
         { label: "Actual", value: formatMinutes(drift.actual_minutes) },
         { label: "Delta", value: formatSignedMinutes(drift.difference_minutes) }
       ],
-      action: hasDrift ? "Plan" : undefined
+      action: hasDrift ? planDriftAction(drift) : undefined
     });
   }
 
@@ -537,7 +649,9 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
         { label: "Actual", value: formatMinutes(response.evidence.summary?.actual_total_minutes) },
         { label: "Slack", value: formatMinutes(plan.planned_slack_minutes) }
       ],
-      action: severity === "severe" || severity === "attention" ? "Plan" : undefined
+      action: severity === "severe" || severity === "attention"
+        ? { label: "Adjust plan", detail: "edit" }
+        : undefined
     });
   }
 
@@ -557,7 +671,9 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
         { label: "Target", value: formatMinutes(project.target_minutes) },
         { label: "Inactive", value: formatDays(project.inactive_days) }
       ],
-      action: severity === "severe" || severity === "attention" ? "Plan" : undefined
+      action: severity === "severe" || severity === "attention"
+        ? stageProjectAction(project)
+        : undefined
     });
   }
 
@@ -579,7 +695,7 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
           { label: "Actual", value: formatMinutes(project.actual_minutes) },
           { label: "Inactive", value: formatDays(project.inactive_days) }
         ],
-        action: "Plan"
+        action: dormantProjectAction(project)
       });
     }
   }
@@ -605,7 +721,7 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
         { label: "Actual", value: formatMinutes(goal.actual_minutes) },
         { label: "Projects", value: String(goal.active_project_count ?? 0) }
       ],
-      action: hasGap ? "Plan" : undefined
+      action: hasGap ? { label: "Choose project", detail: "edit" } : undefined
     });
   }
 
@@ -621,7 +737,7 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
         { label: "Actual", value: formatMinutes(response.evidence.summary?.actual_total_minutes) },
         { label: "Logs", value: String(response.evidence.summary?.time_log_count ?? 0) }
       ],
-      action: "Plan"
+      action: { label: "Choose project", detail: "edit" }
     });
   }
 
@@ -632,10 +748,11 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
     const consuming = activity.mix.consuming ?? 0;
     const restore = activity.mix.restore ?? 0;
     const destroy = activity.mix.destroy ?? 0;
-    const recoveryIsThin = consuming > 0 && restore * 4 < consuming;
+    const recoveryIsThin = consuming > 0 && restore * 5 < consuming;
+    const destroyPattern = activityTotal > 0 && destroy >= 120 && destroy * 4 >= activityTotal;
     const energyRisk = highestRisk(response, ["destroy_pattern"]);
     const severity = maxSignalSeverity(
-      destroy > 0 || recoveryIsThin ? "attention" : "normal",
+      destroyPattern || recoveryIsThin ? "attention" : "normal",
       riskSeverity(energyRisk)
     );
     rows.push({
@@ -643,18 +760,143 @@ function buildSignalEvidence(response: WeeklyReviewApiResponse): AppSignalEviden
       signalId: "energy",
       title: "Energy mix",
       severity,
-      status: destroy > 0 ? "Draining" : recoveryIsThin ? "Thin" : "Balanced",
+      status: destroyPattern ? "Draining" : recoveryIsThin ? "Thin" : "Balanced",
       value: formatMinutes(activityTotal),
-      reason: "Energy balance is based on activity type minutes.",
+      reason: energyBalanceReason(consuming, restore, destroy, activityTotal, recoveryIsThin, destroyPattern),
       rows: [
         { label: "Focus", value: formatMinutes(consuming) },
         { label: "Restore", value: formatMinutes(restore) },
-        { label: "Drain", value: formatMinutes(destroy) }
-      ]
+        { label: "Drain", value: formatMinutes(destroy) },
+        { label: "Method", value: "Restore under 20% of focus, or drain at least 2h and 25%" }
+      ],
+      action: severity === "severe" || severity === "attention"
+        ? { label: "Adjust load", detail: "edit" }
+        : undefined
     });
   }
 
   return rows;
+}
+
+function reviewRiskAction(
+  response: WeeklyReviewApiResponse,
+  risk: WeeklyReviewApiRisk
+): AppSignalAction {
+  if (risk.type === "plan_drift") {
+    const drift = [...(response.evidence.plan?.project_drift ?? [])]
+      .filter((row) => isPlanDrift(row.status))
+      .sort((left, right) => Math.abs(right.difference_minutes ?? 0) - Math.abs(left.difference_minutes ?? 0))[0];
+    return drift ? planDriftAction(drift) : { label: "Adjust plan", detail: "edit" };
+  }
+  if (risk.type === "dormancy_risk") {
+    const dormant = [...(response.evidence.dormancy?.projects ?? [])]
+      .sort((left, right) => (right.inactive_days ?? 0) - (left.inactive_days ?? 0))[0];
+    if (dormant) return dormantProjectAction(dormant);
+    const stage = [...(response.evidence.stage_health?.projects ?? [])]
+      .sort((left, right) => (right.inactive_days ?? 0) - (left.inactive_days ?? 0))[0];
+    return stage ? stageProjectAction(stage) : { label: "Choose project", detail: "edit" };
+  }
+  if (risk.type === "alignment_gap") return { label: "Choose project", detail: "edit" };
+  if (risk.type === "destroy_pattern") return { label: "Adjust load", detail: "edit" };
+  return { label: "Adjust plan", detail: "edit" };
+}
+
+function planDriftAction(drift: {
+  project_id?: number;
+  project_title?: string;
+  planned_minutes?: number;
+  difference_minutes?: number;
+  status?: string;
+}): AppSignalAction {
+  const projectId = drift.project_id;
+  const projectTitle = drift.project_title?.trim() || "Planned work";
+  if (typeof projectId !== "number" || projectId <= 0) {
+    return { label: "Adjust plan", detail: "edit" };
+  }
+
+  const difference = drift.difference_minutes ?? 0;
+  const plannedMinutes = normalizeEvidenceMinutes(drift.planned_minutes);
+  const reduce = drift.status === "under_plan" && plannedMinutes > 0;
+  const deltaMinutes = reduce
+    ? -Math.min(60, plannedMinutes)
+    : Math.min(60, Math.max(30, Math.abs(Math.round(difference))));
+  return {
+    label: "Adjust plan",
+    detail: "suggestion",
+    suggestion: {
+      title: `Adjust ${projectTitle}`,
+      reason: planDriftReason(drift),
+      kind: reduce ? "reduce" : "add",
+      projectId,
+      projectTitle,
+      deltaMinutes
+    }
+  };
+}
+
+function stageProjectAction(project: {
+  project_id?: number;
+  project_title?: string;
+  status?: string;
+  actual_minutes?: number;
+  min_minutes?: number;
+}): AppSignalAction {
+  if (project.status === "overheated") {
+    return { label: "Adjust plan", detail: "edit" };
+  }
+  const projectId = project.project_id;
+  if (typeof projectId !== "number" || projectId <= 0) {
+    return { label: "Choose project", detail: "edit" };
+  }
+  const projectTitle = project.project_title?.trim() || "Project";
+  const missingMinutes = Math.max(
+    0,
+    normalizeEvidenceMinutes(project.min_minutes) - normalizeEvidenceMinutes(project.actual_minutes)
+  );
+  const deltaMinutes = Math.min(120, Math.max(30, missingMinutes));
+  return {
+    label: "Schedule restart",
+    detail: "suggestion",
+    suggestion: {
+      title: `Restart ${projectTitle}`,
+      reason: stageReason(project),
+      kind: "add",
+      projectId,
+      projectTitle,
+      deltaMinutes
+    }
+  };
+}
+
+function dormantProjectAction(project: {
+  project_id?: number;
+  project_title?: string;
+  weekly_min_minutes?: number;
+  actual_minutes?: number;
+  inactive_days?: number;
+}): AppSignalAction {
+  const projectId = project.project_id;
+  if (typeof projectId !== "number" || projectId <= 0) {
+    return { label: "Choose project", detail: "edit" };
+  }
+  const projectTitle = project.project_title?.trim() || "Project";
+  const missingMinutes = Math.max(
+    0,
+    normalizeEvidenceMinutes(project.weekly_min_minutes) - normalizeEvidenceMinutes(project.actual_minutes)
+  );
+  const deltaMinutes = Math.min(120, Math.max(30, missingMinutes));
+  return {
+    label: "Schedule restart",
+    detail: "suggestion",
+    suggestion: {
+      title: `Restart ${projectTitle}`,
+      reason: dormancyReason(project),
+      kind: "add",
+      projectId,
+      projectTitle,
+      deltaMinutes
+    }
+  };
 }
 
 const signalSeverityRank: Record<SignalSeverity, number> = {
@@ -708,6 +950,25 @@ function planDriftReason(row: {
 
 function planTotalsReason(response: WeeklyReviewApiResponse): string {
   return `${formatMinutes(response.evidence.plan?.planned_total_minutes)} planned, ${formatMinutes(response.evidence.summary?.actual_total_minutes)} logged.`;
+}
+
+function energyBalanceReason(
+  consuming: number,
+  restore: number,
+  destroy: number,
+  total: number,
+  recoveryIsThin: boolean,
+  destroyPattern: boolean
+): string {
+  const restorePercent = consuming > 0 ? Math.round((restore / consuming) * 100) : 0;
+  const drainPercent = total > 0 ? Math.round((destroy / total) * 100) : 0;
+  if (destroyPattern) {
+    return `Drain was ${formatMinutes(destroy)} (${drainPercent}% of tracked time); risk begins at 2h and 25%.`;
+  }
+  if (recoveryIsThin) {
+    return `Restore was ${restorePercent}% of focus time; the steady threshold is 20%.`;
+  }
+  return `Restore was ${restorePercent}% of focus time and drain stayed below the 2h / 25% risk threshold.`;
 }
 
 function stageSeverity(status: string | undefined): SignalSeverity {
@@ -777,8 +1038,98 @@ function titleFromRiskType(type: RiskType): string {
   return titles[type];
 }
 
-function evidenceRowsFromText(text: string): Array<{ label: string; value: string }> {
-  return [{ label: "Evidence", value: text }];
+function winEvidenceRows(
+  response: WeeklyReviewApiResponse,
+  win: WeeklyReviewApiFinding
+): Array<{ label: string; value: string }> {
+  const rows = [
+    { label: "Finding", value: win.evidence },
+    { label: "Week logged", value: formatMinutes(response.evidence.summary?.actual_total_minutes) }
+  ];
+  const timeLogCount = response.evidence.summary?.time_log_count;
+  if (typeof timeLogCount === "number") {
+    rows.push({ label: "Sources", value: `${timeLogCount} time ${timeLogCount === 1 ? "log" : "logs"}` });
+  }
+  return rows;
+}
+
+function riskEvidenceRows(
+  response: WeeklyReviewApiResponse,
+  risk: WeeklyReviewApiRisk
+): Array<{ label: string; value: string }> {
+  const rows: Array<{ label: string; value: string }> = [
+    { label: "Finding", value: risk.evidence }
+  ];
+
+  if (risk.type === "alignment_gap") {
+    const goal = [...(response.evidence.goals ?? [])]
+      .filter((row) => row.active_status !== false)
+      .sort((left, right) => {
+        const minuteDifference = (left.actual_minutes ?? 0) - (right.actual_minutes ?? 0);
+        if (minuteDifference !== 0) return minuteDifference;
+        return (left.priority ?? 99) - (right.priority ?? 99);
+      })[0];
+    if (goal) {
+      rows.push(
+        { label: "Goal", value: goal.title ?? "Untitled goal" },
+        { label: "Goal-linked", value: formatMinutes(goal.actual_minutes) },
+        { label: "Active projects", value: String(goal.active_project_count ?? 0) }
+      );
+    }
+  }
+
+  if (risk.type === "plan_drift") {
+    const drift = [...(response.evidence.plan?.project_drift ?? [])]
+      .sort((left, right) => Math.abs(right.difference_minutes ?? 0) - Math.abs(left.difference_minutes ?? 0))[0];
+    if (drift) {
+      rows.push(
+        { label: "Project", value: drift.project_title ?? "Planned work" },
+        { label: "Planned", value: formatMinutes(drift.planned_minutes) },
+        { label: "Actual", value: formatMinutes(drift.actual_minutes) },
+        { label: "Difference", value: formatSignedMinutes(drift.difference_minutes) }
+      );
+    }
+  }
+
+  if (risk.type === "dormancy_risk") {
+    const dormant = [...(response.evidence.dormancy?.projects ?? [])]
+      .sort((left, right) => (right.inactive_days ?? 0) - (left.inactive_days ?? 0))[0];
+    if (dormant) {
+      rows.push(
+        { label: "Project", value: dormant.project_title ?? "Project" },
+        { label: "Inactive", value: formatDays(dormant.inactive_days) },
+        { label: "Logged", value: formatMinutes(dormant.actual_minutes) }
+      );
+    }
+  }
+
+  if (risk.type === "overload_risk" || risk.type === "slack_risk") {
+    const plan = response.evidence.plan;
+    if (plan) {
+      rows.push(
+        { label: "Planned", value: formatMinutes(plan.planned_total_minutes) },
+        { label: "Capacity", value: formatMinutes(plan.planned_capacity_minutes) },
+        { label: "Slack", value: formatMinutes(plan.planned_slack_minutes) }
+      );
+    }
+  }
+
+  if (risk.type === "destroy_pattern") {
+    const mix = response.evidence.activity?.mix;
+    if (mix) {
+      rows.push(
+        { label: "Focus", value: formatMinutes(mix.consuming) },
+        { label: "Restore", value: formatMinutes(mix.restore) },
+        { label: "Drain", value: formatMinutes(mix.destroy) }
+      );
+    }
+  }
+
+  const timeLogCount = response.evidence.summary?.time_log_count;
+  if (typeof timeLogCount === "number") {
+    rows.push({ label: "Sources", value: `${timeLogCount} time ${timeLogCount === 1 ? "log" : "logs"}` });
+  }
+  return rows;
 }
 
 function formatWeekLabel(start: string, end: string): string {

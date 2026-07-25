@@ -15,6 +15,7 @@ const apiPlan = {
       id: 8,
       weekly_plan_id: 4,
       project_id: 3,
+      task_id: null,
       title: "Restart block",
       planned_minutes: 120,
       priority: 1,
@@ -59,7 +60,7 @@ describe("planApi", () => {
       id: 4,
       week: { start: "2026-06-15", end: "2026-06-21" },
       capacityMinutes: 1800,
-      items: [{ projectId: 3, plannedMinutes: 120 }]
+      items: [{ projectId: 3, taskId: null, plannedMinutes: 120 }]
     });
     expect(result.data?.projects[0].title).toBe("Resume and applications");
     expect(calls.map((call) => call.input)).toEqual([

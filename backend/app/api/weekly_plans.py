@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from ..db.repositories import WeeklyPlanRepository
 from ..schemas import AccountRead, WeeklyPlanCreate, WeeklyPlanRead
+from ..services import InvalidPlanTaskReference, WeeklyPlanService
 from .dependencies import get_connection, get_current_user
 
 
@@ -19,7 +20,12 @@ async def create_weekly_plan(
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> WeeklyPlanRead:
     try:
-        return WeeklyPlanRepository(connection, user.id).create(plan)
+        return WeeklyPlanService(connection, user.id).create(plan)
+    except InvalidPlanTaskReference as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The planned Task is not available for this account and Project",
+        ) from exc
     except sqlite3.IntegrityError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -43,11 +49,16 @@ async def replace_weekly_plan(
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> WeeklyPlanRead:
     try:
-        return WeeklyPlanRepository(connection, user.id).replace(plan_id, plan)
+        return WeeklyPlanService(connection, user.id).replace(plan_id, plan)
     except LookupError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Weekly plan {plan_id} was not found",
+        ) from exc
+    except InvalidPlanTaskReference as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The planned Task is not available for this account and Project",
         ) from exc
     except sqlite3.IntegrityError as exc:
         raise HTTPException(

@@ -10,6 +10,7 @@ export type IconName =
   | "chevronLeft"
   | "chevronRight"
   | "code"
+  | "edit"
   | "fileText"
   | "folder"
   | "gauge"
@@ -23,6 +24,7 @@ export type IconName =
   | "sketchReview"
   | "sketchRisk"
   | "sketchWin"
+  | "stop"
   | "target"
   | "timer"
   | "trash"
@@ -78,6 +80,12 @@ const paths: Record<IconName, ReactElement> = {
     <>
       <path {...strokeProps} d="m16 18 6-6-6-6" />
       <path {...strokeProps} d="m8 6-6 6 6 6" />
+    </>
+  ),
+  edit: (
+    <>
+      <path {...strokeProps} d="M12 20h9" />
+      <path {...strokeProps} d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
     </>
   ),
   fileText: (
@@ -158,6 +166,7 @@ const paths: Record<IconName, ReactElement> = {
       <path {...strokeProps} strokeWidth={1.9} d="M6.4 5.6h11.2M8 8.1c-2.7-.2-4.1.7-4 2.4.2 1.9 2.1 3.1 5 3.2M16 8.1c2.7-.2 4.1.7 4 2.4-.2 1.9-2.1 3.1-5 3.2M12 13.9v3.1M9.2 20.1c1.5-1.4 4.2-1.4 5.7 0M8.4 20.2h7.5" />
     </>
   ),
+  stop: <rect fill="currentColor" x="6" y="6" width="12" height="12" rx="1.5" />,
   timer: (
     <>
       <path {...strokeProps} d="M10 2h4M12 14l3-3" />

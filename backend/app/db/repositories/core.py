@@ -5,6 +5,7 @@ import sqlite3
 from ...schemas import (
     ActivityCreate,
     ActivityRead,
+    ActivityTypeSource,
     DailyReflectionCreate,
     DailyReflectionRead,
     GoalCreate,
@@ -85,7 +86,17 @@ class ActivityRepository:
         self.connection = connection
         self.user_id = user_id
 
-    def create(self, activity: ActivityCreate) -> ActivityRead:
+    def create(
+        self,
+        activity: ActivityCreate,
+        *,
+        type_source: ActivityTypeSource = "user_selected",
+    ) -> ActivityRead:
+        values = {
+            **activity.model_dump(mode="json", exclude={"type_source"}),
+            "user_id": self.user_id,
+            "type_source": type_source,
+        }
         cursor = self.connection.execute(
             """
             INSERT INTO activities (
@@ -94,7 +105,7 @@ class ActivityRepository:
                 :user_id, :project_id, :name, :description, :activity_type, :type_source
             )
             """,
-            {**activity.model_dump(mode="json"), "user_id": self.user_id},
+            values,
         )
         return self.get(cursor.lastrowid)
 
@@ -105,12 +116,82 @@ class ActivityRepository:
         ).fetchone()
         return validate_row(ActivityRead, require_row(row, "Activity", activity_id))
 
-    def list(self) -> list[ActivityRead]:
+    def list(self, *, project_id: int | None = None) -> list[ActivityRead]:
+        project_clause = "" if project_id is None else "AND project_id = :project_id"
         rows = self.connection.execute(
-            "SELECT * FROM activities WHERE user_id = ? ORDER BY id",
-            (self.user_id,),
+            f"""
+            SELECT * FROM activities
+            WHERE user_id = :user_id {project_clause}
+            ORDER BY name COLLATE NOCASE, id
+            """,
+            {"user_id": self.user_id, "project_id": project_id},
         ).fetchall()
         return [validate_row(ActivityRead, row) for row in rows]
+
+    def update_if_version(
+        self,
+        activity_id: int,
+        expected_version: int,
+        updates: dict[str, object],
+    ) -> ActivityRead | None:
+        allowed = {
+            "project_id",
+            "name",
+            "description",
+            "activity_type",
+            "type_source",
+        }
+        if not updates or not set(updates) <= allowed:
+            raise ValueError("Activity update contains unsupported fields")
+        assignments = [f"{field} = :{field}" for field in updates]
+        assignments.extend(
+            (
+                "version = version + 1",
+                "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+            )
+        )
+        values = {
+            **updates,
+            "id": activity_id,
+            "user_id": self.user_id,
+            "expected_version": expected_version,
+        }
+        cursor = self.connection.execute(
+            f"""
+            UPDATE activities
+            SET {', '.join(assignments)}
+            WHERE id = :id
+              AND user_id = :user_id
+              AND version = :expected_version
+            """,
+            values,
+        )
+        if cursor.rowcount != 1:
+            return None
+        return self.get(activity_id)
+
+    def has_open_focus_session(self, activity_id: int) -> bool:
+        focus_table = self.connection.execute(
+            """
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'focus_sessions'
+            """
+        ).fetchone()
+        if focus_table is None:
+            return False
+        row = self.connection.execute(
+            """
+            SELECT 1
+            FROM focus_sessions
+            WHERE user_id = ?
+              AND activity_id = ?
+              AND status IN ('running', 'paused')
+            LIMIT 1
+            """,
+            (self.user_id, activity_id),
+        ).fetchone()
+        return row is not None
 
 
 class DailyReflectionRepository:

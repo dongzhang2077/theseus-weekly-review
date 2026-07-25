@@ -74,6 +74,18 @@ export function createPlanWorkspace(
   };
 }
 
+export function withPlanSuggestion(
+  workspace: PlanWorkspace,
+  suggestion: PlanSuggestion
+): PlanWorkspace {
+  const resolved = resolveSuggestion(suggestion, workspace.projects, workspace.draft);
+  return {
+    ...workspace,
+    suggestion: resolved,
+    suggestionStatus: resolved ? "available" : "dismissed"
+  };
+}
+
 export function createUpcomingPlanSeed(reference: Date = new Date()): PlanSeed {
   const targetWeek = nextMondayWeek(reference);
   const reviewWeek = {

@@ -66,7 +66,7 @@ export async function loadAppWeek(options: LoadAppWeekOptions = {}): Promise<Loa
 
       if (!response.ok) {
         if (response.status === 404) {
-          return { week: fallback, source: "empty", error: null };
+          return { week: withoutSampleTrack(fallback), source: "empty", error: null };
         }
         lastError = `Backend returned ${response.status}`;
         if (mode === "supportive_text" && response.status === 502) {
@@ -90,5 +90,12 @@ export async function loadAppWeek(options: LoadAppWeekOptions = {}): Promise<Loa
     }
   }
 
-  return { week: fallback, source: "error", error: lastError };
+  return { week: withoutSampleTrack(fallback), source: "error", error: lastError };
+}
+
+function withoutSampleTrack(fallback: AppWeekViewModel): AppWeekViewModel {
+  return {
+    ...fallback,
+    track: { activities: [] }
+  };
 }

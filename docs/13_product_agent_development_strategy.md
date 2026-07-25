@@ -16,6 +16,10 @@ Use it to decide what to build next, what to defer, and where new capabilities
 belong. It is a strategy and delivery guide, not a replacement for executable
 contracts.
 
+The sequential implementation branches, story dependencies, verification
+commands, and product-owner acceptance gates are maintained in
+[`15_agent_implementation_roadmap.md`](15_agent_implementation_roadmap.md).
+
 When sources disagree, use this order:
 
 1. `AGENTS.md` repository guidance.
@@ -52,16 +56,21 @@ automation, and machine learning extend that kernel; they do not replace it.
 
 ## 3. Current Reality
 
-As of 2026-07-18, Theseus is a working weekly-review MVP foundation rather than
-a general life assistant.
+As of 2026-07-25, Theseus is a working weekly-review MVP foundation rather than
+a general life assistant. The product owner accepted the sequential Agent
+implementation roadmap and STORY-035 domain contract. STORY-036 durable Tasks
+and STORY-033 durable Activities are locally verified and product-owner
+accepted; later Agent-domain
+endpoints remain unimplemented.
 
 | Capability | Current state | Direction |
 |---|---|---|
-| Stable review entities | Schema v4 ownership, credentials, and sessions are implemented and verified in STORY-030 | Keep the core model stable while Signals and Plan consume it |
+| Stable review entities | Schema v5 preserves STORY-030 ownership, credentials, sessions, and existing review records | Preserve v5 while later Agent-domain migrations are implemented |
+| Durable Tasks and live Focus state | Durable Tasks and nullable Plan/TimeLog links are accepted in STORY-036; durable Activity management is accepted in STORY-033; live Focus remains local browser state | Reconcile the accepted two-tap Start/End UX with the STORY-037 contract, then implement STORY-037 and STORY-034 sequentially |
 | Persistent review path | User-scoped sample data flows through SQLite, the review engine, and stored review; v1 migration and restart coverage are merged | Rehearse the browser-to-API restart path |
 | Review reasoning | Deterministic, evidence-first rules | Keep framework-independent |
 | AI wording | Evidence-bound writer adapters exist | Keep AI wording downstream of computed facts |
-| React app | Review, Track, evidence-first Signals, and actionable Plan are on `main`; the Warm Stationery registration/login/account gate is a visually approved release candidate | Preserve the mobile hierarchy through screenshot and interaction gates |
+| React app | The authenticated Warm Stationery app is on `main`; a corrective Focus/Review/Signals/Plan candidate is implemented locally on `feature/032-focus-ux-v2` and is not yet released | Preserve the 430px mobile hierarchy through product-owner screenshot and interaction gates |
 | Personal identity | Argon2id local accounts, JWT/session rotation, account management, and authenticated isolation are implemented and verified in STORY-030 | Keep this separate from cloud identity and sync |
 | Long-term preferences | Not represented | Add explicit, provenance-bearing preferences after user ownership |
 | Agent orchestration | Not implemented | Pilot one LangGraph workflow after the domain foundation is stable |
@@ -121,7 +130,7 @@ hierarchy, but it may not be mistaken for evidence or computed severity.
 | Screen | Level 1 question | Direction |
 |---|---|---|
 | Review | What mattered this week? | Preserve the current hierarchy and evidence expansion |
-| Signals | Why did Theseus reach that conclusion? | Replace the decorative orbit with aligned, data-backed signal rows |
+| Signals | What needs attention, why, and what can I do now? | Show concrete evidence-backed issues with their next action; collapse normal checks |
 | Track | What am I doing now and what was recorded? | Preserve the timer/log focus and improve real-data states as needed |
 | Plan | What should change next week? | Show capacity, planned load, slack, one proposal, and its effect |
 
@@ -132,14 +141,29 @@ duplicate of Track.
 
 Level 1 should contain:
 
-- one priority signal with severity expressed by text and color;
-- one short reason using concrete evidence;
-- four stable rows for Plan, Stage, Goal, and Energy;
+- the highest-priority concrete issue, followed by any remaining severe or
+  attention issues;
+- one short reason and key value for each issue using concrete evidence;
+- one direct action on each issue, with Evidence as an optional secondary path;
+- normal checks collapsed into a quiet summary instead of occupying equal
+  visual weight;
 - a clear distinction between API data, sample data, and no data.
 
 Level 2 should contain the affected projects or records. Level 3 may contain
 raw evidence details. Every summary signal must either open matching evidence
 or explicitly say that evidence is unavailable.
+
+Do not repeat the same issue as both a priority card and a category row. A
+Signal or Review Risk must preserve its project and delta when it opens Plan;
+when the source does not identify a project, open manual editing rather than
+inventing one. The target interaction budget is two steps: select the action,
+then apply or save the contextual adjustment.
+
+Energy semantics must match the deterministic review engine. A restoration gap
+is raised when restorative time is below 20% of consuming time. A destructive
+pattern is raised only when destructive activity is at least 120 minutes and at
+least 25% of all recorded time. The UI must state the measured value and the
+threshold instead of reducing the conclusion to color.
 
 Remove static red/amber/green orbit dots, arbitrary card rotation, and any
 decoration that can be mistaken for a computed status. Do not use color as the
@@ -316,11 +340,17 @@ Goal: demonstrate one trustworthy local-user weekly-review loop.
 
 Exit gate:
 
-- a local user can be created and selected;
+- a formal local account can register, sign in, restore a session, and keep its
+  data isolated;
 - user-owned records survive an application restart;
 - the persisted-data-to-stored-review path passes;
-- Signals does not show misleading static severity;
-- Plan uses the selected week and real project data for the demo path;
+- Focus records a truthful, exactly-once session result;
+- Review browses actual weeks and keeps navigation available for empty weeks;
+- Signals presents concrete actionable issues without duplicated categories or
+  misleading static severity;
+- Risk/Signal context reaches Plan and Plan uses the selected week and real
+  project data for the demo path;
+- opaque full-screen details and the primary workspace remain usable at 430px;
 - a repeatable demo script and sanitized fixture are available.
 
 LangGraph and OpenClaw are explicitly excluded from this phase.
@@ -329,9 +359,19 @@ LangGraph and OpenClaw are explicitly excluded from this phase.
 
 Goal: make ownership, provenance, feedback, and reversible changes reliable.
 
+Status note (2026-07-25): the product owner accepted the gated implementation
+roadmap and the STORY-035 authoritative Task/Activity/Plan/Focus/TimeLog
+contract with its v5-v7 migration sequence. STORY-036 passed its runtime
+implementation and product-owner browser gate on 2026-07-22 PDT. STORY-033
+passed browser, stable-ID TimeLog linkage, and backend-restart acceptance on
+2026-07-25 PDT. STORY-037 is the next sequential gate; its public transition
+contract must first match the accepted two-tap Start/End UX.
+
 Exit gate:
 
 - all relevant repositories and API operations are user-scoped;
+- durable Task and FocusSession behavior, exactly-once TimeLog production, and
+  correctable Evidence are implemented through shared domain services;
 - migrations, export, and reset behavior are documented;
 - preferences, proposals, approvals, actions, and outcomes have accepted
   contracts;
@@ -544,6 +584,14 @@ The focused checkpoint passed 46 tests across 11 files; the final integrated
 suite passes 64 tests across 14 files, and the production build succeeds. The
 result is included in PR #64 on `main`.
 
+Corrective checkpoint (2026-07-18 PDT): subsequent product feedback found that
+the stable category rows still duplicated the priority issue and delayed the
+next action. STORY-032 therefore supersedes that final information architecture
+locally: severe and attention issues are concrete records, normal checks are
+collapsed, actions live on the issue card, and Evidence remains available but
+secondary. This work is verified locally on `feature/032-focus-ux-v2` and is
+not merged or released pending product-owner visual approval.
+
 Acceptance criteria:
 
 - static orbit severity decoration is removed;
@@ -584,6 +632,13 @@ Verification checkpoint: 91 Python tests and 64 frontend tests pass; Python
 compilation, the frontend production build, deterministic sample review, and a
 separate sample -> SQLite -> review engine -> stored review run also succeed.
 The verified result is included in PR #64 on `main`.
+
+Corrective checkpoint (2026-07-18 PDT): STORY-032 adds a contextual handoff
+from Review Risk or Signals into Plan, keeps unknown project context editable
+instead of guessed, removes the duplicate top edit control, and uses an opaque
+full-screen detail surface with primary navigation hidden while open. The
+candidate is locally verified but is not merged or released pending
+product-owner visual approval.
 
 Acceptance criteria:
 
@@ -666,6 +721,8 @@ Do not introduce LangGraph until:
 
 - the same workflow is understandable as explicit domain-service calls;
 - user ownership and durable records are stable;
+- Task, Activity, FocusSession, and TimeLog correction contracts have passed
+  their product-owner implementation gates;
 - a human approval checkpoint is genuinely required.
 
 Do not enable OpenClaw writes until:

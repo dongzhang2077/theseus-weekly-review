@@ -1,11 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { activitySessionToTimeLog, energyToApiActivityType, saveActivitySession, saveTimeLog, type TimeLogCreatePayload } from "./timeLogs";
+import {
+  activitySessionToTimeLog,
+  activitySessionToTimeLogs,
+  applyTodayTimeLogs,
+  calendarDate,
+  energyToApiActivityType,
+  loadTimeLogs,
+  saveActivitySession,
+  saveTimeLogBatch,
+  saveTimeLog,
+  splitElapsedSecondsByDate,
+  type ApiTimeLogRead,
+  type TimeLogCreatePayload
+} from "./timeLogs";
 import type { ActivityTimer } from "../domain/track";
 import type { FetchLike } from "./loadAppWeek";
 
 const activity: ActivityTimer = {
   id: "frontend",
   activityId: 7,
+  activityTypeSource: "user_corrected",
   projectId: 3,
   name: "Frontend build block",
   category: "Project",
@@ -32,13 +46,51 @@ describe("timeLogs api helpers", () => {
       duration_minutes: 2,
       activity_name: "Frontend build block",
       activity_type: "consuming",
-      type_source: "user_selected",
+      type_source: "user_corrected",
       note: "Focused UI polish."
     });
   });
 
   it("does not build a time-log payload for an empty session", () => {
     expect(activitySessionToTimeLog({ ...activity, sessionSeconds: 0 })).toBeNull();
+  });
+
+  it("uses the account timezone rather than UTC for the calendar date", () => {
+    const losAngelesEvening = new Date("2026-07-19T01:00:00.000Z");
+
+    expect(calendarDate("America/Los_Angeles", losAngelesEvening)).toBe("2026-07-18");
+    expect(calendarDate("Asia/Shanghai", losAngelesEvening)).toBe("2026-07-19");
+    expect(calendarDate("Not/A_Timezone", losAngelesEvening)).toMatch(/^2026-07-(18|19)$/);
+  });
+
+  it("splits elapsed seconds at the account's local midnight", () => {
+    const beforeLosAngelesMidnight = new Date("2026-07-19T06:59:58.000Z").getTime();
+
+    expect(
+      splitElapsedSecondsByDate(beforeLosAngelesMidnight, 4, "America/Los_Angeles")
+    ).toEqual({
+      "2026-07-18": 2,
+      "2026-07-19": 2
+    });
+  });
+
+  it("turns a cross-day session into duration-preserving daily logs", () => {
+    expect(
+      activitySessionToTimeLogs(
+        {
+          ...activity,
+          sessionSeconds: 125,
+          sessionSecondsByDate: {
+            "2026-07-18": 65,
+            "2026-07-19": 60
+          }
+        },
+        { timeZone: "America/Los_Angeles" }
+      )
+    ).toEqual([
+      expect.objectContaining({ date: "2026-07-18", duration_minutes: 1 }),
+      expect.objectContaining({ date: "2026-07-19", duration_minutes: 1 })
+    ]);
   });
 
   it("posts time-log payloads when an API base URL is configured", async () => {
@@ -97,4 +149,109 @@ describe("timeLogs api helpers", () => {
       activity_name: "Frontend build block"
     });
   });
+
+  it("posts cross-day segments as one atomic batch", async () => {
+    const calls: Array<{ input: string; init: RequestInit }> = [];
+    const fetchImpl: FetchLike = async (input, init) => {
+      calls.push({ input, init });
+      return { ok: true, status: 201, json: async () => [] };
+    };
+    const crossDayActivity = {
+      ...activity,
+      sessionSeconds: 120,
+      sessionSecondsByDate: { "2026-07-18": 60, "2026-07-19": 60 }
+    };
+
+    await expect(
+      saveActivitySession({
+        apiBaseUrl: "http://127.0.0.1:8000",
+        activity: crossDayActivity,
+        fetchImpl
+      })
+    ).resolves.toEqual({ saved: true, error: null });
+
+    expect(calls[0].input).toBe("http://127.0.0.1:8000/time-logs/batch");
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({
+      time_logs: [
+        expect.objectContaining({ date: "2026-07-18", duration_minutes: 1 }),
+        expect.objectContaining({ date: "2026-07-19", duration_minutes: 1 })
+      ]
+    });
+  });
+
+  it("rejects an empty atomic batch before making a request", async () => {
+    await expect(
+      saveTimeLogBatch({ apiBaseUrl: "http://127.0.0.1:8000", payloads: [] })
+    ).resolves.toEqual({ saved: false, error: "Time-log batch is empty" });
+  });
+
+  it("loads account-scoped time logs from the authenticated API", async () => {
+    const log = apiLog({ id: 9, date: "2026-07-18", duration_minutes: 12 });
+    const fetchImpl: FetchLike = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => [log]
+    });
+
+    await expect(
+      loadTimeLogs({ apiBaseUrl: "http://127.0.0.1:8000/", fetchImpl })
+    ).resolves.toEqual({ loaded: true, logs: [log], error: null });
+  });
+
+  it("hydrates Today from persisted logs without counting a project twice", () => {
+    const duplicateProjectCards: ActivityTimer[] = [
+      { ...activity, id: "review-project-3", activityId: undefined, todaySeconds: 0 },
+      { ...activity, id: "plan-item-8", activityId: undefined, todaySeconds: 0 }
+    ];
+    const logs = [
+      apiLog({ id: 1, date: "2026-07-18", duration_minutes: 12 }),
+      apiLog({ id: 2, date: "2026-07-17", duration_minutes: 30 })
+    ];
+
+    const hydrated = applyTodayTimeLogs(duplicateProjectCards, logs, "2026-07-18");
+
+    expect(hydrated[0].todaySeconds).toBe(12 * 60);
+    expect(hydrated[1].todaySeconds).toBe(0);
+  });
+
+  it("restores an unlinked saved activity after a browser reload", () => {
+    const logs = [apiLog({
+      id: 4,
+      activity_id: undefined,
+      project_id: undefined,
+      activity_name: "Inbox cleanup",
+      activity_type: "neutral",
+      date: "2026-07-18",
+      duration_minutes: 7
+    })];
+
+    expect(applyTodayTimeLogs([], logs, "2026-07-18")).toEqual([
+      expect.objectContaining({
+        id: "today-name-Inbox cleanup",
+        name: "Inbox cleanup",
+        todaySeconds: 7 * 60,
+        focusContext: {
+          source: "persisted_log",
+          reason: "Recorded from today's saved focus history"
+        }
+      })
+    ]);
+  });
 });
+
+function apiLog(overrides: Partial<ApiTimeLogRead>): ApiTimeLogRead {
+  return {
+    id: 1,
+    user_id: 1,
+    project_id: 3,
+    date: "2026-07-18",
+    duration_minutes: 2,
+    activity_name: "Frontend build block",
+    activity_type: "consuming",
+    type_source: "user_selected",
+    note: "",
+    created_at: "2026-07-18T12:00:00Z",
+    updated_at: "2026-07-18T12:00:00Z",
+    ...overrides
+  };
+}

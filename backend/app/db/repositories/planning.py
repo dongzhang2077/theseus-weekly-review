@@ -95,9 +95,11 @@ class WeeklyPlanRepository:
         self.connection.execute(
             """
             INSERT INTO planned_items (
-                weekly_plan_id, project_id, title, planned_minutes, priority, is_completed
+                weekly_plan_id, project_id, task_id, title, planned_minutes,
+                priority, is_completed
             ) VALUES (
-                :weekly_plan_id, :project_id, :title, :planned_minutes, :priority, :is_completed
+                :weekly_plan_id, :project_id, :task_id, :title, :planned_minutes,
+                :priority, :is_completed
             )
             """,
             values,
@@ -149,14 +151,37 @@ class TimeLogRepository:
     def create(self, time_log: TimeLogCreate) -> TimeLogRead:
         values = time_log.model_dump(mode="json")
         values["user_id"] = self.user_id
+        values["task_title"] = None
+        if time_log.task_id is not None:
+            task = self.connection.execute(
+                """
+                SELECT project_id, title
+                FROM tasks
+                WHERE id = ? AND user_id = ?
+                """,
+                (time_log.task_id, self.user_id),
+            ).fetchone()
+            if task is None:
+                raise sqlite3.IntegrityError(
+                    "time log task must belong to the same user"
+                )
+            if values["project_id"] is None:
+                values["project_id"] = task["project_id"]
+            elif values["project_id"] != task["project_id"]:
+                raise sqlite3.IntegrityError(
+                    "time log task must match the project"
+                )
+            values["task_title"] = task["title"]
         cursor = self.connection.execute(
             """
             INSERT INTO time_logs (
-                user_id, activity_id, project_id, date, start_time, end_time,
-                duration_minutes, activity_name, activity_type, type_source, note
+                user_id, activity_id, project_id, task_id, date, start_time,
+                end_time, duration_minutes, activity_name, activity_type,
+                type_source, task_title, note
             ) VALUES (
-                :user_id, :activity_id, :project_id, :date, :start_time, :end_time,
-                :duration_minutes, :activity_name, :activity_type, :type_source, :note
+                :user_id, :activity_id, :project_id, :task_id, :date, :start_time,
+                :end_time, :duration_minutes, :activity_name, :activity_type,
+                :type_source, :task_title, :note
             )
             """,
             values,
