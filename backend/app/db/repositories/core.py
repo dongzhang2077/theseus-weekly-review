@@ -186,7 +186,7 @@ class ActivityRepository:
             FROM focus_sessions
             WHERE user_id = ?
               AND activity_id = ?
-              AND status IN ('running', 'paused')
+              AND status = 'running'
             LIMIT 1
             """,
             (self.user_id, activity_id),

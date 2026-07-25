@@ -24,6 +24,7 @@ export interface ActivityTimer {
   activityVersion?: number;
   activityDescription?: string;
   activityTypeSource?: "user_selected" | "ai_suggested" | "user_corrected";
+  taskId?: number;
   projectId?: number;
   projectTitle?: string;
   focusContext?: FocusContext;
@@ -36,6 +37,9 @@ export interface ActivityTimer {
   sessionSeconds: number;
   sessionSecondsByDate?: Record<string, number>;
   runSeconds?: number;
+  focusSessionId?: number;
+  focusSessionVersion?: number;
+  focusStartedAt?: string;
   running: boolean;
   recommended?: boolean;
 }

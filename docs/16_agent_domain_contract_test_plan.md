@@ -89,7 +89,7 @@ Required cases:
   sub-minute slice may have zero whole minutes;
 - reject FocusSession links to another user's Activity, Task, or Project;
 - allow simultaneous sessions for different Activities;
-- reject two non-terminal sessions for the same user and Activity;
+- reject two running sessions for the same user and Activity;
 - allow at most one open segment inside one running session;
 - reject invalid session status and negative accumulated duration;
 - enforce unique Focus-produced TimeLog per session and local date;
@@ -143,15 +143,14 @@ Required cases:
 - start creates one running session and one open segment;
 - starting an open Task atomically changes it to `in_progress`;
 - completed, cancelled, and archived Tasks cannot start Focus;
-- elapsed time is derived from closed segments plus the open segment;
-- pause closes one segment and increments version;
-- resume opens one new segment and increments version;
+- elapsed time is derived from the server-owned open segment;
 - multiple Activities accumulate independently;
 - stale `expected_version` returns a conflict without mutation;
 - identical idempotency replay returns the original response;
 - key reuse with a different request returns a conflict;
 - cancel closes an open segment but creates no TimeLogs;
-- finish from running and paused states succeeds exactly once;
+- End from running succeeds exactly once and creates no confirmation step;
+- terminal commands accept no result-note form and increment version once;
 - completed and cancelled sessions reject further transitions;
 - timezone change after start does not change the captured session timezone;
 - cross-midnight completion groups seconds into the correct local dates;
@@ -163,7 +162,7 @@ Required cases:
   fabricating extra whole minutes;
 - backend restart between commands preserves state and completion behavior;
 - an invalid account timezone produces a controlled conflict and no session;
-- finishing does not silently complete the linked Task.
+- ending does not silently complete the linked Task.
 - cancelling does not silently change the linked Task lifecycle.
 
 ### TimeLogService
@@ -220,10 +219,9 @@ register account
   -> create durable Task and Activity
   -> create WeeklyPlan item linked to Task
   -> start Focus
-  -> pause
   -> restart backend/database connection
-  -> resume across local midnight
-  -> finish twice with the same idempotency key
+  -> observe the same running Session across local midnight
+  -> End twice with the same idempotency key
   -> prove one completed session and expected daily TimeLogs
   -> generate WeeklyReview
   -> correct one TimeLog

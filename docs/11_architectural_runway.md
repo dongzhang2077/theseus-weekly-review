@@ -235,9 +235,9 @@ Current status: implemented.
 sample_week.json -> SQLite -> review_engine -> stored weekly_review
 ```
 
-Current status: implemented with SQLite schema version 5, atomic version
-1-through-4 migration paths, formal account ownership, user-scoped
-repositories, and restart-path tests.
+Current accepted status: SQLite schema version 6, supported migrations from
+every prior version, formal account ownership, user-scoped repositories,
+restart-path tests, and the product-owner accepted STORY-037 Focus runtime.
 
 ### Stage C: Web Input
 
@@ -277,11 +277,12 @@ Task + Activity
   -> correctable Evidence
 ```
 
-Accepted contract status: STORY-035. Runtime status: schema v5 durable Tasks
-and nullable Task references are implemented and product-owner accepted
-through STORY-036. Authenticated durable Activity management is implemented
-and automatically verified on the STORY-033 acceptance candidate; durable
-FocusSession state and later correction steps remain unavailable.
+Accepted contract status: STORY-035. The accepted runtime includes schema-v5
+durable Tasks and nullable Task references through STORY-036, plus
+authenticated durable Activity management through STORY-033. STORY-037 adds
+the automatically verified and product-owner accepted schema-v6 runtime for
+durable FocusSession state and exactly-once TimeLog production. Later
+correction steps remain unavailable.
 
 Implementation sequence:
 
@@ -322,8 +323,8 @@ Avoid:
 - Treating a WeeklyPlan `PlannedItem` as the only durable Task record.
 - Keeping live Focus state only in one browser once a second channel can
   observe or control it.
-- Calculating elapsed Focus time with one start/end subtraction that ignores
-  pause segments.
+- Calculating elapsed Focus time from browser ticks instead of the persisted
+  server-owned Start/End interval.
 - Letting FastAPI routes, LangGraph nodes, or OpenClaw tools implement different
   Task or timer transitions.
 - Letting OpenClaw reuse browser refresh credentials or access SQLite directly.

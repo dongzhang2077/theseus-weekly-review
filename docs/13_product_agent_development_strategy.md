@@ -65,8 +65,8 @@ endpoints remain unimplemented.
 
 | Capability | Current state | Direction |
 |---|---|---|
-| Stable review entities | Schema v5 preserves STORY-030 ownership, credentials, sessions, and existing review records | Preserve v5 while later Agent-domain migrations are implemented |
-| Durable Tasks and live Focus state | Durable Tasks and nullable Plan/TimeLog links are accepted in STORY-036; durable Activity management is accepted in STORY-033; live Focus remains local browser state | Reconcile the accepted two-tap Start/End UX with the STORY-037 contract, then implement STORY-037 and STORY-034 sequentially |
+| Stable review entities | Schema v6 preserves STORY-030 ownership, credentials, sessions, and existing review records while adding durable Focus state | Preserve supported migration paths while later Agent-domain migrations are implemented |
+| Durable Tasks and live Focus state | Durable Tasks and nullable Plan/TimeLog links are accepted in STORY-036; durable Activity management is accepted in STORY-033; persisted two-tap Focus and exact TimeLogs are accepted in STORY-037 | Implement correctable Today history and review invalidation in STORY-034 |
 | Persistent review path | User-scoped sample data flows through SQLite, the review engine, and stored review; v1 migration and restart coverage are merged | Rehearse the browser-to-API restart path |
 | Review reasoning | Deterministic, evidence-first rules | Keep framework-independent |
 | AI wording | Evidence-bound writer adapters exist | Keep AI wording downstream of computed facts |
@@ -364,8 +364,9 @@ roadmap and the STORY-035 authoritative Task/Activity/Plan/Focus/TimeLog
 contract with its v5-v7 migration sequence. STORY-036 passed its runtime
 implementation and product-owner browser gate on 2026-07-22 PDT. STORY-033
 passed browser, stable-ID TimeLog linkage, and backend-restart acceptance on
-2026-07-25 PDT. STORY-037 is the next sequential gate; its public transition
-contract must first match the accepted two-tap Start/End UX.
+2026-07-25 PDT. STORY-037's two-tap Start/End contract is accepted, and its
+schema-v6 runtime implementation passed automated and product-owner browser
+acceptance on 2026-07-25 PDT. STORY-034 is the next sequential gate.
 
 Exit gate:
 

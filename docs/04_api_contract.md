@@ -2,15 +2,17 @@
 
 Contract status:
 
-- Sections 1-9 describe the implemented schema-v5 HTTP surface.
+- Sections 1-9 describe the product-owner accepted schema-v5 HTTP surface.
 - Section 10 remains a planned evaluation endpoint.
 - Section 11 is the accepted STORY-035 Agent-foundation contract. STORY-036
   implements Tasks, optional PlannedItem Task links, and TimeLog Task
   snapshots on its product-owner accepted branch. STORY-033 implements
   authenticated Activity create, list, detail, and optimistic correction on
-  its product-owner accepted branch. FocusSession, TimeLog correction, deletion,
-  Undo, and idempotency routes remain unavailable until their owning stories
-  pass verification and merge.
+  its product-owner accepted branch. STORY-037 implements the Section 11.5
+  FocusSession routes, Focus idempotency receipts, and the schema-v6 exact-time
+  read fields. That implementation passed automated verification and the
+  product-owner browser gate on 2026-07-25. TimeLog correction, deletion,
+  Undo, and their mutation-idempotency routes remain unavailable.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -548,9 +550,12 @@ Request:
 
 Current implementation status: STORY-036 Task routes, Plan Task links, and
 TimeLog Task links are implemented, verified, and product-owner accepted on
-the schema-v5 runtime baseline. Sections 11.3 and 11.5-11.6 remain future
-runtime contracts except
-for the explicitly identified v5 TimeLog Task fields.
+the schema-v5 runtime baseline. STORY-033 Activity routes are also
+product-owner accepted. Section 11.5 and the schema-v6 Focus provenance/exact
+seconds subset of Section 11.6 are implemented, automatically verified, and
+product-owner accepted through STORY-037.
+TimeLog correction, removal, revision, and Undo remain future runtime
+contracts.
 
 Implementation is split across STORY-036, STORY-033, STORY-037, and STORY-034.
 Each story must update this status only for the routes it actually delivers.
@@ -773,6 +778,10 @@ Existing requests without `task_id` retain their pre-v5 behavior.
 
 ### 11.5 Focus Sessions
 
+Implementation status: STORY-037 is implemented and product-owner accepted.
+Backend, frontend, migration, production-build, persisted-review, and browser
+verification pass.
+
 FocusSession is the durable live timer boundary. It is intentionally distinct
 from `auth_sessions`.
 
@@ -789,7 +798,7 @@ Requires `Idempotency-Key`.
 
 `activity_id` is required. `task_id` is optional. The server derives the
 Project, captures Activity/Task snapshots and the account timezone, creates a
-`running` session, and opens its first segment in one transaction.
+`running` session, and opens its one segment in one transaction.
 
 An `open` Task becomes `in_progress` as part of that transaction. A completed,
 cancelled, or archived Task returns `409 task_not_runnable` until the user
@@ -828,17 +837,17 @@ Response:
 }
 ```
 
-`elapsed_seconds` is calculated at response time from closed segments plus the
-open segment. It is not a background counter.
+`elapsed_seconds` is calculated at response time from the server-owned open
+segment. It is not a background counter.
 
-A second non-terminal session for the same Activity returns
+A second running session for the same Activity returns
 `409 activity_already_open` with the existing same-user session ID. Different
 Activities may run concurrently.
 
 #### GET /focus-sessions
 
-Optional `state=open` returns running and paused sessions. Repeated `status`
-filters exact statuses. Ordering is non-terminal first, then start time and ID.
+Optional `state=open` returns running sessions. Repeated `status` filters exact
+statuses. Ordering is running first, then start time and ID.
 
 #### GET /focus-sessions/{session_id}
 
@@ -849,21 +858,21 @@ inspectable.
 
 Requires `Idempotency-Key`.
 
-Pause:
+End:
 
 ```json
 {
-  "command": "pause",
+  "command": "end",
   "expected_version": 1
 }
 ```
 
-Resume uses `command = resume`; finish and cancel may include a bounded `note`.
-Valid transitions are:
+Cancel uses `command = cancel`. The v6 terminal commands accept no result or
+note form; later notes are edited on the generated TimeLog through the v7
+correction contract. Valid transitions are:
 
 ```text
-running -> paused | completed | cancelled
-paused -> running | completed | cancelled
+running -> completed | cancelled
 completed -> no transitions
 cancelled -> no transitions
 ```
@@ -879,30 +888,32 @@ Command response:
 }
 ```
 
-`time_logs` is populated only by the first successful finish. Finishing closes
-the open segment, groups exact seconds by the session timezone, atomically
-creates at most one TimeLog per affected local date, marks the session
-completed, and stores the idempotency result. A replay returns the same session
-and TimeLogs without creating new rows.
+The first successful End closes the open segment, groups exact seconds by the
+session timezone, atomically creates at most one TimeLog per affected local
+date, stores the final `accumulated_seconds`, increments the session version,
+marks the session completed, and stores a response containing those TimeLogs
+in the idempotency receipt. A replay returns that original session and those
+TimeLogs without creating new rows or incrementing the version again.
 
-Cancelling produces no TimeLogs. A completed or cancelled session cannot be
-reopened; the user starts a new session. Finishing Focus never silently marks a
-linked Task completed, and cancelling Focus does not silently cancel or reopen
-the Task.
+The first successful Cancel closes the segment, increments the session version,
+marks the session cancelled, and returns an empty `time_logs` list. A completed
+or cancelled session cannot be reopened; the user starts a new session. Ending
+Focus never silently marks a linked Task completed, and cancelling Focus does
+not silently cancel or reopen the Task.
 
 ### 11.6 TimeLog Read, Correction, Removal, And Undo
 
-STORY-036 implements only nullable `task_id` input/linkage and the server-owned
+STORY-036 implements nullable `task_id` input/linkage and the server-owned
 `task_title` snapshot on the existing create, batch, mobile-import, and list
-paths. Focus provenance, exact seconds, TimeLog versions, correction, soft
-deletion, revisions, review invalidation, Undo, and mutation idempotency remain
-owned by schema v6/v7 stories below.
+paths. The STORY-037 schema-v6 runtime implements nullable
+`focus_session_id` and canonical `duration_seconds` on TimeLog reads. TimeLog
+versions, correction, soft deletion, revisions, review invalidation, Undo, and
+mutation idempotency remain owned by schema v7.
 
-The existing `TimeLogRead` shape gains nullable `task_id`,
-`focus_session_id`, `task_title`, `duration_seconds`, `deleted_at`, and required
-`version`. Legacy rows are represented with
-`duration_seconds = duration_minutes * 60`, `version = 1`, and null extension
-links.
+In schema v6, the existing `TimeLogRead` shape includes nullable `task_id`,
+`focus_session_id`, `task_title`, and required `duration_seconds`. Legacy rows
+are represented with `duration_seconds = duration_minutes * 60` and null
+extension links. Schema v7 later adds `deleted_at` and required `version`.
 
 After schema v6, `duration_seconds` is positive and canonical.
 `duration_minutes` is a non-negative compatibility and Review value. A
@@ -913,8 +924,10 @@ After their owning migrations:
 
 - `POST /time-logs`, `POST /time-logs/batch`, and mobile import accept optional
   `task_id`;
-- manual and imported writes may accept either `duration_minutes` or
-  `duration_seconds` and the service derives the other representation;
+- schema-v6 manual and imported writes continue accepting
+  `duration_minutes`, with the service deriving exact seconds;
+- schema-v7 manual and imported writes may accept either `duration_minutes` or
+  `duration_seconds` and derive the other representation;
 - `focus_session_id`, `task_title`, user ownership, and snapshot provenance are
   always server-controlled;
 - Task, Activity, and explicit Project links must resolve to one same-user

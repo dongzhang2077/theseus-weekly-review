@@ -10,7 +10,10 @@ EXPECTED_TABLES = {
     "auth_credentials",
     "auth_sessions",
     "daily_reflections",
+    "focus_session_segments",
+    "focus_sessions",
     "goals",
+    "idempotency_receipts",
     "planned_items",
     "projects",
     "tasks",
@@ -53,8 +56,9 @@ def test_schema_rejects_invalid_foreign_keys_and_enums(
         connection.execute(
             """
             INSERT INTO time_logs (
-                user_id, date, duration_minutes, activity_name, activity_type
-            ) VALUES (?, '2026-06-10', 30, 'Invalid type', 'unknown')
+                user_id, date, duration_minutes, duration_seconds,
+                activity_name, activity_type
+            ) VALUES (?, '2026-06-10', 30, 1800, 'Invalid type', 'unknown')
             """,
             (user_id,),
         )
@@ -109,6 +113,14 @@ def test_schema_rejects_cross_user_references(database: Database) -> None:
             ) VALUES (?, ?, 'Second activity', 'consuming')
             """,
             (second, second_project),
+        ).lastrowid
+        first_activity = connection.execute(
+            """
+            INSERT INTO activities (
+                user_id, project_id, name, activity_type
+            ) VALUES (?, ?, 'First activity', 'consuming')
+            """,
+            (first, first_project),
         ).lastrowid
         first_plan = connection.execute(
             """
@@ -175,11 +187,47 @@ def test_schema_rejects_cross_user_references(database: Database) -> None:
         with pytest.raises(sqlite3.IntegrityError):
             connection.execute(
                 """
+                INSERT INTO focus_sessions (
+                    user_id, activity_id, project_id, activity_name,
+                    activity_type, type_source, timezone, started_at,
+                    created_at, updated_at
+                ) VALUES (
+                    ?, ?, ?, 'Cross-user focus', 'consuming',
+                    'user_selected', 'UTC', '2026-06-10T12:00:00Z',
+                    '2026-06-10T12:00:00Z', '2026-06-10T12:00:00Z'
+                )
+                """,
+                (first, second_activity, first_project),
+            )
+
+        focus_session = connection.execute(
+            """
+            INSERT INTO focus_sessions (
+                user_id, activity_id, project_id, activity_name,
+                activity_type, type_source, timezone, started_at,
+                created_at, updated_at
+            ) VALUES (
+                ?, ?, ?, 'First focus', 'consuming',
+                'user_selected', 'UTC', '2026-06-10T12:00:00Z',
+                '2026-06-10T12:00:00Z', '2026-06-10T12:00:00Z'
+            )
+            """,
+            (first, first_activity, first_project),
+        ).lastrowid
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                "UPDATE focus_sessions SET project_id = ? WHERE id = ?",
+                (second_project, focus_session),
+            )
+
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                """
                 INSERT INTO time_logs (
                     user_id, activity_id, project_id, date, duration_minutes,
-                    activity_name, activity_type
+                    duration_seconds, activity_name, activity_type
                 ) VALUES (
-                    ?, ?, ?, '2026-06-10', 30,
+                    ?, ?, ?, '2026-06-10', 30, 1800,
                     'Cross-user log', 'consuming'
                 )
                 """,
@@ -191,9 +239,9 @@ def test_schema_rejects_cross_user_references(database: Database) -> None:
                 """
                 INSERT INTO time_logs (
                     user_id, project_id, task_id, date, duration_minutes,
-                    activity_name, activity_type
+                    duration_seconds, activity_name, activity_type
                 ) VALUES (
-                    ?, ?, ?, '2026-06-10', 30,
+                    ?, ?, ?, '2026-06-10', 30, 1800,
                     'Cross-user task log', 'consuming'
                 )
                 """,

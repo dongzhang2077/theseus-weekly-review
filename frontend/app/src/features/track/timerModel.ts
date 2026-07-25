@@ -56,7 +56,7 @@ export function startActivity(activities: ActivityTimer[], activityId: string): 
   });
 }
 
-export function pauseActivity(activities: ActivityTimer[], activityId: string): ActivityTimer[] {
+export function stopActivity(activities: ActivityTimer[], activityId: string): ActivityTimer[] {
   return activities.map((activity) =>
     activity.id === activityId ? { ...activity, running: false, runSeconds: 0 } : activity
   );
@@ -79,6 +79,9 @@ export function completeActivity(
           sessionSeconds: 0,
           sessionSecondsByDate: undefined,
           runSeconds: 0,
+          focusSessionId: undefined,
+          focusSessionVersion: undefined,
+          focusStartedAt: undefined,
           running: false
         }
       : activity
@@ -110,6 +113,9 @@ export function reconcileFocusActivities(
       sessionSeconds: previous.sessionSeconds,
       sessionSecondsByDate: previous.sessionSecondsByDate,
       runSeconds: previous.runSeconds,
+      focusSessionId: previous.focusSessionId,
+      focusSessionVersion: previous.focusSessionVersion,
+      focusStartedAt: previous.focusStartedAt,
       running: previous.running
     };
   });
@@ -137,9 +143,6 @@ export function chooseFocusActivity(
 
   const running = activities.filter((activity) => activity.running);
   if (running.length > 0) return rankActivities(running)[0];
-
-  const resumable = activities.filter((activity) => activity.sessionSeconds > 0);
-  if (resumable.length > 0) return rankActivities(resumable)[0];
 
   const visible = activities.filter((activity) => !ignored.has(activity.id));
   const candidates = visible.filter((activity) => activity.recommended);

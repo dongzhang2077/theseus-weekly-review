@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import dataclass
 
 from ...schemas import (
+    ActivityType,
+    ActivityTypeSource,
     PlannedItemCreate,
     PlannedItemRead,
     TimeLogCreate,
@@ -11,6 +14,24 @@ from ...schemas import (
     WeeklyPlanRead,
 )
 from ._common import require_row, validate_row
+
+
+@dataclass(frozen=True)
+class FocusTimeLogInsert:
+    focus_session_id: int
+    activity_id: int
+    project_id: int | None
+    task_id: int | None
+    date: str
+    start_time: str
+    end_time: str
+    duration_minutes: int
+    duration_seconds: int
+    activity_name: str
+    activity_type: ActivityType
+    type_source: ActivityTypeSource
+    task_title: str | None
+    note: str = ""
 
 
 class WeeklyPlanRepository:
@@ -152,6 +173,8 @@ class TimeLogRepository:
         values = time_log.model_dump(mode="json")
         values["user_id"] = self.user_id
         values["task_title"] = None
+        values["focus_session_id"] = None
+        values["duration_seconds"] = time_log.duration_minutes * 60
         if time_log.task_id is not None:
             task = self.connection.execute(
                 """
@@ -175,30 +198,39 @@ class TimeLogRepository:
         cursor = self.connection.execute(
             """
             INSERT INTO time_logs (
-                user_id, activity_id, project_id, task_id, date, start_time,
-                end_time, duration_minutes, activity_name, activity_type,
-                type_source, task_title, note
+                user_id, activity_id, project_id, task_id, focus_session_id,
+                date, start_time, end_time, duration_minutes, duration_seconds,
+                activity_name, activity_type, type_source, task_title, note
             ) VALUES (
-                :user_id, :activity_id, :project_id, :task_id, :date, :start_time,
-                :end_time, :duration_minutes, :activity_name, :activity_type,
-                :type_source, :task_title, :note
+                :user_id, :activity_id, :project_id, :task_id,
+                :focus_session_id, :date, :start_time, :end_time,
+                :duration_minutes, :duration_seconds, :activity_name,
+                :activity_type, :type_source, :task_title, :note
             )
             """,
             values,
         )
-        if time_log.project_id is not None:
-            self.connection.execute(
-                """
-                UPDATE projects
-                SET last_activity_date = CASE
-                        WHEN last_activity_date IS NULL OR last_activity_date < :date THEN :date
-                        ELSE last_activity_date
-                    END,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = :project_id AND user_id = :user_id
-                """,
-                values,
+        self._update_project_last_activity(values["project_id"], values["date"])
+        return self.get(cursor.lastrowid)
+
+    def create_from_focus(self, time_log: FocusTimeLogInsert) -> TimeLogRead:
+        values = {**time_log.__dict__, "user_id": self.user_id}
+        cursor = self.connection.execute(
+            """
+            INSERT INTO time_logs (
+                user_id, activity_id, project_id, task_id, focus_session_id,
+                date, start_time, end_time, duration_minutes, duration_seconds,
+                activity_name, activity_type, type_source, task_title, note
+            ) VALUES (
+                :user_id, :activity_id, :project_id, :task_id,
+                :focus_session_id, :date, :start_time, :end_time,
+                :duration_minutes, :duration_seconds, :activity_name,
+                :activity_type, :type_source, :task_title, :note
             )
+            """,
+            values,
+        )
+        self._update_project_last_activity(time_log.project_id, time_log.date)
         return self.get(cursor.lastrowid)
 
     def get(self, time_log_id: int) -> TimeLogRead:
@@ -225,3 +257,28 @@ class TimeLogRepository:
             (self.user_id, start_date, end_date),
         ).fetchall()
         return [validate_row(TimeLogRead, row) for row in rows]
+
+    def _update_project_last_activity(
+        self,
+        project_id: int | None,
+        log_date: str,
+    ) -> None:
+        if project_id is None:
+            return
+        self.connection.execute(
+            """
+            UPDATE projects
+            SET last_activity_date = CASE
+                    WHEN last_activity_date IS NULL OR last_activity_date < :date
+                        THEN :date
+                    ELSE last_activity_date
+                END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :project_id AND user_id = :user_id
+            """,
+            {
+                "project_id": project_id,
+                "user_id": self.user_id,
+                "date": log_date,
+            },
+        )

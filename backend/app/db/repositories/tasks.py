@@ -137,3 +137,15 @@ class TaskRepository:
         if cursor.rowcount != 1:
             return None
         return self.get(task_id, include_archived=True)
+
+    def has_running_focus_session(self, task_id: int) -> bool:
+        row = self.connection.execute(
+            """
+            SELECT 1
+            FROM focus_sessions
+            WHERE user_id = ? AND task_id = ? AND status = 'running'
+            LIMIT 1
+            """,
+            (self.user_id, task_id),
+        ).fetchone()
+        return row is not None

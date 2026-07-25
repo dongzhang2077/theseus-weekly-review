@@ -14,6 +14,18 @@ from .auth_service import (
     InvalidCSRFToken,
     RefreshTokenReuse,
 )
+from .focus import (
+    ActivityAlreadyRunning,
+    FocusReferenceConflict,
+    FocusService,
+    FocusSessionNotFound,
+    FocusVersionConflict,
+    IdempotencyConflict,
+    IdempotencyInProgress,
+    InvalidAccountTimezone,
+    InvalidFocusTransition,
+    TaskNotRunnable,
+)
 from .review_service import ReviewService, WeeklyPlanNotFound
 from .review_writer import (
     OpenCodeGoReviewWriter,
@@ -27,6 +39,7 @@ from .sample_import import SampleImportResult, import_sample_week, load_sample_p
 from .planning import InvalidPlanTaskReference, WeeklyPlanService
 from .tasks import (
     InvalidTaskTransition,
+    TaskInUse,
     TaskNotFound,
     TaskService,
     TaskVersionConflict,
@@ -37,6 +50,7 @@ __all__ = [
     "ActivityNotFound",
     "ActivityService",
     "ActivityVersionConflict",
+    "ActivityAlreadyRunning",
     "AccountLocked",
     "AuthContext",
     "AuthService",
@@ -44,6 +58,14 @@ __all__ = [
     "InvalidAuthToken",
     "InvalidCredentials",
     "InvalidCSRFToken",
+    "FocusReferenceConflict",
+    "FocusService",
+    "FocusSessionNotFound",
+    "FocusVersionConflict",
+    "IdempotencyConflict",
+    "IdempotencyInProgress",
+    "InvalidAccountTimezone",
+    "InvalidFocusTransition",
     "InvalidPlanTaskReference",
     "InvalidTaskTransition",
     "ReviewService",
@@ -54,7 +76,9 @@ __all__ = [
     "SampleImportResult",
     "TemplateSupportiveReviewWriter",
     "TaskNotFound",
+    "TaskInUse",
     "TaskService",
+    "TaskNotRunnable",
     "TaskVersionConflict",
     "WeeklyPlanNotFound",
     "WeeklyPlanService",

@@ -42,6 +42,10 @@ export interface SaveTimeLogResult {
 export interface ApiTimeLogRead extends TimeLogCreatePayload {
   id: number;
   user_id: number;
+  task_id?: number | null;
+  focus_session_id?: number | null;
+  task_title?: string | null;
+  duration_seconds?: number;
   created_at: string;
   updated_at: string;
 }
@@ -197,7 +201,11 @@ export function applyTodayTimeLogs(
   logs: ApiTimeLogRead[],
   date: string
 ): ActivityTimer[] {
-  const todayLogs = logs.filter((log) => log.date === date && log.duration_minutes > 0);
+  const todayLogs = logs.filter(
+    (log) =>
+      log.date === date
+      && (log.duration_seconds ?? log.duration_minutes * 60) > 0
+  );
   const totals = activities.map(() => 0);
   const unmatched: ApiTimeLogRead[] = [];
 
@@ -215,7 +223,7 @@ export function applyTodayTimeLogs(
       unmatched.push(log);
       continue;
     }
-    totals[index] += Math.round(log.duration_minutes * 60);
+    totals[index] += log.duration_seconds ?? Math.round(log.duration_minutes * 60);
   }
 
   const hydrated = activities.map((activity, index) => ({
@@ -232,7 +240,9 @@ export function applyTodayTimeLogs(
         : `name-${log.activity_name}`;
     const existing = groups.get(key);
     if (existing) {
-      existing.todaySeconds += Math.round(log.duration_minutes * 60);
+      existing.todaySeconds += (
+        log.duration_seconds ?? Math.round(log.duration_minutes * 60)
+      );
       continue;
     }
     groups.set(key, {
@@ -244,7 +254,7 @@ export function applyTodayTimeLogs(
       energy: apiActivityTypeToEnergy(log.activity_type),
       color: "#8aa9c0",
       todayDate: date,
-      todaySeconds: Math.round(log.duration_minutes * 60),
+      todaySeconds: log.duration_seconds ?? Math.round(log.duration_minutes * 60),
       sessionSeconds: 0,
       running: false,
       focusContext: {

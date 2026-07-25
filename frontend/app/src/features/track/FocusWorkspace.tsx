@@ -23,19 +23,14 @@ export function FocusWorkspace({
   onToggle,
   onOpenToday
 }: FocusWorkspaceProps) {
-  const hasSession = focus.sessionSeconds > 0;
   const actionLabel = focus.running
     ? "End focus activity"
-    : hasSession
-      ? "Resume focus activity"
-      : "Start focus activity";
+    : "Start focus activity";
   const meta = focus.running
     ? `${focus.category}${runningCount > 1 ? ` · ${runningCount} running` : ""}`
-    : hasSession
-      ? "Paused"
-      : focus.recommended
-        ? "Recommended now"
-        : focus.projectTitle ?? focus.category;
+    : focus.recommended
+      ? "Recommended now"
+      : focus.projectTitle ?? focus.category;
   const softColor = activitySoftColor(focus.color);
   const targetSeconds = targetMinutes === null ? null : targetMinutes * 60;
   const targetDelta = targetSeconds === null ? null : targetSeconds - focus.sessionSeconds;

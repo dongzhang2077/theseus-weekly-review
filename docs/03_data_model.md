@@ -3,12 +3,14 @@
 ## 1. Core Entities
 
 The tree below is the accepted Agent-foundation target. Schema version 5 is the
-current accepted runtime baseline. `Task` and its nullable PlannedItem/TimeLog
-links are implemented and product-owner accepted through STORY-036.
-Authenticated Activity management is implemented and product-owner accepted
-through STORY-033 without a schema-version change. `FocusSession`, `FocusSessionSegment`, and
-the correction/audit extensions remain contracts for later versioned
-migrations; their presence here does not mean the current runtime exposes them.
+durable-Task baseline. `Task` and its nullable
+PlannedItem/TimeLog links are implemented and product-owner accepted through
+STORY-036. Authenticated Activity management is implemented and product-owner
+accepted through STORY-033 without a schema-version change. Schema version 6,
+including `FocusSession`, `FocusSessionSegment`, Focus idempotency, and exact
+TimeLog seconds, is implemented, automatically verified, and product-owner
+accepted through STORY-037 on 2026-07-25. The correction/audit extensions
+remain a schema-v7 contract.
 
 ```text
 Account (users + auth_credentials)
@@ -107,7 +109,6 @@ There is intentionally no unapproved `ai_created` value.
 | Value | Meaning |
 |---|---|
 | `running` | One open segment is accumulating elapsed time. |
-| `paused` | No segment is open; prior accumulated time is retained. |
 | `completed` | The session is immutable and its TimeLogs were created exactly once. |
 | `cancelled` | The session ended without producing TimeLogs. |
 
@@ -285,8 +286,8 @@ state of this week's plan block and does not silently complete a linked Task.
 | type_source | text enum | Classification-source snapshot captured at start |
 | task_title | text | Optional Task-title snapshot captured at start |
 | timezone | text | Valid IANA timezone captured from the account at start |
-| status | text enum | `running`, `paused`, `completed`, or `cancelled` |
-| accumulated_seconds | integer | Closed-segment total; non-negative |
+| status | text enum | `running`, `completed`, or `cancelled` |
+| accumulated_seconds | integer | Final exact duration after End; zero while running |
 | version | integer | Optimistic-concurrency version; begins at 1 |
 | started_at | datetime | UTC start timestamp |
 | completed_at | datetime | UTC completion timestamp |
@@ -300,10 +301,10 @@ Activity with `project_id = NULL` may be used with any same-user Task.
 
 Starting Focus for an `open` Task changes it to `in_progress` in the same
 transaction. Completed, cancelled, or archived Tasks must be explicitly
-reopened or restored first. Finishing or cancelling Focus does not infer Task
+reopened or restored first. Ending or cancelling Focus does not infer Task
 completion or cancellation.
 
-At most one non-terminal FocusSession may exist for the same
+At most one running FocusSession may exist for the same
 `(user_id, activity_id)`. Different Activities may run concurrently, preserving
 the accepted multi-Activity Focus behavior.
 
@@ -314,12 +315,13 @@ the accepted multi-Activity Focus behavior.
 | id | integer pk | Stable segment ID |
 | focus_session_id | integer fk | Required parent; cascades on account deletion |
 | started_at | datetime | UTC instant when running began |
-| ended_at | datetime | UTC instant when paused, completed, or cancelled |
+| ended_at | datetime | UTC instant when ended or cancelled |
 | created_at | datetime | System timestamp |
 
-A running FocusSession has exactly one open segment. Pausing or completing
-closes it; resuming creates another. Segments, rather than wall-clock
-subtraction, make pause/resume and cross-midnight allocation auditable.
+A running FocusSession has exactly one open segment created by Start. End or
+Cancel closes it permanently; v6 exposes no Pause or Resume transition.
+Keeping the immutable interval separate makes server-timestamp provenance,
+cross-midnight allocation, and later audit behavior explicit.
 
 ### idempotency_receipts (accepted for schema v6)
 
@@ -368,7 +370,7 @@ TimeLog mutations do not expire while their target record is retained.
 
 Legacy and minute-only manual TimeLogs use
 `duration_seconds = duration_minutes * 60` when the v6 migration runs. A
-completed FocusSession aggregates its closed segments by the session's captured
+completed FocusSession aggregates its closed segment by the session's captured
 timezone and creates at most one TimeLog per local date. The exact seconds
 remain canonical for timer display. Whole minutes are allocated with a
 deterministic largest-remainder rule so that daily `duration_minutes` values
@@ -445,7 +447,7 @@ payloads are user-owned personal data and cascade on account deletion.
 - Focus timestamps are stored in UTC. Local dates are derived using the valid
   IANA timezone captured at session start, so an account timezone change cannot
   rewrite an in-flight session.
-- Finishing a FocusSession and creating all affected TimeLogs is one
+- Ending a FocusSession and creating all affected TimeLogs is one
   transaction. The session becomes `completed` only when all logs and the
   idempotency receipt are durable.
 - Every TimeLog create, correction, soft deletion, or Undo updates affected
@@ -466,8 +468,9 @@ payloads are user-owned personal data and cascade on account deletion.
 
 ## 5. Accepted Migration Sequence
 
-Version 5 is the product-owner accepted STORY-036 runtime baseline. Versions 6
-and 7 remain accepted contracts rather than current implementation claims:
+Version 5 is the durable-Task baseline. Version 6 is the automatically verified
+and product-owner accepted STORY-037 runtime. Version 7 remains an accepted
+contract rather than a current implementation claim:
 
 | Version | Story | Additive behavior |
 |---|---|---|
@@ -516,21 +519,20 @@ The lifecycle below is the STORY-035 contract proof:
    title and planned-minute snapshot.
 4. Starting Focus validates Task, Activity, and Project ownership, captures
    their names/types and the account timezone, creates a `running`
-   FocusSession, opens its first segment, changes an open Task to
+   FocusSession, opens its one segment, changes an open Task to
    `in_progress`, and completes an idempotency receipt.
-5. Pause closes the open segment. Resume opens another. Replaying either
-   command with its original key returns the original response.
-6. Finish closes the last segment, groups exact elapsed seconds by captured
+5. End closes the open segment, groups exact elapsed seconds by captured
    local date, creates the TimeLogs atomically, updates affected Project
    activity dates, invalidates overlapping stored reviews, marks the session
-   `completed`, and stores the command receipt. A duplicate finish produces no
-   extra TimeLog. Finishing Focus does not silently complete the linked Task.
-7. Review generation reads non-deleted normalized TimeLogs through the existing
+   `completed`, and stores the command receipt. A duplicate End with the same
+   idempotency key returns the original response and produces no extra TimeLog.
+   Ending Focus does not silently complete the linked Task.
+6. Review generation reads non-deleted normalized TimeLogs through the existing
    ReviewService and deterministic `review_engine`.
-8. A user correction creates a TimeLog revision, updates or soft-deletes the
+7. A user correction creates a TimeLog revision, updates or soft-deletes the
    record, recalculates affected Project activity dates, and marks overlapping
    stored WeeklyReviews stale in the same transaction.
-9. Regenerating the WeeklyReview uses the corrected Evidence, preserves the
+8. Regenerating the WeeklyReview uses the corrected Evidence, preserves the
    review ID, and clears `stale_at`.
-10. Undo applies the recorded pre-mutation representation subject to ownership
+9. Undo applies the recorded pre-mutation representation subject to ownership
     and optimistic-version checks and appends another audit revision.

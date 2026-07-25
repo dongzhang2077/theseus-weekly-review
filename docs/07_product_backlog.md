@@ -353,6 +353,11 @@ and decoration-only motion are intentionally excluded. The full frontend suite
 passes 71 tests, the production build passes, production dependency audit is
 clean, and sanitized mobile/desktop screenshots were refreshed.
 
+Supersession note (2026-07-25 PDT): STORY-037 replaces the historical
+pause/resume and result-note interaction below with the accepted two-tap
+Start/End flow. End auto-saves the resulting TimeLogs without a confirmation
+form; Cancel remains recovery-only.
+
 Acceptance criteria:
 
 - Tailwind is integrated through Vite and new styling uses shared `desk-*`
@@ -663,25 +668,33 @@ Acceptance criteria:
 - Task history survives restart and remains distinct from reusable Activities.
 - Migration, API, persistence, sample-review, and frontend tests pass.
 
-### STORY-037 Persist resumable Focus sessions
+### STORY-037 Persist Focus sessions
 
-As a user, I want running and paused Focus state stored under my account so
-that the App and future conversation channels observe and finish the same
-execution without losing or duplicating time.
+As a user, I want running Focus state stored under my account so that the App
+and future conversation channels observe and end the same execution without
+losing or duplicating time.
 
 Priority: P0 for Agent foundation
 
 Acceptance criteria:
 
-- Authenticated start, pause, resume, finish, and cancel transitions are
-  persisted and user-scoped.
+- Authenticated Start, End, and recovery-only Cancel transitions are persisted
+  and user-scoped.
 - Independent multi-Activity sessions remain supported.
-- Server timestamps and stored accumulated duration determine elapsed time.
-- Finishing creates cross-midnight TimeLog segments atomically and exactly
-  once.
+- Server timestamps determine exact elapsed time; browser counters are only a
+  presentation.
+- End automatically creates cross-midnight TimeLog segments atomically and
+  exactly once without a confirmation form.
 - Duplicate commands return the original result rather than double counting.
 - Browser refresh, backend restart, timezone rollover, and account isolation
   have focused tests.
+
+Accepted checkpoint (2026-07-25 PDT): schema v6, authenticated
+Start/End/recovery-only Cancel, user-scoped idempotency, atomic cross-day
+TimeLogs, server-time recovery, multi-Activity frontend integration, and
+supported migration paths are implemented. The full backend/frontend suites,
+production build, compilation, deterministic sample review, and persisted
+sample-to-review path pass. Product-owner browser acceptance passed.
 
 ### STORY-038 Build a bounded Assistant API
 

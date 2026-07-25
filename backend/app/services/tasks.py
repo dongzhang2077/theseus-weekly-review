@@ -15,6 +15,10 @@ class InvalidTaskTransition(Exception):
     pass
 
 
+class TaskInUse(Exception):
+    pass
+
+
 class TaskVersionConflict(Exception):
     def __init__(self, current: TaskRead) -> None:
         super().__init__("The task changed after it was loaded")
@@ -86,6 +90,8 @@ class TaskService:
                     updates["completed_at"] = None
 
         if "archived" in patch.model_fields_set:
+            if patch.archived and self.repository.has_running_focus_session(task_id):
+                raise TaskInUse
             updates["archived_at"] = (
                 _utc_now() if patch.archived and current.archived_at is None else None
             ) if patch.archived is not None else current.archived_at
