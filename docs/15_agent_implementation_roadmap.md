@@ -504,15 +504,17 @@ product-owner accepted on `feature/036-durable-tasks`. STORY-033 is implemented,
 automatically verified, and product-owner accepted on
 `feature/033-persisted-activities` after browser, stable-ID TimeLog linkage,
 and backend-restart verification on 2026-07-25 PDT. STORY-037's two-tap
-contract is accepted; its schema-v6 runtime is implemented and automatically
-verified on `feature/037-persisted-focus-sessions`, with browser acceptance and
-merge pending.
+contract and schema-v6 runtime are implemented, automatically verified, and
+product-owner accepted after browser verification on 2026-07-25 PDT.
 
-Next acceptance request:
+Completed STORY-037 acceptance evidence:
 
 1. Start one Activity in the authenticated app and observe its running state;
 2. restart the browser and backend and observe the same running Session;
 3. End it by tapping the Activity again and confirm the UI opens no result
    form;
 4. confirm Today total and the stable-ID TimeLog survive another reload;
-5. accept or revise STORY-037 before Today-history correction work.
+5. product-owner acceptance recorded on 2026-07-25 PDT.
+
+Next sequential gate: STORY-034 correctable Today history, audit revisions,
+and affected WeeklyReview invalidation.

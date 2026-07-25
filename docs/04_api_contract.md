@@ -10,10 +10,9 @@ Contract status:
   authenticated Activity create, list, detail, and optimistic correction on
   its product-owner accepted branch. STORY-037 implements the Section 11.5
   FocusSession routes, Focus idempotency receipts, and the schema-v6 exact-time
-  read fields on `feature/037-persisted-focus-sessions`. That implementation
-  has passed automated verification but remains a candidate until the
-  product-owner browser gate and merge. TimeLog correction, deletion, Undo,
-  and their mutation-idempotency routes remain unavailable.
+  read fields. That implementation passed automated verification and the
+  product-owner browser gate on 2026-07-25. TimeLog correction, deletion,
+  Undo, and their mutation-idempotency routes remain unavailable.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -553,8 +552,8 @@ Current implementation status: STORY-036 Task routes, Plan Task links, and
 TimeLog Task links are implemented, verified, and product-owner accepted on
 the schema-v5 runtime baseline. STORY-033 Activity routes are also
 product-owner accepted. Section 11.5 and the schema-v6 Focus provenance/exact
-seconds subset of Section 11.6 are implemented and automatically verified on
-the STORY-037 candidate branch; browser acceptance and merge are pending.
+seconds subset of Section 11.6 are implemented, automatically verified, and
+product-owner accepted through STORY-037.
 TimeLog correction, removal, revision, and Undo remain future runtime
 contracts.
 
@@ -779,10 +778,9 @@ Existing requests without `task_id` retain their pre-v5 behavior.
 
 ### 11.5 Focus Sessions
 
-Implementation status: STORY-037 implementation candidate on
-`feature/037-persisted-focus-sessions`; backend, frontend, migration,
-production-build, and persisted-review verification pass. Product-owner
-browser acceptance and merge remain pending.
+Implementation status: STORY-037 is implemented and product-owner accepted.
+Backend, frontend, migration, production-build, persisted-review, and browser
+verification pass.
 
 FocusSession is the durable live timer boundary. It is intentionally distinct
 from `auth_sessions`.
@@ -907,7 +905,7 @@ not silently cancel or reopen the Task.
 
 STORY-036 implements nullable `task_id` input/linkage and the server-owned
 `task_title` snapshot on the existing create, batch, mobile-import, and list
-paths. The STORY-037 schema-v6 candidate implements nullable
+paths. The STORY-037 schema-v6 runtime implements nullable
 `focus_session_id` and canonical `duration_seconds` on TimeLog reads. TimeLog
 versions, correction, soft deletion, revisions, review invalidation, Undo, and
 mutation idempotency remain owned by schema v7.

@@ -3,15 +3,14 @@
 ## 1. Core Entities
 
 The tree below is the accepted Agent-foundation target. Schema version 5 is the
-current accepted `main` runtime baseline. `Task` and its nullable
+durable-Task baseline. `Task` and its nullable
 PlannedItem/TimeLog links are implemented and product-owner accepted through
 STORY-036. Authenticated Activity management is implemented and product-owner
 accepted through STORY-033 without a schema-version change. Schema version 6,
 including `FocusSession`, `FocusSessionSegment`, Focus idempotency, and exact
-TimeLog seconds, is implemented and automatically verified on
-`feature/037-persisted-focus-sessions`; it remains an implementation candidate
-until the product-owner browser gate and merge. The correction/audit
-extensions remain a schema-v7 contract.
+TimeLog seconds, is implemented, automatically verified, and product-owner
+accepted through STORY-037 on 2026-07-25. The correction/audit extensions
+remain a schema-v7 contract.
 
 ```text
 Account (users + auth_credentials)
@@ -469,10 +468,9 @@ payloads are user-owned personal data and cascade on account deletion.
 
 ## 5. Accepted Migration Sequence
 
-Version 5 is the product-owner accepted `main` runtime baseline. Version 6 is
-an automatically verified STORY-037 implementation candidate awaiting browser
-acceptance and merge. Version 7 remains an accepted contract rather than a
-current implementation claim:
+Version 5 is the durable-Task baseline. Version 6 is the automatically verified
+and product-owner accepted STORY-037 runtime. Version 7 remains an accepted
+contract rather than a current implementation claim:
 
 | Version | Story | Additive behavior |
 |---|---|---|
