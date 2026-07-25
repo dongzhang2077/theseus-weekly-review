@@ -579,6 +579,16 @@ cross-account, and restart-safe persistence tests pass. Product-owner
 acceptance passed. STORY-025C Pending/History/Memory control surfaces are the
 next sequential gate.
 
+STORY-025C candidate checkpoint (2026-07-25 PDT): an authenticated Assistant
+control surface is available from Account without adding a fifth primary tab.
+It separates the summary, Pending/History/Memory lists, and full-screen detail
+layers; supports proposal review, structured edit-and-approve, rejection,
+preference creation/correction, soft deletion, deleted filtering, restore,
+and explicit loading/error/empty/conflict states. Tags remain single-line and
+the implementation adds no custom CSS or raw JSON editor. Focused interaction
+tests, the full 138-test frontend suite, type checking, and production build
+pass. Product-owner browser acceptance remains open.
+
 ### STORY-026 Pilot one LangGraph weekly-adjustment workflow
 
 As a user, I want an approved review-to-plan workflow that can pause and resume

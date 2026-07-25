@@ -533,6 +533,8 @@ and product-owner accepted on `feature/025-trust-ledger` on 2026-07-25 PDT.
 Arbitrary action execution remains private until the bounded Assistant API.
 
 Current sequential gate: STORY-025C compact authenticated Pending, History,
-and Memory control surfaces. The interface remains outside the four primary
-bottom-navigation tabs and must expose explicit loading, empty, error,
-approval, correction, deletion, and restore states before browser acceptance.
+and Memory control surfaces. The automatically verified candidate is available
+from Account and remains outside the four primary bottom-navigation tabs. It
+exposes summary/list/detail information layers plus explicit loading, empty,
+error, approval, correction, deletion, and restore states. Product-owner
+browser acceptance remains open.
