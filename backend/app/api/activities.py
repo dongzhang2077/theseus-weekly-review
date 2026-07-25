@@ -72,7 +72,7 @@ async def update_activity(
             status_code=status.HTTP_409_CONFLICT,
             detail={
                 "code": "activity_in_use",
-                "message": "Pause or finish this activity before changing its Project",
+                "message": "End this activity before changing its Project",
             },
         ) from exc
     except ActivityVersionConflict as exc:

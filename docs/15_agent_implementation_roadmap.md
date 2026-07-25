@@ -503,14 +503,16 @@ owner on 2026-07-22. STORY-036 is implemented, automatically verified, and
 product-owner accepted on `feature/036-durable-tasks`. STORY-033 is implemented,
 automatically verified, and product-owner accepted on
 `feature/033-persisted-activities` after browser, stable-ID TimeLog linkage,
-and backend-restart verification on 2026-07-25 PDT.
+and backend-restart verification on 2026-07-25 PDT. STORY-037's two-tap
+contract is accepted; its schema-v6 runtime is implemented and automatically
+verified on `feature/037-persisted-focus-sessions`, with browser acceptance and
+merge pending.
 
 Next acceptance request:
 
-1. reconcile STORY-037's public commands with the accepted two-tap Start/End
-   interaction before schema-v6 implementation;
-2. persist one running FocusSession under the authenticated account;
-3. restart the browser and backend and observe the same running Session;
-4. End once and atomically create the correct stable-ID TimeLog segments;
-5. replay End and confirm it does not double count;
-6. accept or revise STORY-037 before Today-history correction work.
+1. Start one Activity in the authenticated app and observe its running state;
+2. restart the browser and backend and observe the same running Session;
+3. End it by tapping the Activity again and confirm the UI opens no result
+   form;
+4. confirm Today total and the stable-ID TimeLog survive another reload;
+5. accept or revise STORY-037 before Today-history correction work.

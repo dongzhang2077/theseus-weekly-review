@@ -689,6 +689,15 @@ Acceptance criteria:
 - Browser refresh, backend restart, timezone rollover, and account isolation
   have focused tests.
 
+Implementation candidate checkpoint (2026-07-25 PDT): schema v6, authenticated
+Start/End/recovery-only Cancel, user-scoped idempotency, atomic cross-day
+TimeLogs, server-time recovery, multi-Activity frontend integration, and
+supported migration paths are implemented on
+`feature/037-persisted-focus-sessions`. The full backend/frontend suites,
+production build, compilation, deterministic sample review, and persisted
+sample-to-review path pass. Product-owner browser acceptance and merge remain
+the story gate.
+
 ### STORY-038 Build a bounded Assistant API
 
 As a user, I want language requests to use typed, evidence-backed operations so

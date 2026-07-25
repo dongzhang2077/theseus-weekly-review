@@ -235,9 +235,11 @@ Current status: implemented.
 sample_week.json -> SQLite -> review_engine -> stored weekly_review
 ```
 
-Current status: implemented with SQLite schema version 5, atomic version
+Current accepted `main` status: SQLite schema version 5, atomic version
 1-through-4 migration paths, formal account ownership, user-scoped
-repositories, and restart-path tests.
+repositories, and restart-path tests. The STORY-037 branch adds an
+automatically verified schema-v6 migration candidate from every supported
+prior version; product-owner browser acceptance and merge are pending.
 
 ### Stage C: Web Input
 
@@ -277,11 +279,12 @@ Task + Activity
   -> correctable Evidence
 ```
 
-Accepted contract status: STORY-035. Runtime status: schema v5 durable Tasks
-and nullable Task references are implemented and product-owner accepted
-through STORY-036. Authenticated durable Activity management is implemented,
-verified, and product-owner accepted through STORY-033; durable
-FocusSession state and later correction steps remain unavailable.
+Accepted contract status: STORY-035. Accepted `main` runtime status: schema-v5
+durable Tasks and nullable Task references through STORY-036, plus
+authenticated durable Activity management through STORY-033. STORY-037 now
+has an automatically verified schema-v6 implementation candidate for durable
+FocusSession state and exactly-once TimeLog production. Browser acceptance and
+merge remain pending; later correction steps remain unavailable.
 
 Implementation sequence:
 

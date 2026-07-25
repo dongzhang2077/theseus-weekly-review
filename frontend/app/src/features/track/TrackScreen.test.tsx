@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FetchLike } from "../../shared/api/loadAppWeek";
@@ -60,6 +60,46 @@ describe("TrackScreen", () => {
     expect(screen.getAllByRole("button", { name: "End focus activity" })).toHaveLength(3);
   });
 
+  it("starts a durable FocusSession before showing the Activity as running", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
+      response(true, 201, runningFocusSession())
+    );
+    const track: AppWeekViewModel["track"] = {
+      activities: demoWeek.track.activities.map((activity, index) =>
+        index === 0
+          ? {
+              ...activity,
+              activityId: 7,
+              activityVersion: 1
+            }
+          : activity
+      )
+    };
+    render(
+      <TrackScreen
+        apiBaseUrl="http://127.0.0.1:8000"
+        fetchImpl={fetchImpl}
+        track={track}
+      />
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Start focus activity" })[0]);
+
+    expect(await screen.findAllByRole("button", { name: "End focus activity" })).toHaveLength(3);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls[0][0]).toBe(
+      "http://127.0.0.1:8000/focus-sessions"
+    );
+    expect(JSON.parse(String(fetchImpl.mock.calls[0][1]?.body))).toEqual({
+      activity_id: 7
+    });
+    expect(fetchImpl.mock.calls[0][1]?.headers).toMatchObject({
+      "Content-Type": "application/json",
+      "Idempotency-Key": expect.stringMatching(/^focus-start-/)
+    });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
   it("runs multiple activities independently and ends the selected session on its next tap", () => {
     vi.useFakeTimers();
     render(<TrackScreen track={demoWeek.track} />);
@@ -86,7 +126,7 @@ describe("TrackScreen", () => {
     act(() => vi.advanceTimersByTime(2_000));
     fireEvent.click(within(chooser).getByRole("button", { name: "End Backend polish" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Session kept in this demo");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
     const reopenedChooser = screen.getByRole("dialog", { name: "Today" });
@@ -321,7 +361,7 @@ describe("TrackScreen", () => {
     endCurrentFocus();
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Session kept in this demo");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByText("00:00:00")).toBeInTheDocument();
     expect(onResultModalChange).not.toHaveBeenCalledWith(true);
   });
@@ -330,7 +370,7 @@ describe("TrackScreen", () => {
     const fetchImpl = vi
       .fn<FetchLike>()
       .mockResolvedValueOnce(response(false, 503))
-      .mockResolvedValueOnce(response(true, 201));
+      .mockResolvedValueOnce(response(true, 200, focusCommandResponse()));
     render(
       <TrackScreen
         apiBaseUrl="http://127.0.0.1:8000"
@@ -348,9 +388,14 @@ describe("TrackScreen", () => {
 
     fireEvent.click(within(result).getByRole("button", { name: "Retry" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Session recorded");
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Save failed" })).not.toBeInTheDocument();
+    });
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(screen.queryByRole("dialog", { name: "Save failed" })).not.toBeInTheDocument();
+    expect(fetchImpl.mock.calls[0][1]?.headers).toEqual(
+      fetchImpl.mock.calls[1][1]?.headers
+    );
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("posts once when the end control is clicked twice during an automatic save", async () => {
@@ -377,19 +422,60 @@ describe("TrackScreen", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     await act(async () => {
-      resolveFetch?.(response(true, 201));
+      resolveFetch?.(response(true, 200, focusCommandResponse()));
       await Promise.resolve();
     });
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Session recorded");
+    await waitFor(() => {
+      expect(screen.getByText("00:00:00")).toBeInTheDocument();
+    });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("saves a cross-day accumulated session through one batch request", async () => {
+  it("delegates cross-day persistence to one atomic End command", async () => {
     const calls: Array<{ input: string; init?: RequestInit }> = [];
     const fetchImpl: FetchLike = async (input, init) => {
       calls.push({ input, init });
-      return response(true, 201);
+      return response(
+        true,
+        200,
+        focusCommandResponse(120, [
+          {
+            id: 71,
+            user_id: 1,
+            activity_id: 7,
+            project_id: null,
+            task_id: null,
+            focus_session_id: 31,
+            date: "2026-07-18",
+            duration_minutes: 1,
+            duration_seconds: 60,
+            activity_name: "Frontend build block",
+            activity_type: "consuming",
+            type_source: "user_selected",
+            note: "",
+            created_at: "2026-07-19T07:01:00Z",
+            updated_at: "2026-07-19T07:01:00Z"
+          },
+          {
+            id: 72,
+            user_id: 1,
+            activity_id: 7,
+            project_id: null,
+            task_id: null,
+            focus_session_id: 31,
+            date: "2026-07-19",
+            duration_minutes: 1,
+            duration_seconds: 60,
+            activity_name: "Frontend build block",
+            activity_type: "consuming",
+            type_source: "user_selected",
+            note: "",
+            created_at: "2026-07-19T07:01:00Z",
+            updated_at: "2026-07-19T07:01:00Z"
+          }
+        ])
+      );
     };
     const track: AppWeekViewModel["track"] = {
       activities: demoWeek.track.activities.map((activity, index) =>
@@ -403,6 +489,9 @@ describe("TrackScreen", () => {
                 "2026-07-18": 60,
                 "2026-07-19": 60
               },
+              activityId: 7,
+              focusSessionId: 31,
+              focusSessionVersion: 1,
               running: true
             }
           : { ...activity, todayDate: "2026-07-19", todaySeconds: 0 }
@@ -421,14 +510,16 @@ describe("TrackScreen", () => {
 
     endCurrentFocus();
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Session recorded");
+    await waitFor(() => {
+      expect(calls).toHaveLength(1);
+    });
     expect(calls).toHaveLength(1);
-    expect(calls[0].input).toBe("http://127.0.0.1:8000/time-logs/batch");
+    expect(calls[0].input).toBe(
+      "http://127.0.0.1:8000/focus-sessions/31/commands"
+    );
     expect(JSON.parse(String(calls[0].init?.body))).toEqual({
-      time_logs: [
-        expect.objectContaining({ date: "2026-07-18", duration_minutes: 1 }),
-        expect.objectContaining({ date: "2026-07-19", duration_minutes: 1 })
-      ]
+      command: "end",
+      expected_version: 1
     });
     expect(screen.getByText("00:00:00")).toBeInTheDocument();
   });
@@ -450,6 +541,9 @@ function trackWithSession(): AppWeekViewModel["track"] {
       index === 0
         ? {
               ...activity,
+              activityId: 7,
+              focusSessionId: 31,
+              focusSessionVersion: 1,
               sessionSeconds: 61,
               running: true
           }
@@ -463,6 +557,62 @@ function response(ok: boolean, status: number, payload: unknown = {}) {
     ok,
     status,
     json: async () => payload
+  };
+}
+
+function focusCommandResponse(
+  accumulatedSeconds = 61,
+  timeLogs: unknown[] = []
+) {
+  return {
+    session: {
+      id: 31,
+      user_id: 1,
+      activity_id: 7,
+      task_id: null,
+      project_id: null,
+      activity_name: "Frontend build block",
+      activity_type: "consuming",
+      type_source: "user_selected",
+      task_title: null,
+      timezone: "America/Los_Angeles",
+      status: "completed",
+      accumulated_seconds: accumulatedSeconds,
+      current_run_started_at: null,
+      elapsed_seconds: accumulatedSeconds,
+      version: 2,
+      started_at: "2026-07-25T18:00:00Z",
+      completed_at: "2026-07-25T18:01:01Z",
+      cancelled_at: null,
+      created_at: "2026-07-25T18:00:00Z",
+      updated_at: "2026-07-25T18:01:01Z"
+    },
+    time_logs: timeLogs
+  };
+}
+
+function runningFocusSession() {
+  return {
+    id: 31,
+    user_id: 1,
+    activity_id: 7,
+    task_id: null,
+    project_id: null,
+    activity_name: "Frontend build block",
+    activity_type: "consuming",
+    type_source: "user_selected",
+    task_title: null,
+    timezone: "America/Los_Angeles",
+    status: "running",
+    accumulated_seconds: 0,
+    current_run_started_at: "2026-07-25T18:00:00Z",
+    elapsed_seconds: 0,
+    version: 1,
+    started_at: "2026-07-25T18:00:00Z",
+    completed_at: null,
+    cancelled_at: null,
+    created_at: "2026-07-25T18:00:00Z",
+    updated_at: "2026-07-25T18:00:00Z"
   };
 }
 

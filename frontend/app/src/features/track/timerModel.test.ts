@@ -7,7 +7,7 @@ import {
   formatCompactClock,
   formatLiveClock,
   nextFocusActivityId,
-  pauseActivity,
+  stopActivity,
   reconcileFocusActivities,
   startActivity,
   tickActivities,
@@ -53,8 +53,8 @@ describe("timerModel", () => {
   it("starts and accumulates multiple activities independently", () => {
     const bothRunning = startActivity(startActivity(activities, "build"), "walk");
     const ticked = tickActivitiesByDate(bothRunning, { "2026-07-18": 75 });
-    const pausedWalk = pauseActivity(ticked, "walk");
-    const tickedAgain = tickActivitiesByDate(pausedWalk, { "2026-07-18": 15 });
+    const stoppedWalk = stopActivity(ticked, "walk");
+    const tickedAgain = tickActivitiesByDate(stoppedWalk, { "2026-07-18": 15 });
 
     expect(tickedAgain[0]).toMatchObject({ running: true, sessionSeconds: 90, runSeconds: 90 });
     expect(tickedAgain[1]).toMatchObject({ running: false, sessionSeconds: 75, runSeconds: 0 });
@@ -62,28 +62,23 @@ describe("timerModel", () => {
     expect(tickedAgain[1].sessionSecondsByDate).toEqual({ "2026-07-18": 75 });
   });
 
-  it("supports pause and completion as separate session states", () => {
+  it("stops display ticks before committing a completed session", () => {
     const started = startActivity(activities, "build");
     const ticked = tickActivities(started, 75);
-    const paused = pauseActivity(ticked, "build");
-    expect(paused[0]).toMatchObject({
+    const stopped = stopActivity(ticked, "build");
+    expect(stopped[0]).toMatchObject({
       running: false,
       sessionSeconds: 75,
       runSeconds: 0,
       todaySeconds: 1200
     });
 
-    const resumed = startActivity(paused, "build");
-    expect(resumed[0]).toMatchObject({ running: true, sessionSeconds: 75, runSeconds: 0 });
-    const resumedTick = tickActivities(resumed, 5);
-    expect(resumedTick[0]).toMatchObject({ running: true, sessionSeconds: 80, runSeconds: 5 });
-
-    const completed = completeActivity(resumedTick, "build");
+    const completed = completeActivity(stopped, "build");
     expect(completed[0]).toMatchObject({
       running: false,
       sessionSeconds: 0,
       runSeconds: 0,
-      todaySeconds: 1280
+      todaySeconds: 1275
     });
   });
 

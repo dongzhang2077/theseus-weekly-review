@@ -123,16 +123,94 @@ CREATE TABLE IF NOT EXISTS planned_items (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS focus_sessions (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    activity_id INTEGER NOT NULL REFERENCES activities(id),
+    task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+    project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+    activity_name TEXT NOT NULL CHECK (length(trim(activity_name)) > 0),
+    activity_type TEXT NOT NULL
+        CHECK (activity_type IN ('consuming', 'neutral', 'restore', 'destroy')),
+    type_source TEXT NOT NULL
+        CHECK (type_source IN ('user_selected', 'ai_suggested', 'user_corrected')),
+    task_title TEXT,
+    timezone TEXT NOT NULL CHECK (length(trim(timezone)) > 0),
+    status TEXT NOT NULL DEFAULT 'running'
+        CHECK (status IN ('running', 'completed', 'cancelled')),
+    accumulated_seconds INTEGER NOT NULL DEFAULT 0
+        CHECK (accumulated_seconds >= 0),
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    cancelled_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    CHECK (
+        (
+            status = 'running'
+            AND accumulated_seconds = 0
+            AND completed_at IS NULL
+            AND cancelled_at IS NULL
+        )
+        OR (
+            status = 'completed'
+            AND accumulated_seconds > 0
+            AND completed_at IS NOT NULL
+            AND cancelled_at IS NULL
+        )
+        OR (
+            status = 'cancelled'
+            AND accumulated_seconds = 0
+            AND completed_at IS NULL
+            AND cancelled_at IS NOT NULL
+        )
+    )
+);
+
+CREATE TABLE IF NOT EXISTS focus_session_segments (
+    id INTEGER PRIMARY KEY,
+    focus_session_id INTEGER NOT NULL
+        REFERENCES focus_sessions(id) ON DELETE CASCADE,
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    created_at TEXT NOT NULL,
+    CHECK (ended_at IS NULL OR ended_at >= started_at)
+);
+
+CREATE TABLE IF NOT EXISTS idempotency_receipts (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    idempotency_key TEXT NOT NULL CHECK (length(trim(idempotency_key)) > 0),
+    operation TEXT NOT NULL CHECK (length(trim(operation)) > 0),
+    request_hash TEXT NOT NULL CHECK (length(request_hash) = 64),
+    status TEXT NOT NULL
+        CHECK (status IN ('in_progress', 'completed', 'failed')),
+    response_status INTEGER,
+    response_json TEXT CHECK (
+        response_json IS NULL OR json_valid(response_json)
+    ),
+    created_at TEXT NOT NULL,
+    expires_at TEXT,
+    UNIQUE (user_id, idempotency_key),
+    CHECK (
+        status != 'completed'
+        OR (response_status IS NOT NULL AND response_json IS NOT NULL)
+    )
+);
+
 CREATE TABLE IF NOT EXISTS time_logs (
     id INTEGER PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     activity_id INTEGER REFERENCES activities(id) ON DELETE SET NULL,
     project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
     task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+    focus_session_id INTEGER REFERENCES focus_sessions(id) ON DELETE SET NULL,
     date TEXT NOT NULL,
     start_time TEXT,
     end_time TEXT,
-    duration_minutes INTEGER NOT NULL CHECK (duration_minutes > 0),
+    duration_minutes INTEGER NOT NULL CHECK (duration_minutes >= 0),
+    duration_seconds INTEGER NOT NULL CHECK (duration_seconds > 0),
     activity_name TEXT NOT NULL CHECK (length(trim(activity_name)) > 0),
     activity_type TEXT NOT NULL CHECK (activity_type IN ('consuming', 'neutral', 'restore', 'destroy')),
     type_source TEXT NOT NULL DEFAULT 'user_selected' CHECK (type_source IN ('user_selected', 'ai_suggested', 'user_corrected')),
@@ -190,10 +268,27 @@ CREATE INDEX IF NOT EXISTS idx_weekly_plans_dates ON weekly_plans(user_id, week_
 CREATE INDEX IF NOT EXISTS idx_planned_items_plan_id ON planned_items(weekly_plan_id);
 CREATE INDEX IF NOT EXISTS idx_planned_items_project_id ON planned_items(project_id);
 CREATE INDEX IF NOT EXISTS idx_planned_items_task_id ON planned_items(task_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_focus_sessions_running_activity
+ON focus_sessions(user_id, activity_id)
+WHERE status = 'running';
+CREATE INDEX IF NOT EXISTS idx_focus_sessions_user_status
+ON focus_sessions(user_id, status, started_at, id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_focus_segments_open
+ON focus_session_segments(focus_session_id)
+WHERE ended_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_focus_segments_session
+ON focus_session_segments(focus_session_id, started_at, id);
+CREATE INDEX IF NOT EXISTS idx_idempotency_receipts_user
+ON idempotency_receipts(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_time_logs_date ON time_logs(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_time_logs_project_id ON time_logs(project_id);
 CREATE INDEX IF NOT EXISTS idx_time_logs_activity_id ON time_logs(activity_id);
 CREATE INDEX IF NOT EXISTS idx_time_logs_task_id ON time_logs(task_id);
+CREATE INDEX IF NOT EXISTS idx_time_logs_focus_session_id
+ON time_logs(focus_session_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_time_logs_focus_session_date
+ON time_logs(focus_session_id, date)
+WHERE focus_session_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_time_logs_activity_type ON time_logs(user_id, activity_type);
 CREATE INDEX IF NOT EXISTS idx_daily_reflections_date ON daily_reflections(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_weekly_reviews_dates ON weekly_reviews(user_id, week_start, week_end);
@@ -320,6 +415,110 @@ BEGIN
     SELECT RAISE(ABORT, 'planned item task must match the plan user and project');
 END;
 
+CREATE TRIGGER IF NOT EXISTS focus_sessions_activity_same_user_insert
+BEFORE INSERT ON focus_sessions
+WHEN NOT EXISTS (
+    SELECT 1 FROM activities
+    WHERE id = NEW.activity_id AND user_id = NEW.user_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'focus activity must belong to the same user');
+END;
+
+CREATE TRIGGER IF NOT EXISTS focus_sessions_activity_same_user_update
+BEFORE UPDATE OF activity_id, user_id ON focus_sessions
+WHEN NOT EXISTS (
+    SELECT 1 FROM activities
+    WHERE id = NEW.activity_id AND user_id = NEW.user_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'focus activity must belong to the same user');
+END;
+
+CREATE TRIGGER IF NOT EXISTS focus_sessions_project_same_user_insert
+BEFORE INSERT ON focus_sessions
+WHEN NEW.project_id IS NOT NULL
+     AND NOT EXISTS (
+         SELECT 1 FROM projects
+         WHERE id = NEW.project_id AND user_id = NEW.user_id
+     )
+BEGIN
+    SELECT RAISE(ABORT, 'focus project must belong to the same user');
+END;
+
+CREATE TRIGGER IF NOT EXISTS focus_sessions_project_same_user_update
+BEFORE UPDATE OF project_id, user_id ON focus_sessions
+WHEN NEW.project_id IS NOT NULL
+     AND NOT EXISTS (
+         SELECT 1 FROM projects
+         WHERE id = NEW.project_id AND user_id = NEW.user_id
+     )
+BEGIN
+    SELECT RAISE(ABORT, 'focus project must belong to the same user');
+END;
+
+CREATE TRIGGER IF NOT EXISTS focus_sessions_task_same_user_insert
+BEFORE INSERT ON focus_sessions
+WHEN NEW.task_id IS NOT NULL
+     AND NOT EXISTS (
+         SELECT 1
+         FROM tasks AS task
+         JOIN activities AS activity ON activity.id = NEW.activity_id
+         WHERE task.id = NEW.task_id
+           AND task.user_id = NEW.user_id
+           AND task.project_id = NEW.project_id
+           AND activity.user_id = NEW.user_id
+           AND (activity.project_id IS NULL OR activity.project_id = task.project_id)
+     )
+BEGIN
+    SELECT RAISE(ABORT, 'focus task must match the same user and project');
+END;
+
+CREATE TRIGGER IF NOT EXISTS focus_sessions_task_same_user_update
+BEFORE UPDATE OF task_id, project_id, activity_id, user_id ON focus_sessions
+WHEN NEW.task_id IS NOT NULL
+     AND NOT EXISTS (
+         SELECT 1
+         FROM tasks AS task
+         JOIN activities AS activity ON activity.id = NEW.activity_id
+         WHERE task.id = NEW.task_id
+           AND task.user_id = NEW.user_id
+           AND task.project_id = NEW.project_id
+           AND activity.user_id = NEW.user_id
+           AND (activity.project_id IS NULL OR activity.project_id = task.project_id)
+     )
+BEGIN
+    SELECT RAISE(ABORT, 'focus task must match the same user and project');
+END;
+
+CREATE TRIGGER IF NOT EXISTS focus_sessions_activity_project_insert
+BEFORE INSERT ON focus_sessions
+WHEN NEW.task_id IS NULL
+     AND NOT EXISTS (
+         SELECT 1
+         FROM activities
+         WHERE id = NEW.activity_id
+           AND user_id = NEW.user_id
+           AND project_id IS NEW.project_id
+     )
+BEGIN
+    SELECT RAISE(ABORT, 'focus project must match the activity project');
+END;
+
+CREATE TRIGGER IF NOT EXISTS focus_sessions_activity_project_update
+BEFORE UPDATE OF task_id, project_id, activity_id, user_id ON focus_sessions
+WHEN NEW.task_id IS NULL
+     AND NOT EXISTS (
+         SELECT 1
+         FROM activities
+         WHERE id = NEW.activity_id
+           AND user_id = NEW.user_id
+           AND project_id IS NEW.project_id
+     )
+BEGIN
+    SELECT RAISE(ABORT, 'focus project must match the activity project');
+END;
+
 CREATE TRIGGER IF NOT EXISTS time_logs_project_same_user_insert
 BEFORE INSERT ON time_logs
 WHEN NEW.project_id IS NOT NULL
@@ -390,4 +589,37 @@ BEGIN
     SELECT RAISE(ABORT, 'time log activity must belong to the same user');
 END;
 
-PRAGMA user_version = 5;
+CREATE TRIGGER IF NOT EXISTS time_logs_focus_same_user_insert
+BEFORE INSERT ON time_logs
+WHEN NEW.focus_session_id IS NOT NULL
+     AND NOT EXISTS (
+         SELECT 1
+         FROM focus_sessions
+         WHERE id = NEW.focus_session_id
+           AND user_id = NEW.user_id
+           AND activity_id IS NEW.activity_id
+           AND task_id IS NEW.task_id
+           AND project_id IS NEW.project_id
+     )
+BEGIN
+    SELECT RAISE(ABORT, 'time log focus provenance must match the same user');
+END;
+
+CREATE TRIGGER IF NOT EXISTS time_logs_focus_same_user_update
+BEFORE UPDATE OF focus_session_id, user_id, activity_id, task_id, project_id
+ON time_logs
+WHEN NEW.focus_session_id IS NOT NULL
+     AND NOT EXISTS (
+         SELECT 1
+         FROM focus_sessions
+         WHERE id = NEW.focus_session_id
+           AND user_id = NEW.user_id
+           AND activity_id IS NEW.activity_id
+           AND task_id IS NEW.task_id
+           AND project_id IS NEW.project_id
+     )
+BEGIN
+    SELECT RAISE(ABORT, 'time log focus provenance must match the same user');
+END;
+
+PRAGMA user_version = 6;

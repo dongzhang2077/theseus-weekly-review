@@ -364,8 +364,10 @@ roadmap and the STORY-035 authoritative Task/Activity/Plan/Focus/TimeLog
 contract with its v5-v7 migration sequence. STORY-036 passed its runtime
 implementation and product-owner browser gate on 2026-07-22 PDT. STORY-033
 passed browser, stable-ID TimeLog linkage, and backend-restart acceptance on
-2026-07-25 PDT. STORY-037 is the next sequential gate; its public transition
-contract must first match the accepted two-tap Start/End UX.
+2026-07-25 PDT. STORY-037's two-tap Start/End contract is accepted, and its
+schema-v6 runtime implementation is now an automatically verified local
+candidate. Product-owner browser acceptance and merge are the next sequential
+gate.
 
 Exit gate:
 

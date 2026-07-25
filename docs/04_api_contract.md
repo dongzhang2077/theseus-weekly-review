@@ -2,15 +2,18 @@
 
 Contract status:
 
-- Sections 1-9 describe the implemented schema-v5 HTTP surface.
+- Sections 1-9 describe the product-owner accepted schema-v5 HTTP surface.
 - Section 10 remains a planned evaluation endpoint.
 - Section 11 is the accepted STORY-035 Agent-foundation contract. STORY-036
   implements Tasks, optional PlannedItem Task links, and TimeLog Task
   snapshots on its product-owner accepted branch. STORY-033 implements
   authenticated Activity create, list, detail, and optimistic correction on
-  its product-owner accepted branch. FocusSession, TimeLog correction, deletion,
-  Undo, and idempotency routes remain unavailable until their owning stories
-  pass verification and merge.
+  its product-owner accepted branch. STORY-037 implements the Section 11.5
+  FocusSession routes, Focus idempotency receipts, and the schema-v6 exact-time
+  read fields on `feature/037-persisted-focus-sessions`. That implementation
+  has passed automated verification but remains a candidate until the
+  product-owner browser gate and merge. TimeLog correction, deletion, Undo,
+  and their mutation-idempotency routes remain unavailable.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -548,9 +551,12 @@ Request:
 
 Current implementation status: STORY-036 Task routes, Plan Task links, and
 TimeLog Task links are implemented, verified, and product-owner accepted on
-the schema-v5 runtime baseline. Sections 11.3 and 11.5-11.6 remain future
-runtime contracts except
-for the explicitly identified v5 TimeLog Task fields.
+the schema-v5 runtime baseline. STORY-033 Activity routes are also
+product-owner accepted. Section 11.5 and the schema-v6 Focus provenance/exact
+seconds subset of Section 11.6 are implemented and automatically verified on
+the STORY-037 candidate branch; browser acceptance and merge are pending.
+TimeLog correction, removal, revision, and Undo remain future runtime
+contracts.
 
 Implementation is split across STORY-036, STORY-033, STORY-037, and STORY-034.
 Each story must update this status only for the routes it actually delivers.
@@ -773,6 +779,11 @@ Existing requests without `task_id` retain their pre-v5 behavior.
 
 ### 11.5 Focus Sessions
 
+Implementation status: STORY-037 implementation candidate on
+`feature/037-persisted-focus-sessions`; backend, frontend, migration,
+production-build, and persisted-review verification pass. Product-owner
+browser acceptance and merge remain pending.
+
 FocusSession is the durable live timer boundary. It is intentionally distinct
 from `auth_sessions`.
 
@@ -894,17 +905,17 @@ not silently cancel or reopen the Task.
 
 ### 11.6 TimeLog Read, Correction, Removal, And Undo
 
-STORY-036 implements only nullable `task_id` input/linkage and the server-owned
+STORY-036 implements nullable `task_id` input/linkage and the server-owned
 `task_title` snapshot on the existing create, batch, mobile-import, and list
-paths. Focus provenance, exact seconds, TimeLog versions, correction, soft
-deletion, revisions, review invalidation, Undo, and mutation idempotency remain
-owned by schema v6/v7 stories below.
+paths. The STORY-037 schema-v6 candidate implements nullable
+`focus_session_id` and canonical `duration_seconds` on TimeLog reads. TimeLog
+versions, correction, soft deletion, revisions, review invalidation, Undo, and
+mutation idempotency remain owned by schema v7.
 
-The existing `TimeLogRead` shape gains nullable `task_id`,
-`focus_session_id`, `task_title`, `duration_seconds`, `deleted_at`, and required
-`version`. Legacy rows are represented with
-`duration_seconds = duration_minutes * 60`, `version = 1`, and null extension
-links.
+In schema v6, the existing `TimeLogRead` shape includes nullable `task_id`,
+`focus_session_id`, `task_title`, and required `duration_seconds`. Legacy rows
+are represented with `duration_seconds = duration_minutes * 60` and null
+extension links. Schema v7 later adds `deleted_at` and required `version`.
 
 After schema v6, `duration_seconds` is positive and canonical.
 `duration_minutes` is a non-negative compatibility and Review value. A
@@ -915,8 +926,10 @@ After their owning migrations:
 
 - `POST /time-logs`, `POST /time-logs/batch`, and mobile import accept optional
   `task_id`;
-- manual and imported writes may accept either `duration_minutes` or
-  `duration_seconds` and the service derives the other representation;
+- schema-v6 manual and imported writes continue accepting
+  `duration_minutes`, with the service deriving exact seconds;
+- schema-v7 manual and imported writes may accept either `duration_minutes` or
+  `duration_seconds` and derive the other representation;
 - `focus_session_id`, `task_title`, user ownership, and snapshot provenance are
   always server-controlled;
 - Task, Activity, and explicit Project links must resolve to one same-user

@@ -10,6 +10,7 @@ from ..schemas import AccountRead, TaskCreate, TaskRead, TaskStatus, TaskUpdate
 from ..services import (
     InvalidTaskTransition,
     TaskNotFound,
+    TaskInUse,
     TaskService,
     TaskVersionConflict,
 )
@@ -89,6 +90,14 @@ async def update_task(
             detail={
                 "code": "invalid_task_transition",
                 "message": str(exc),
+            },
+        ) from exc
+    except TaskInUse as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "task_in_use",
+                "message": "End the running FocusSession before archiving this Task",
             },
         ) from exc
     except TaskVersionConflict as exc:

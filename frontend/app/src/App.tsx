@@ -19,15 +19,15 @@ import {
   loadTimeLogs,
   splitElapsedSecondsByDate
 } from "./shared/api/timeLogs";
+import {
+  applyOpenFocusSessions,
+  loadOpenFocusSessions
+} from "./shared/api/focusSessions";
 import { StateSurface } from "./shared/components/StateSurface";
 import { demoWeek } from "./shared/demo/demoWeek";
 import type { PlanItem, PlanSuggestion } from "./features/plan/planModel";
 import type { AppSignalAction } from "./shared/api/weeklyReview";
-import { reconcileFocusActivities, tickActivitiesByDate } from "./features/track/timerModel";
-import {
-  persistTimerCheckpoint,
-  restoreTimerCheckpoint
-} from "./features/track/timerCheckpoint";
+import { tickActivitiesByDate } from "./features/track/timerModel";
 import type { ActivityTimer, FocusSessionDraft } from "./shared/domain/track";
 import type { PlanProject } from "./shared/domain/plan";
 import { resolveInitialTab, type AppTab } from "./shared/navigation/tabs";
@@ -126,8 +126,9 @@ export function App() {
         weekEnd: selectedReviewWeek.end
       }),
       loadTimeLogs({ apiBaseUrl, fetchImpl: authClient.fetch }),
-      loadActivityCatalog({ apiBaseUrl, fetchImpl: authClient.fetch })
-    ]).then(([loaded, timeLogs, activityCatalog]) => {
+      loadActivityCatalog({ apiBaseUrl, fetchImpl: authClient.fetch }),
+      loadOpenFocusSessions({ apiBaseUrl, fetchImpl: authClient.fetch })
+    ]).then(([loaded, timeLogs, activityCatalog, focusSessions]) => {
       if (!ignore) {
         const persistedActivities = activityCatalog.status === "ok" && activityCatalog.data
           ? activityCatalog.data.activities.map((activity) =>
@@ -138,37 +139,36 @@ export function App() {
           persistedActivities,
           loaded.week.track.activities
         );
-        const activities = timeLogs.loaded
+        const activitiesWithHistory = timeLogs.loaded
           ? applyTodayTimeLogs(
               activitySeed,
               timeLogs.logs,
               trackTodayDate
             )
           : activitySeed;
+        const activities = focusSessions.status === "ok" && focusSessions.data
+          ? applyOpenFocusSessions(
+              activitiesWithHistory,
+              focusSessions.data,
+              account.timezone
+            )
+          : activitiesWithHistory;
         const hydratedWeek = {
           ...loaded.week,
           track: { activities }
         };
-        const restoredActivities = typeof window === "undefined"
-          ? activities
-          : restoreTimerCheckpoint(
-              window.localStorage,
-              account.id,
-              activities,
-              account.timezone
-            );
         setLoadedWeek({ ...loaded, week: hydratedWeek });
         setActivityProjects(
           activityCatalog.status === "ok" && activityCatalog.data
             ? activityCatalog.data.projects
             : []
         );
-        setTrackHistoryError(timeLogs.error ?? activityCatalog.error);
-        setTrackActivities((current) =>
-          current.some((activity) => activity.running || activity.sessionSeconds > 0)
-            ? reconcileFocusActivities(activities, current)
-            : restoredActivities
+        setTrackHistoryError(
+          timeLogs.error
+          ?? activityCatalog.error
+          ?? focusSessions.error
         );
+        setTrackActivities(activities);
         setWeekLoading(false);
       }
     });
@@ -206,18 +206,6 @@ export function App() {
 
     return () => window.clearInterval(interval);
   }, [account?.timezone, hasRunningTrackActivity]);
-
-  useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      !account ||
-      appPhase !== "signed_in" ||
-      weekLoading
-    ) {
-      return;
-    }
-    persistTimerCheckpoint(window.localStorage, account.id, trackActivities);
-  }, [account, appPhase, trackActivities, weekLoading]);
 
   function enterSignedIn(nextAccount: AuthAccount) {
     setAccount(nextAccount);
@@ -299,6 +287,7 @@ export function App() {
                 name: item.title,
                 category: "Project",
                 projectId: item.projectId ?? undefined,
+                taskId: item.taskId ?? undefined,
                 projectTitle: projectTitle ?? undefined,
                 recommended: true,
                 focusContext: planItemFocusContext(item)
@@ -310,6 +299,7 @@ export function App() {
         {
           id: activityId,
           projectId: item.projectId ?? undefined,
+          taskId: item.taskId ?? undefined,
           name: item.title,
           category: "Project",
           energy: "neutral",

@@ -12,8 +12,8 @@ import {
   currentRunSeconds,
   formatDuration,
   formatLiveClock,
-  pauseActivity,
   startActivity,
+  stopActivity,
   tickActivitiesByDate,
   todayActivitySeconds,
   type ActivityTimer
@@ -27,9 +27,15 @@ import {
 } from "../../shared/api/activities";
 import {
   calendarDate,
-  saveActivitySession,
   splitElapsedSecondsByDate
 } from "../../shared/api/timeLogs";
+import {
+  applyFocusSession,
+  createIdempotencyKey,
+  endFocusSession,
+  loadOpenFocusSessions,
+  startFocusSession
+} from "../../shared/api/focusSessions";
 import { FocusWorkspace } from "./FocusWorkspace";
 import type { FocusSessionDraft } from "../../shared/domain/track";
 import type { PlanProject } from "../../shared/domain/plan";
@@ -93,6 +99,8 @@ export function TrackScreen({
   const noticeTimerRef = useRef<number | null>(null);
   const saveRequestIdRef = useRef(0);
   const saveInFlightRef = useRef(false);
+  const startKeysRef = useRef(new Map<string, string>());
+  const endKeyRef = useRef<string | null>(null);
 
   const activities = controlledActivities ?? localActivities;
   const todayDate = controlledTodayDate ?? calendarDate(timeZone);
@@ -188,10 +196,6 @@ export function TrackScreen({
     noticeTimerRef.current = window.setTimeout(() => setRecommendationNotice(null), 1800);
   }
 
-  function onStart(activityId: string) {
-    updateActivities((current) => startActivity(current, activityId));
-  }
-
   function onToggleActivity(activity: ActivityTimer) {
     if (backgroundLocked) return;
     setManualFocusId(activity.id);
@@ -199,25 +203,109 @@ export function TrackScreen({
       onEnd(activity.id);
       return;
     }
-    onStart(activity.id);
-    showNotice("Session started");
+    void onStart(activity);
+  }
+
+  async function onStart(activity: ActivityTimer) {
+    if (!apiBaseUrl) {
+      updateActivities((current) => startActivity(current, activity.id));
+      return;
+    }
+    if (sessionSaveState === "saving") return;
+    setSessionSaveState("saving");
+    setSessionSaveError(null);
+
+    let target = activity;
+    if (!target.activityId) {
+      const created = await createActivity({
+        apiBaseUrl,
+        fetchImpl,
+        draft: {
+          projectId: target.projectId ?? null,
+          name: target.name,
+          description: target.activityDescription ?? "",
+          activityType: energyToActivityType(target.energy)
+        }
+      });
+      if (created.status !== "ok" || !created.data) {
+        setSessionSaveState("error");
+        setSessionSaveError(created.error);
+        showNotice("Start failed");
+        return;
+      }
+      target = preserveTimerState(
+        activityRecordToTimer(created.data, projects),
+        target
+      );
+      updateActivities((current) =>
+        current.map((item) => item.id === activity.id ? target : item)
+      );
+      setManualFocusId(target.id);
+    }
+
+    const key = startKeysRef.current.get(target.id)
+      ?? createIdempotencyKey("start");
+    startKeysRef.current.set(target.id, key);
+    const result = await startFocusSession({
+      apiBaseUrl,
+      fetchImpl,
+      activityId: target.activityId as number,
+      ...(target.taskId ? { taskId: target.taskId } : {}),
+      idempotencyKey: key
+    });
+
+    if (result.status !== "ok" || !result.data) {
+      if (result.code === "activity_already_open") {
+        const open = await loadOpenFocusSessions({ apiBaseUrl, fetchImpl });
+        const running = open.data?.find(
+          (session) => session.activity_id === target.activityId
+        );
+        if (running) {
+          updateActivities((current) =>
+            current.map((item) =>
+              item.activityId === target.activityId
+                ? applyFocusSession(item, running, timeZone)
+                : item
+            )
+          );
+          startKeysRef.current.delete(target.id);
+          setSessionSaveState("idle");
+          return;
+        }
+      }
+      setSessionSaveState("error");
+      setSessionSaveError(result.error);
+      showNotice("Start failed");
+      return;
+    }
+
+    const startedSession = result.data;
+    updateActivities((current) =>
+      current.map((item) =>
+        item.activityId === target.activityId
+          ? applyFocusSession(item, startedSession, timeZone)
+          : item
+      )
+    );
+    startKeysRef.current.delete(target.id);
+    setSessionSaveState("idle");
   }
 
   function onEnd(activityId: string) {
     const activity = activities.find((item) => item.id === activityId);
     if (!activity) return;
-    if (activity.sessionSeconds <= 0) {
-      updateActivities((current) => pauseActivity(current, activityId));
-      showNotice("Session ended");
+    if (!apiBaseUrl && activity.sessionSeconds <= 0) {
+      updateActivities((current) => stopActivity(current, activityId));
       return;
     }
     const session = { ...activity, running: false };
-    updateActivities((current) => pauseActivity(current, activityId));
+    updateActivities((current) => stopActivity(current, activityId));
     setPendingSession(session);
     setDetail(null);
     setSessionSaveError(null);
     setSessionSaveState("idle");
     setActiveSheet(null);
+    endKeyRef.current = createIdempotencyKey("end");
     void onSaveSession(session);
   }
 
@@ -230,32 +318,69 @@ export function TrackScreen({
     setSessionSaveError(null);
 
     if (apiBaseUrl) {
-      const result = await saveActivitySession({
+      if (!session.focusSessionId || !session.focusSessionVersion) {
+        saveInFlightRef.current = false;
+        setSessionSaveState("error");
+        setSessionSaveError("Reload Focus before ending this session");
+        setActiveSheet("complete");
+        return;
+      }
+      const idempotencyKey = endKeyRef.current
+        ?? createIdempotencyKey("end");
+      endKeyRef.current = idempotencyKey;
+      const result = await endFocusSession({
         apiBaseUrl,
-        activity: session,
-        timeZone,
-        note: buildSessionNote(sessionIntent),
-        fetchImpl
+        fetchImpl,
+        sessionId: session.focusSessionId,
+        expectedVersion: session.focusSessionVersion,
+        idempotencyKey
       });
       if (requestId !== saveRequestIdRef.current) return;
-      if (!result.saved) {
+      if (result.status !== "ok" || !result.data) {
         saveInFlightRef.current = false;
+        updateActivities((current) =>
+          current.map((item) =>
+            item.id === session.id
+              ? {
+                  ...item,
+                  runSeconds: session.runSeconds ?? session.sessionSeconds,
+                  running: true
+                }
+              : item
+          )
+        );
         setSessionSaveState("error");
         setSessionSaveError(result.error);
         setActiveSheet("complete");
         return;
       }
+      const completedSession = result.data.session;
+      updateActivities((current) =>
+        completeActivity(
+          current.map((item) =>
+            item.id === session.id
+              ? {
+                  ...item,
+                  sessionSeconds: completedSession.accumulated_seconds
+                }
+              : item
+          ),
+          session.id,
+          todayDate
+        )
+      );
+    } else {
+      updateActivities((current) => completeActivity(current, session.id, todayDate));
     }
 
     if (requestId !== saveRequestIdRef.current) return;
-    updateActivities((current) => completeActivity(current, session.id, todayDate));
     saveInFlightRef.current = false;
+    endKeyRef.current = null;
     setPendingSession(null);
     setSessionSaveState("idle");
     setActiveSheet(null);
     updateSessionDraft(session.id, null);
     onSessionSaved?.();
-    showNotice(apiBaseUrl ? "Session recorded" : "Session kept in this demo");
   }
 
   function closeResultSheet() {
@@ -264,6 +389,8 @@ export function TrackScreen({
     setSessionSaveError(null);
     setSessionSaveState("idle");
     setActiveSheet(null);
+    endKeyRef.current = null;
+    onSessionSaved?.();
   }
 
   function openNewActivity() {
@@ -496,7 +623,7 @@ export function TrackScreen({
                       <button
                         className="grid min-h-[46px] min-w-0 grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-paper border-0 bg-transparent px-1 text-left transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                         type="button"
-                        aria-label={`${activity.running ? "End" : activity.sessionSeconds > 0 ? "Resume" : "Start"} ${activity.name}`}
+                        aria-label={`${activity.running ? "End" : "Start"} ${activity.name}`}
                         aria-describedby={`activity-time-${activity.id}`}
                         aria-pressed={activity.running}
                         disabled={backgroundLocked}
@@ -704,7 +831,7 @@ export function TrackScreen({
       >
         <div className="grid gap-4">
           <div>
-            <p className="m-0 text-xs font-bold uppercase tracking-wide text-desk-muted">Session kept locally</p>
+            <p className="m-0 text-xs font-bold uppercase tracking-wide text-desk-muted">Session awaiting retry</p>
             <h2 className="mt-1 text-lg font-bold">{pendingSession?.name}</h2>
             <p className="mt-1 text-sm text-desk-muted">
               {pendingSession ? formatDuration(pendingSession.sessionSeconds) : "0m"}
@@ -827,12 +954,6 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function buildSessionNote(intent: string): string {
-  const parts = ["Outcome: Progress."];
-  if (intent.trim()) parts.push(`Session goal: ${intent.trim()}.`);
-  return parts.join(" ");
-}
-
 function energyLabel(energy: ActivityTimer["energy"]): string {
   if (energy === "consume") return "Focused";
   if (energy === "restore") return "Restorative";
@@ -857,6 +978,10 @@ function preserveTimerState(
     sessionSeconds: current.sessionSeconds,
     sessionSecondsByDate: current.sessionSecondsByDate,
     runSeconds: current.runSeconds,
+    taskId: current.taskId,
+    focusSessionId: current.focusSessionId,
+    focusSessionVersion: current.focusSessionVersion,
+    focusStartedAt: current.focusStartedAt,
     running: current.running,
     recommended: current.recommended,
     focusContext: current.focusContext ?? saved.focusContext

@@ -3,11 +3,17 @@ import sqlite3
 import pytest
 
 from backend.app.db.repositories import ProjectRepository
-from backend.app.schemas import ActivityCreate, ActivityUpdate, ProjectCreate
+from backend.app.schemas import (
+    ActivityCreate,
+    ActivityUpdate,
+    FocusSessionCreate,
+    ProjectCreate,
+)
 from backend.app.services import (
     ActivityInUse,
     ActivityService,
     ActivityVersionConflict,
+    FocusService,
 )
 
 
@@ -78,22 +84,9 @@ def test_activity_project_change_is_blocked_by_future_open_focus_session(
             activity_type="consuming",
         )
     )
-    connection.execute(
-        """
-        CREATE TABLE focus_sessions (
-            id INTEGER PRIMARY KEY,
-            user_id INTEGER NOT NULL,
-            activity_id INTEGER NOT NULL,
-            status TEXT NOT NULL
-        )
-        """
-    )
-    connection.execute(
-        """
-        INSERT INTO focus_sessions (user_id, activity_id, status)
-        VALUES (?, ?, 'paused')
-        """,
-        (local_user.id, activity.id),
+    FocusService(connection, local_user.id).start(
+        FocusSessionCreate(activity_id=activity.id),
+        idempotency_key="activity-in-use",
     )
 
     with pytest.raises(ActivityInUse):

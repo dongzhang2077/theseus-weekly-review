@@ -12,6 +12,8 @@ ProjectStage = Literal["startup", "stable", "sprint", "dormant", "wake_up"]
 ProjectStatus = Literal["active", "paused", "archived"]
 TaskStatus = Literal["open", "in_progress", "completed", "cancelled"]
 TaskCreationSource = Literal["user", "assistant_approved", "imported"]
+FocusSessionStatus = Literal["running", "completed", "cancelled"]
+FocusSessionCommandName = Literal["end", "cancel"]
 ReviewMode = Literal["deterministic_first", "supportive_text"]
 RiskType = Literal[
     "alignment_gap",
@@ -355,6 +357,39 @@ class WeeklyPlanRead(WeeklyPlanCreate):
     updated_at: datetime
 
 
+class FocusSessionCreate(APIModel):
+    activity_id: int = Field(gt=0)
+    task_id: int | None = Field(default=None, gt=0)
+
+
+class FocusSessionCommand(APIModel):
+    command: FocusSessionCommandName
+    expected_version: int = Field(ge=1)
+
+
+class FocusSessionRead(APIModel):
+    id: int
+    user_id: int
+    activity_id: int
+    task_id: int | None
+    project_id: int | None
+    activity_name: str
+    activity_type: ActivityType
+    type_source: ActivityTypeSource
+    task_title: str | None
+    timezone: str
+    status: FocusSessionStatus
+    accumulated_seconds: int = Field(ge=0)
+    current_run_started_at: datetime | None
+    elapsed_seconds: int = Field(ge=0)
+    version: int = Field(ge=1)
+    started_at: datetime
+    completed_at: datetime | None
+    cancelled_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class TimeLogCreate(APIModel):
     activity_id: int | None = None
     project_id: int | None = None
@@ -383,12 +418,30 @@ class TimeLog(TimeLogCreate):
     pass
 
 
-class TimeLogRead(TimeLogCreate):
+class TimeLogRead(APIModel):
     id: int
     user_id: int
+    activity_id: int | None = None
+    project_id: int | None = None
+    task_id: int | None = None
+    focus_session_id: int | None = None
+    date: date
+    start_time: time | None = None
+    end_time: time | None = None
+    duration_minutes: int = Field(ge=0)
+    duration_seconds: int = Field(gt=0)
+    activity_name: str
+    activity_type: ActivityType
+    type_source: ActivityTypeSource
     task_title: str | None = None
+    note: str = ""
     created_at: datetime
     updated_at: datetime
+
+
+class FocusSessionCommandResponse(APIModel):
+    session: FocusSessionRead
+    time_logs: list[TimeLogRead] = Field(default_factory=list)
 
 
 class MobileTimeLogImportRecord(APIModel):
