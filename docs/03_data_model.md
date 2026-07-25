@@ -9,9 +9,9 @@ STORY-036. Authenticated Activity management is implemented and product-owner
 accepted through STORY-033 without a schema-version change. Schema version 6,
 including `FocusSession`, `FocusSessionSegment`, Focus idempotency, and exact
 TimeLog seconds, is implemented, automatically verified, and product-owner
-accepted through STORY-037 on 2026-07-25. The correction/audit extensions
-are implemented as the schema-v7 STORY-034 candidate and have passed automated
-verification; product-owner browser acceptance is still required.
+accepted through STORY-037 on 2026-07-25. The schema-v7 correction/audit
+extensions are implemented, automatically verified, and product-owner accepted
+through STORY-034 on 2026-07-25.
 
 ```text
 Account (users + auth_credentials)

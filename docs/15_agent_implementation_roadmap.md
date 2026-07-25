@@ -516,7 +516,8 @@ Completed STORY-037 acceptance evidence:
 4. confirm Today total and the stable-ID TimeLog survive another reload;
 5. product-owner acceptance recorded on 2026-07-25 PDT.
 
-Current sequential gate: STORY-034 correctable Today history, audit revisions,
+Completed sequential gate: STORY-034 correctable Today history, audit revisions,
 soft deletion, Undo, and stale-review invalidation is implemented and
-automatically verified on `feature/034-correctable-today-history`. It awaits
-the product-owner browser gate before freeze and merge.
+automatically verified on `feature/034-correctable-today-history`. The
+product-owner browser gate passed on 2026-07-25 PDT; freeze and merge are
+authorized.

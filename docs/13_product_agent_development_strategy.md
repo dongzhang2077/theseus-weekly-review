@@ -66,7 +66,7 @@ endpoints remain unimplemented.
 | Capability | Current state | Direction |
 |---|---|---|
 | Stable review entities | Schema v6 preserves STORY-030 ownership, credentials, sessions, and existing review records while adding durable Focus state | Preserve supported migration paths while later Agent-domain migrations are implemented |
-| Durable Tasks and live Focus state | Durable Tasks and nullable Plan/TimeLog links are accepted in STORY-036; durable Activity management is accepted in STORY-033; persisted two-tap Focus and exact TimeLogs are accepted in STORY-037; the STORY-034 correctable Today-history candidate is automatically verified and awaits browser acceptance | Accept and freeze STORY-034 before starting the next Agent-domain module |
+| Durable Tasks and live Focus state | Durable Tasks and nullable Plan/TimeLog links are accepted in STORY-036; durable Activity management is accepted in STORY-033; persisted two-tap Focus and exact TimeLogs are accepted in STORY-037; correctable Today history and review invalidation are accepted in STORY-034 | Begin the next Agent-domain module from the frozen STORY-034 baseline |
 | Persistent review path | User-scoped sample data flows through SQLite, the review engine, and stored review; v1 migration and restart coverage are merged | Rehearse the browser-to-API restart path |
 | Review reasoning | Deterministic, evidence-first rules | Keep framework-independent |
 | AI wording | Evidence-bound writer adapters exist | Keep AI wording downstream of computed facts |
@@ -366,7 +366,8 @@ implementation and product-owner browser gate on 2026-07-22 PDT. STORY-033
 passed browser, stable-ID TimeLog linkage, and backend-restart acceptance on
 2026-07-25 PDT. STORY-037's two-tap Start/End contract is accepted, and its
 schema-v6 runtime implementation passed automated and product-owner browser
-acceptance on 2026-07-25 PDT. STORY-034 is the next sequential gate.
+acceptance on 2026-07-25 PDT. STORY-034 also passed automated verification and
+product-owner browser acceptance on 2026-07-25 PDT.
 
 Exit gate:
 

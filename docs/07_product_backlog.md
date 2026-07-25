@@ -534,12 +534,12 @@ Acceptance criteria:
 - local-date boundaries follow the account timezone and have cross-midnight,
   restart, and account-isolation tests.
 
-Candidate checkpoint (2026-07-25 PDT): schema v7, authenticated TimeLog
+Accepted checkpoint (2026-07-25 PDT): schema v7, authenticated TimeLog
 correction/removal/Undo, append-only revisions, review invalidation, and the
 mobile Today-history flow are implemented on
 `feature/034-correctable-today-history`. Backend, frontend, migration, sample,
 and persisted-review verification pass. Product-owner browser acceptance
-remains open.
+passed.
 
 ## Epic 8: Personal Assistant Evolution
 

@@ -13,8 +13,8 @@ Contract status:
   read fields. That implementation passed automated verification and the
   product-owner browser gate on 2026-07-25. STORY-034 implements TimeLog
   correction, deletion, Undo, mutation idempotency, audit revisions, and
-  overlapping-review invalidation as a schema-v7 candidate. Automated
-  verification passes; product-owner browser acceptance is still required.
+  overlapping-review invalidation on schema v7. Automated verification and
+  product-owner browser acceptance passed on 2026-07-25.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
