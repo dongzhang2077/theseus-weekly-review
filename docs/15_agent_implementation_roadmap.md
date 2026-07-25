@@ -522,7 +522,10 @@ automatically verified on `feature/034-correctable-today-history`. The
 product-owner browser gate passed on 2026-07-25 PDT; freeze and merge are
 authorized.
 
-Current sequential gate: STORY-025A Trust, Memory, and Action Ledger data
-foundation. Schema v8, repositories, domain services, and focused tests are
-implemented on `feature/025-trust-ledger`; full regression verification and
-product-owner acceptance remain open before STORY-025B authenticated APIs.
+Completed sequential gate: STORY-025A Trust, Memory, and Action Ledger data
+foundation. Schema v8, repositories, domain services, focused tests, and full
+regression verification pass on `feature/025-trust-ledger`; product-owner
+acceptance is recorded.
+
+Current sequential gate: STORY-025B authenticated preference and ledger APIs.
+Arbitrary action execution remains private until the bounded Assistant API.

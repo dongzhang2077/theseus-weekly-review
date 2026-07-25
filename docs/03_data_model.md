@@ -11,9 +11,9 @@ including `FocusSession`, `FocusSessionSegment`, Focus idempotency, and exact
 TimeLog seconds, is implemented, automatically verified, and product-owner
 accepted through STORY-037 on 2026-07-25. The schema-v7 correction/audit
 extensions are implemented, automatically verified, and product-owner accepted
-through STORY-034 on 2026-07-25. Schema version 8 is the active STORY-025A
-candidate for inspectable preferences and the proposal-to-outcome ledger; it
-has not reached the product-owner acceptance gate.
+through STORY-034 on 2026-07-25. Schema version 8 is implemented,
+automatically verified, and product-owner accepted through STORY-025A for
+inspectable preferences and the proposal-to-outcome ledger.
 
 ```text
 Account (users + auth_credentials)
@@ -441,7 +441,7 @@ payloads are user-owned personal data and cascade on account deletion.
 | created_at | datetime | System timestamp |
 | updated_at | datetime | System timestamp |
 
-### preferences (schema v8 candidate)
+### preferences (accepted schema v8)
 
 Stores user-stated and inferred preferences as distinct, inspectable records.
 Every record contains a stable key, JSON value, typed scope, provenance, an
@@ -452,7 +452,7 @@ deletion, restore, or Undo appends `preference_revisions`.
 
 ### proposals, proposal_decisions, agent_actions, proposal_outcomes
 
-These schema-v8 candidate tables form the trust ledger:
+These accepted schema-v8 tables form the trust ledger:
 
 - `proposals` preserve rationale, evidence, before/after JSON, expiry, status,
   and optimistic version;
@@ -503,8 +503,8 @@ them but cannot replace them.
 ## 5. Accepted Migration Sequence
 
 Version 5 is the durable-Task baseline. Versions 6 and 7 are automatically
-verified and product-owner accepted runtimes. Version 8 is the active STORY-025A
-candidate:
+verified and product-owner accepted runtimes. Version 8 is the accepted
+STORY-025A foundation:
 
 | Version | Story | Additive behavior |
 |---|---|---|
