@@ -1,3 +1,8 @@
+from .agent_memory import (
+    PreferenceRepository,
+    ProposalRepository,
+    StoredPreferenceRevision,
+)
 from .auth import AuthRepository, StoredAuthIdentity, StoredAuthSession
 from .core import ActivityRepository, DailyReflectionRepository, GoalRepository, ProjectRepository
 from .focus import (
@@ -18,6 +23,8 @@ from .users import UserRepository
 
 __all__ = [
     "ActivityRepository",
+    "PreferenceRepository",
+    "ProposalRepository",
     "AuthRepository",
     "DailyReflectionRepository",
     "FocusTimeLogInsert",
@@ -29,6 +36,7 @@ __all__ = [
     "StoredAuthSession",
     "StoredFocusSession",
     "StoredIdempotencyReceipt",
+    "StoredPreferenceRevision",
     "StoredTimeLogRevision",
     "TimeLogRepository",
     "TaskRepository",

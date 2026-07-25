@@ -1057,3 +1057,26 @@ persisted path into the framework-independent review engine.
 
 OpenAPI must not expose any Section 11 operation until its implementation,
 failure tests, migration tests, and current-story acceptance gate pass.
+
+## 12. Trust, Memory, And Action Ledger
+
+STORY-025A currently implements the schema-v8 repository and domain-service
+foundation only. No Section 12 route is public yet.
+
+The future authenticated HTTP surface will keep these resources separate:
+
+- `/preferences` for inspectable user-stated or inferred memory;
+- `/proposals` for evidence-backed before/after suggestions;
+- `/proposals/{id}/decisions` for approve, edit, reject, or expire;
+- `/agent-actions` for idempotent, verified execution and Undo links;
+- `/proposal-outcomes` for usefulness and completion feedback.
+
+Requests will never accept `user_id`. Public create routes will not allow a
+client to claim assistant provenance without a bounded internal caller.
+Preference correction/deletion and proposal decisions require optimistic
+versions. Actions require a user-scoped idempotency key; key reuse with a
+different request is a conflict. Cross-account resources return a
+non-disclosing `404`, and all multi-record transitions run in one transaction.
+
+Route shapes and error bodies remain contract candidates until STORY-025B
+implements focused API tests and the product owner accepts them.

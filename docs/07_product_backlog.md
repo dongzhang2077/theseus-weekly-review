@@ -562,6 +562,14 @@ Acceptance criteria:
 - Proposals, approvals, actions, undo operations, and outcomes are auditable.
 - The user can inspect, correct, and delete learned preferences.
 
+STORY-025A candidate checkpoint (2026-07-25 PDT): schema v8, supported v1-v7
+migration composition, user-scoped Preference/PreferenceRevision persistence,
+and the Proposal/Decision/Action/Outcome repository and domain-service
+foundation are implemented on `feature/025-trust-ledger`. Focused migration,
+rollback, provenance, scope-isolation, audit, expiry, and idempotency tests
+pass. Authenticated APIs and Pending/History/Memory UI remain the next two
+acceptance slices.
+
 ### STORY-026 Pilot one LangGraph weekly-adjustment workflow
 
 As a user, I want an approved review-to-plan workflow that can pause and resume

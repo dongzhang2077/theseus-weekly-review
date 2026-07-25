@@ -15,6 +15,14 @@ TaskStatus = Literal["open", "in_progress", "completed", "cancelled"]
 TaskCreationSource = Literal["user", "assistant_approved", "imported"]
 FocusSessionStatus = Literal["running", "completed", "cancelled"]
 FocusSessionCommandName = Literal["end", "cancel"]
+PreferenceSource = Literal["user_stated", "inferred"]
+PreferenceScopeType = Literal["global", "goal", "project", "task", "activity"]
+ProposalType = Literal["weekly_plan_adjustment", "task_create", "reflection", "generic"]
+ProposalSource = Literal["deterministic", "assistant"]
+ProposalStatus = Literal["pending", "approved", "rejected", "expired", "executed", "undone"]
+ProposalDecisionType = Literal["approve", "edit", "reject", "expire"]
+AgentActionStatus = Literal["pending", "succeeded", "failed", "undone"]
+ProposalOutcomeResult = Literal["completed", "partial", "not_completed", "dismissed"]
 ReviewMode = Literal["deterministic_first", "supportive_text"]
 RiskType = Literal[
     "alignment_gap",
@@ -558,6 +566,146 @@ class DailyReflectionRead(DailyReflectionCreate):
     user_id: int
     created_at: datetime
     updated_at: datetime
+
+
+class PreferenceCreate(APIModel):
+    source: PreferenceSource
+    preference_key: str = Field(min_length=1, max_length=120)
+    value: Any
+    scope_type: PreferenceScopeType = "global"
+    scope_ref_id: int | None = Field(default=None, gt=0)
+    provenance: dict[str, Any] = Field(default_factory=dict)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    review_after: datetime | None = None
+    expires_at: datetime | None = None
+
+    @field_validator("preference_key")
+    @classmethod
+    def strip_preference_key(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+    @model_validator(mode="after")
+    def validate_preference_source_and_scope(self) -> PreferenceCreate:
+        if self.scope_type == "global" and self.scope_ref_id is not None:
+            raise ValueError("global preferences cannot have scope_ref_id")
+        if self.scope_type != "global" and self.scope_ref_id is None:
+            raise ValueError("scoped preferences require scope_ref_id")
+        if self.source == "user_stated" and self.confidence is not None:
+            raise ValueError("user-stated preferences do not use confidence")
+        if self.source == "inferred":
+            if self.confidence is None:
+                raise ValueError("inferred preferences require confidence")
+            if self.review_after is None and self.expires_at is None:
+                raise ValueError(
+                    "inferred preferences require review_after or expires_at"
+                )
+        return self
+
+
+class PreferenceRead(PreferenceCreate):
+    id: int
+    user_id: int
+    version: int = Field(ge=1)
+    deleted_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProposalCreate(APIModel):
+    proposal_type: ProposalType
+    source: ProposalSource = "deterministic"
+    title: str = Field(min_length=1, max_length=240)
+    rationale: str = Field(default="", max_length=4000)
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
+    before: dict[str, Any]
+    after: dict[str, Any]
+    expires_at: datetime | None = None
+
+    @field_validator("title")
+    @classmethod
+    def strip_proposal_title(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+
+class ProposalRead(ProposalCreate):
+    id: int
+    user_id: int
+    status: ProposalStatus
+    version: int = Field(ge=1)
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProposalDecisionCreate(APIModel):
+    decision: ProposalDecisionType
+    decided_after: dict[str, Any] | None = None
+    reason: str = Field(default="", max_length=1000)
+
+    @model_validator(mode="after")
+    def validate_decision_payload(self) -> ProposalDecisionCreate:
+        if self.decision == "edit" and self.decided_after is None:
+            raise ValueError("edit decisions require decided_after")
+        return self
+
+
+class ProposalDecisionRead(ProposalDecisionCreate):
+    id: int
+    user_id: int
+    proposal_id: int
+    created_at: datetime
+
+
+class AgentActionCreate(APIModel):
+    proposal_id: int = Field(gt=0)
+    decision_id: int | None = Field(default=None, gt=0)
+    operation: str = Field(min_length=1, max_length=120)
+    request: dict[str, Any]
+    idempotency_key: str = Field(min_length=8, max_length=200)
+    reversible: bool = False
+    undo_of_action_id: int | None = Field(default=None, gt=0)
+
+    @field_validator("operation", "idempotency_key")
+    @classmethod
+    def strip_action_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+
+class AgentActionRead(AgentActionCreate):
+    id: int
+    user_id: int
+    result: dict[str, Any] | None = None
+    verification: dict[str, Any] | None = None
+    status: AgentActionStatus
+    error_message: str
+    executed_at: datetime | None = None
+    undone_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProposalOutcomeCreate(APIModel):
+    proposal_id: int = Field(gt=0)
+    action_id: int | None = Field(default=None, gt=0)
+    result: ProposalOutcomeResult
+    usefulness: int | None = Field(default=None, ge=1, le=5)
+    actual_duration_minutes: int | None = Field(default=None, ge=0)
+    energy_feedback: ActivityType | None = None
+    note: str = Field(default="", max_length=4000)
+
+
+class ProposalOutcomeRead(ProposalOutcomeCreate):
+    id: int
+    user_id: int
+    created_at: datetime
 
 
 class WeeklyReviewRequest(APIModel):
