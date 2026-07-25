@@ -39,7 +39,6 @@ const energyOptions = ["consume", "restore", "neutral", "destroy"] as const;
 const targetOptions = [15, 25, 45, 60] as const;
 
 type TrackSheet = "logs" | "create" | "setup" | "complete";
-type SessionOutcome = "done" | "progress" | "stuck";
 type ActivityFormMode = "new" | "save" | "edit";
 
 interface TrackScreenProps {
@@ -89,8 +88,6 @@ export function TrackScreen({
   const [recommendationNotice, setRecommendationNotice] = useState<string | null>(null);
   const [localSessionDrafts, setLocalSessionDrafts] = useState<Record<string, FocusSessionDraft>>({});
   const [pendingSession, setPendingSession] = useState<ActivityTimer | null>(null);
-  const [sessionOutcome, setSessionOutcome] = useState<SessionOutcome>("progress");
-  const [sessionNote, setSessionNote] = useState("");
   const [sessionSaveState, setSessionSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [sessionSaveError, setSessionSaveError] = useState<string | null>(null);
   const noticeTimerRef = useRef<number | null>(null);
@@ -208,21 +205,26 @@ export function TrackScreen({
 
   function onEnd(activityId: string) {
     const activity = activities.find((item) => item.id === activityId);
-    if (!activity || activity.sessionSeconds <= 0) return;
+    if (!activity) return;
+    if (activity.sessionSeconds <= 0) {
+      updateActivities((current) => pauseActivity(current, activityId));
+      showNotice("Session ended");
+      return;
+    }
+    const session = { ...activity, running: false };
     updateActivities((current) => pauseActivity(current, activityId));
-    setPendingSession({ ...activity, running: false });
+    setPendingSession(session);
     setDetail(null);
-    setSessionOutcome("progress");
-    setSessionNote("");
     setSessionSaveError(null);
     setSessionSaveState("idle");
-    setActiveSheet("complete");
+    setActiveSheet(null);
+    void onSaveSession(session);
   }
 
-  async function onSaveSession() {
-    if (!pendingSession || saveInFlightRef.current) return;
+  async function onSaveSession(sessionOverride?: ActivityTimer) {
+    const session = sessionOverride ?? pendingSession;
+    if (!session || saveInFlightRef.current) return;
     const requestId = ++saveRequestIdRef.current;
-    const session = pendingSession;
     saveInFlightRef.current = true;
     setSessionSaveState("saving");
     setSessionSaveError(null);
@@ -232,7 +234,7 @@ export function TrackScreen({
         apiBaseUrl,
         activity: session,
         timeZone,
-        note: buildSessionNote(sessionOutcome, sessionIntent, sessionNote),
+        note: buildSessionNote(sessionIntent),
         fetchImpl
       });
       if (requestId !== saveRequestIdRef.current) return;
@@ -240,6 +242,7 @@ export function TrackScreen({
         saveInFlightRef.current = false;
         setSessionSaveState("error");
         setSessionSaveError(result.error);
+        setActiveSheet("complete");
         return;
       }
     }
@@ -694,47 +697,19 @@ export function TrackScreen({
       </Sheet>
 
       <Sheet
-        title="Session result"
+        title="Save failed"
         open={activeSheet === "complete"}
         closeDisabled={sessionSaveState === "saving"}
         onClose={closeResultSheet}
       >
         <div className="grid gap-4">
           <div>
-            <p className="m-0 text-xs font-bold uppercase tracking-wide text-desk-muted">Focus completed</p>
+            <p className="m-0 text-xs font-bold uppercase tracking-wide text-desk-muted">Session kept locally</p>
             <h2 className="mt-1 text-lg font-bold">{pendingSession?.name}</h2>
             <p className="mt-1 text-sm text-desk-muted">
               {pendingSession ? formatDuration(pendingSession.sessionSeconds) : "0m"}
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2" aria-label="Session outcome">
-            {(["done", "progress", "stuck"] as const).map((outcome) => (
-              <button
-                className={`min-h-10 rounded-paper border px-2 text-sm font-bold ${
-                  sessionOutcome === outcome
-                    ? "border-desk-accent bg-desk-accent-soft text-desk-accent"
-                    : "border-desk-line bg-desk-raised text-desk-muted"
-                }`}
-                type="button"
-                key={outcome}
-                aria-pressed={sessionOutcome === outcome}
-                disabled={sessionSaveState === "saving"}
-                onClick={() => setSessionOutcome(outcome)}
-              >
-                {outcomeLabel(outcome)}
-              </button>
-            ))}
-          </div>
-          <label className="grid gap-1 text-sm font-semibold">
-            <span>Result note</span>
-            <textarea
-              className="rounded-paper border border-desk-line bg-desk-raised p-3 disabled:opacity-60"
-              rows={3}
-              value={sessionNote}
-              disabled={sessionSaveState === "saving"}
-              onChange={(event) => setSessionNote(event.currentTarget.value)}
-            />
-          </label>
           {sessionSaveState === "error" ? (
             <p className="m-0 rounded-paper bg-desk-danger-soft px-3 py-2 text-sm font-semibold text-desk-danger" role="alert">
               Session could not be saved{sessionSaveError ? `: ${sessionSaveError}` : ". Try again."}
@@ -746,7 +721,7 @@ export function TrackScreen({
             disabled={sessionSaveState === "saving"}
             onClick={() => void onSaveSession()}
           >
-            {sessionSaveState === "saving" ? "Saving" : sessionSaveState === "error" ? "Retry save" : "Save result"}
+            {sessionSaveState === "saving" ? "Saving" : "Retry"}
           </button>
         </div>
       </Sheet>
@@ -852,17 +827,10 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function buildSessionNote(outcome: SessionOutcome, intent: string, note: string): string {
-  const parts = [`Outcome: ${outcomeLabel(outcome)}.`];
+function buildSessionNote(intent: string): string {
+  const parts = ["Outcome: Progress."];
   if (intent.trim()) parts.push(`Session goal: ${intent.trim()}.`);
-  if (note.trim()) parts.push(note.trim());
   return parts.join(" ");
-}
-
-function outcomeLabel(outcome: SessionOutcome): string {
-  if (outcome === "done") return "Completed";
-  if (outcome === "stuck") return "Stuck";
-  return "Progress";
 }
 
 function energyLabel(energy: ActivityTimer["energy"]): string {

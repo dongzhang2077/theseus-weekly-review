@@ -104,14 +104,16 @@ authenticated persistence path:
 
 Multiple activities may run concurrently. Each timer accumulates independently.
 The first tap starts an Activity Session and the next tap ends that Session,
-then opens its result sheet; there is no separate formal End action in Detail.
-Today total and the eventual TimeLog use the complete Session. Session setup
-defaults to an open count-up timer; selecting 15, 25, 45, or 60 minutes changes
-the main timer to a target countdown and overtime display without changing the
-stored elapsed duration. Open timer state is checkpointed per local account
-without storing credentials. Elapsed time is allocated by the account timezone,
-and a session crossing local midnight is stored as an atomic batch of daily
-TimeLogs rather than being assigned wholly to its end date.
+and saves it immediately; there is no separate confirmation or formal End
+action in Detail. A compact success notice confirms the write. A recovery sheet
+appears only when saving fails, preserving the unsaved Session for Retry. Today
+total and the eventual TimeLog use the complete Session. Session setup defaults
+to an open count-up timer; selecting 15, 25, 45, or 60 minutes changes the main
+timer to a target countdown and overtime display without changing the stored
+elapsed duration. Open timer state is checkpointed per local account without
+storing credentials. Elapsed time is allocated by the account timezone, and a
+session crossing local midnight is stored as an atomic batch of daily TimeLogs
+rather than being assigned wholly to its end date.
 
 ### Durable Activity information depth
 

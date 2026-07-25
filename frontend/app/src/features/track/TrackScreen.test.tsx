@@ -85,12 +85,8 @@ describe("TrackScreen", () => {
 
     act(() => vi.advanceTimersByTime(2_000));
     fireEvent.click(within(chooser).getByRole("button", { name: "End Backend polish" }));
-    expect(screen.getByRole("dialog", { name: "Session result" })).toBeInTheDocument();
-    fireEvent.click(
-      within(screen.getByRole("dialog", { name: "Session result" })).getByRole("button", {
-        name: "Save result"
-      })
-    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Session kept in this demo");
 
     fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
     const reopenedChooser = screen.getByRole("dialog", { name: "Today" });
@@ -318,29 +314,19 @@ describe("TrackScreen", () => {
     );
   });
 
-  it("keeps a completed result in demo mode", () => {
+  it("ends and saves a session without opening a confirmation sheet", () => {
     const onResultModalChange = vi.fn();
     render(<TrackScreen track={trackWithSession()} onResultModalChange={onResultModalChange} />);
 
     endCurrentFocus();
-    const result = screen.getByRole("dialog", { name: "Session result" });
-    screen
-      .getAllByRole("button", { name: "Resume focus activity" })
-      .forEach((button) => expect(button).toBeDisabled());
-    expect(onResultModalChange).toHaveBeenLastCalledWith(true);
-    fireEvent.click(within(result).getByRole("button", { name: "Completed" }));
-    fireEvent.change(within(result).getByLabelText("Result note"), {
-      target: { value: "Finished the first pass." }
-    });
-    fireEvent.click(within(result).getByRole("button", { name: "Save result" }));
 
-    expect(screen.queryByRole("dialog", { name: "Session result" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Session kept in this demo");
     expect(screen.getByText("00:00:00")).toBeInTheDocument();
-    expect(onResultModalChange).toHaveBeenLastCalledWith(false);
+    expect(onResultModalChange).not.toHaveBeenCalledWith(true);
   });
 
-  it("keeps the result draft after an API failure and allows retry", async () => {
+  it("opens recovery only after an automatic save failure and allows retry", async () => {
     const fetchImpl = vi
       .fn<FetchLike>()
       .mockResolvedValueOnce(response(false, 503))
@@ -354,32 +340,20 @@ describe("TrackScreen", () => {
     );
 
     endCurrentFocus();
-    const result = screen.getByRole("dialog", { name: "Session result" });
-    fireEvent.click(within(result).getByRole("button", { name: "Stuck" }));
-    fireEvent.change(within(result).getByLabelText("Result note"), {
-      target: { value: "Need a narrower mobile layout." }
-    });
-    fireEvent.click(within(result).getByRole("button", { name: "Save result" }));
-
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const result = await screen.findByRole("dialog", { name: "Save failed" });
     expect(await within(result).findByRole("alert")).toHaveTextContent(
       "Session could not be saved: Backend returned 503"
     );
-    expect(within(result).getByLabelText("Result note")).toHaveValue(
-      "Need a narrower mobile layout."
-    );
-    expect(within(result).getByRole("button", { name: "Stuck" })).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
 
-    fireEvent.click(within(result).getByRole("button", { name: "Retry save" }));
+    fireEvent.click(within(result).getByRole("button", { name: "Retry" }));
 
     expect(await screen.findByRole("status")).toHaveTextContent("Session recorded");
     expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(screen.queryByRole("dialog", { name: "Session result" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Save failed" })).not.toBeInTheDocument();
   });
 
-  it("posts once on a double save and disables both close controls while saving", async () => {
+  it("posts once when the end control is clicked twice during an automatic save", async () => {
     let resolveFetch: ((value: ReturnType<typeof response>) => void) | undefined;
     const fetchImpl: FetchLike = vi.fn(
       () =>
@@ -395,17 +369,12 @@ describe("TrackScreen", () => {
       />
     );
 
-    endCurrentFocus();
-    const result = screen.getByRole("dialog", { name: "Session result" });
-    const saveButton = within(result).getByRole("button", { name: "Save result" });
-    fireEvent.click(saveButton);
-    fireEvent.click(saveButton);
+    const endButton = screen.getAllByRole("button", { name: "End focus activity" })[0];
+    fireEvent.click(endButton);
+    fireEvent.click(endButton);
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(within(result).getByRole("button", { name: "Saving" })).toBeDisabled();
-    const closeButtons = screen.getAllByRole("button", { name: "Close" });
-    expect(closeButtons).toHaveLength(2);
-    closeButtons.forEach((button) => expect(button).toBeDisabled());
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     await act(async () => {
       resolveFetch?.(response(true, 201));
@@ -451,7 +420,6 @@ describe("TrackScreen", () => {
     );
 
     endCurrentFocus();
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Session result" })).getByRole("button", { name: "Save result" }));
 
     expect(await screen.findByRole("status")).toHaveTextContent("Session recorded");
     expect(calls).toHaveLength(1);
