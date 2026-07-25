@@ -5,8 +5,8 @@ export type ApiActivityType = "consuming" | "neutral" | "restore" | "destroy";
 export type ApiActivityTypeSource = "user_selected" | "ai_suggested" | "user_corrected";
 
 export interface TimeLogCreatePayload {
-  activity_id?: number;
-  project_id?: number;
+  activity_id?: number | null;
+  project_id?: number | null;
   date: string;
   duration_minutes: number;
   activity_name: string;
@@ -45,9 +45,28 @@ export interface ApiTimeLogRead extends TimeLogCreatePayload {
   task_id?: number | null;
   focus_session_id?: number | null;
   task_title?: string | null;
-  duration_seconds?: number;
+  duration_seconds: number;
+  start_time?: string | null;
+  end_time?: string | null;
+  version: number;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface TimeLogMutationResult {
+  time_log: ApiTimeLogRead;
+  revision_id: number;
+  affected_review_weeks: Array<{
+    week_start: string;
+    week_end: string;
+  }>;
+}
+
+export interface TimeLogMutationApiResult {
+  status: "ok" | "conflict" | "not_found" | "error";
+  data: TimeLogMutationResult | null;
+  error: string | null;
 }
 
 export interface LoadTimeLogsResult {
@@ -170,15 +189,24 @@ export async function saveTimeLogBatch(options: {
 export async function loadTimeLogs(options: {
   apiBaseUrl?: string;
   fetchImpl?: FetchLike;
+  dateFrom?: string;
+  dateTo?: string;
+  includeDeleted?: boolean;
 }): Promise<LoadTimeLogsResult> {
   const apiBaseUrl = options.apiBaseUrl?.trim();
   if (!apiBaseUrl) {
     return { loaded: false, logs: [], error: "API base URL is not configured" };
   }
   try {
-    const response = await (options.fetchImpl ?? fetch)(`${apiBaseUrl.replace(/\/$/, "")}/time-logs`, {
-      method: "GET"
-    });
+    const query = new URLSearchParams();
+    if (options.dateFrom) query.set("date_from", options.dateFrom);
+    if (options.dateTo) query.set("date_to", options.dateTo);
+    if (options.includeDeleted) query.set("include_deleted", "true");
+    const suffix = query.size > 0 ? `?${query.toString()}` : "";
+    const response = await (options.fetchImpl ?? fetch)(
+      `${apiBaseUrl.replace(/\/$/, "")}/time-logs${suffix}`,
+      { method: "GET" }
+    );
     if (!response.ok) {
       return { loaded: false, logs: [], error: `Backend returned ${response.status}` };
     }
@@ -194,6 +222,69 @@ export async function loadTimeLogs(options: {
       error: error instanceof Error ? error.message : "Time-log request failed"
     };
   }
+}
+
+export async function updateTimeLog(options: {
+  apiBaseUrl?: string;
+  timeLogId: number;
+  expectedVersion: number;
+  durationSeconds: number;
+  activityType: ApiActivityType;
+  note: string;
+  reason?: string;
+  idempotencyKey: string;
+  fetchImpl?: FetchLike;
+}): Promise<TimeLogMutationApiResult> {
+  return mutateTimeLog(
+    options,
+    `/time-logs/${options.timeLogId}`,
+    "PATCH",
+    {
+      expected_version: options.expectedVersion,
+      duration_seconds: options.durationSeconds,
+      activity_type: options.activityType,
+      note: options.note,
+      reason: options.reason ?? ""
+    }
+  );
+}
+
+export async function deleteTimeLog(options: {
+  apiBaseUrl?: string;
+  timeLogId: number;
+  expectedVersion: number;
+  idempotencyKey: string;
+  fetchImpl?: FetchLike;
+}): Promise<TimeLogMutationApiResult> {
+  return mutateTimeLog(
+    options,
+    `/time-logs/${options.timeLogId}?expected_version=${options.expectedVersion}`,
+    "DELETE"
+  );
+}
+
+export async function undoTimeLogMutation(options: {
+  apiBaseUrl?: string;
+  timeLogId: number;
+  revisionId: number;
+  expectedVersion: number;
+  idempotencyKey: string;
+  fetchImpl?: FetchLike;
+}): Promise<TimeLogMutationApiResult> {
+  return mutateTimeLog(
+    options,
+    `/time-logs/${options.timeLogId}/revisions/${options.revisionId}/undo`,
+    "POST",
+    { expected_version: options.expectedVersion }
+  );
+}
+
+export function createTimeLogIdempotencyKey(
+  operation: "update" | "delete" | "undo"
+): string {
+  const randomId = globalThis.crypto?.randomUUID?.()
+    ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `time-log-${operation}-${randomId}`;
 }
 
 export function applyTodayTimeLogs(
@@ -329,6 +420,60 @@ export function calendarDate(timeZone?: string, now = new Date()): string {
 function apiActivityTypeToEnergy(activityType: ApiActivityType): EnergyKind {
   if (activityType === "consuming") return "consume";
   return activityType;
+}
+
+async function mutateTimeLog(
+  options: {
+    apiBaseUrl?: string;
+    idempotencyKey: string;
+    fetchImpl?: FetchLike;
+  },
+  path: string,
+  method: "PATCH" | "DELETE" | "POST",
+  body?: unknown
+): Promise<TimeLogMutationApiResult> {
+  const apiBaseUrl = options.apiBaseUrl?.trim();
+  if (!apiBaseUrl) {
+    return { status: "error", data: null, error: "API base URL is not configured" };
+  }
+  try {
+    const response = await (options.fetchImpl ?? fetch)(
+      `${apiBaseUrl.replace(/\/$/, "")}${path}`,
+      {
+        method,
+        headers: {
+          "Idempotency-Key": options.idempotencyKey,
+          ...(body === undefined ? {} : { "Content-Type": "application/json" })
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) })
+      }
+    );
+    if (!response.ok) {
+      const payload = await response.json() as {
+        detail?: { message?: string };
+      };
+      return {
+        status: response.status === 409
+          ? "conflict"
+          : response.status === 404
+            ? "not_found"
+            : "error",
+        data: null,
+        error: payload.detail?.message ?? `Backend returned ${response.status}`
+      };
+    }
+    return {
+      status: "ok",
+      data: await response.json() as TimeLogMutationResult,
+      error: null
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      data: null,
+      error: error instanceof Error ? error.message : "Time-log request failed"
+    };
+  }
 }
 
 function normalizedSessionDates(activity: ActivityTimer, fallbackDate: string): Array<{ date: string; seconds: number }> {

@@ -29,6 +29,7 @@ export type IconName =
   | "timer"
   | "trash"
   | "trophy"
+  | "undo"
   | "x";
 
 interface IconProps {
@@ -181,6 +182,12 @@ const paths: Record<IconName, ReactElement> = {
       <path {...strokeProps} d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16" />
       <path {...strokeProps} d="M10 14.66V17c0 .55-.47.98-.97 1.16C7.85 18.5 7 20.06 7 22M14 14.66V17c0 .55.47.98.97 1.16C16.15 18.5 17 20.06 17 22" />
       <path {...strokeProps} d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+    </>
+  ),
+  undo: (
+    <>
+      <path {...strokeProps} d="M9 7 5 11l4 4" />
+      <path {...strokeProps} d="M5 11h8a6 6 0 0 1 6 6v1" />
     </>
   ),
   x: (

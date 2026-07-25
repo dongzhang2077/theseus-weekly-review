@@ -44,6 +44,14 @@ from .tasks import (
     TaskService,
     TaskVersionConflict,
 )
+from .time_logs import (
+    InvalidTimeLogState,
+    TimeLogNotFound,
+    TimeLogReferenceConflict,
+    TimeLogRevisionNotFound,
+    TimeLogService,
+    TimeLogVersionConflict,
+)
 
 __all__ = [
     "ActivityInUse",
@@ -80,6 +88,12 @@ __all__ = [
     "TaskService",
     "TaskNotRunnable",
     "TaskVersionConflict",
+    "InvalidTimeLogState",
+    "TimeLogNotFound",
+    "TimeLogReferenceConflict",
+    "TimeLogRevisionNotFound",
+    "TimeLogService",
+    "TimeLogVersionConflict",
     "WeeklyPlanNotFound",
     "WeeklyPlanService",
     "build_structured_review_prompt",

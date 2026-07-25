@@ -17,7 +17,8 @@ import {
   applyTodayTimeLogs,
   calendarDate,
   loadTimeLogs,
-  splitElapsedSecondsByDate
+  splitElapsedSecondsByDate,
+  type ApiTimeLogRead
 } from "./shared/api/timeLogs";
 import {
   applyOpenFocusSessions,
@@ -63,6 +64,7 @@ export function App() {
   const [selectedReviewWeek, setSelectedReviewWeek] = useState<ReviewWeekRange>(demoWeekRange);
   const [trackTodayDate, setTrackTodayDate] = useState(() => calendarDate());
   const [trackActivities, setTrackActivities] = useState<ActivityTimer[]>(demoWeek.track.activities);
+  const [trackTimeLogs, setTrackTimeLogs] = useState<ApiTimeLogRead[]>([]);
   const [activityProjects, setActivityProjects] = useState<PlanProject[]>([]);
   const [focusSessionDrafts, setFocusSessionDrafts] = useState<Record<string, FocusSessionDraft>>({});
   const [focusResultOpen, setFocusResultOpen] = useState(false);
@@ -168,6 +170,7 @@ export function App() {
           ?? activityCatalog.error
           ?? focusSessions.error
         );
+        setTrackTimeLogs(timeLogs.loaded ? timeLogs.logs : []);
         setTrackActivities(activities);
         setWeekLoading(false);
       }
@@ -186,6 +189,13 @@ export function App() {
     trackTodayDate,
     weekReload
   ]);
+
+  useEffect(() => {
+    if (!account || appPhase !== "signed_in") return;
+    setTrackActivities((current) =>
+      applyTodayTimeLogs(current, trackTimeLogs, trackTodayDate)
+    );
+  }, [account?.id, appPhase, trackTimeLogs, trackTodayDate]);
 
   useEffect(() => {
     if (!hasRunningTrackActivity) return;
@@ -211,6 +221,7 @@ export function App() {
     setAccount(nextAccount);
     setAccountOpen(false);
     setTrackActivities([]);
+    setTrackTimeLogs([]);
     setActivityProjects([]);
     setFocusSessionDrafts({});
     setFocusResultOpen(false);
@@ -247,6 +258,7 @@ export function App() {
     setAccountOpen(false);
     setAccount(null);
     setTrackActivities([]);
+    setTrackTimeLogs([]);
     setActivityProjects([]);
     setFocusSessionDrafts({});
     setFocusResultOpen(false);
@@ -434,8 +446,10 @@ export function App() {
           fetchImpl={authClient.fetch}
           track={appWeek.track}
           activities={trackActivities}
+          timeLogs={trackTimeLogs}
           projects={activityProjects}
           onActivitiesChange={setTrackActivities}
+          onTimeLogsChange={setTrackTimeLogs}
           sessionDrafts={focusSessionDrafts}
           onSessionDraftChange={updateFocusSessionDraft}
           onResultModalChange={setFocusResultOpen}

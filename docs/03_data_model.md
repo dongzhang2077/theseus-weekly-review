@@ -10,7 +10,8 @@ accepted through STORY-033 without a schema-version change. Schema version 6,
 including `FocusSession`, `FocusSessionSegment`, Focus idempotency, and exact
 TimeLog seconds, is implemented, automatically verified, and product-owner
 accepted through STORY-037 on 2026-07-25. The correction/audit extensions
-remain a schema-v7 contract.
+are implemented as the schema-v7 STORY-034 candidate and have passed automated
+verification; product-owner browser acceptance is still required.
 
 ```text
 Account (users + auth_credentials)

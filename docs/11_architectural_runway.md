@@ -238,6 +238,8 @@ sample_week.json -> SQLite -> review_engine -> stored weekly_review
 Current accepted status: SQLite schema version 6, supported migrations from
 every prior version, formal account ownership, user-scoped repositories,
 restart-path tests, and the product-owner accepted STORY-037 Focus runtime.
+The STORY-034 schema-v7 correction/audit candidate has passed automated
+verification and awaits product-owner browser acceptance.
 
 ### Stage C: Web Input
 
@@ -283,6 +285,11 @@ authenticated durable Activity management through STORY-033. STORY-037 adds
 the automatically verified and product-owner accepted schema-v6 runtime for
 durable FocusSession state and exactly-once TimeLog production. Later
 correction steps remain unavailable.
+
+Candidate status (2026-07-25 PDT): STORY-034 implements those correction steps,
+append-only revisions, soft deletion, Undo, and stale-review invalidation on
+schema v7. Automated verification passes; the candidate is not accepted until
+the product-owner browser gate passes.
 
 Implementation sequence:
 

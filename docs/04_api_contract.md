@@ -11,8 +11,10 @@ Contract status:
   its product-owner accepted branch. STORY-037 implements the Section 11.5
   FocusSession routes, Focus idempotency receipts, and the schema-v6 exact-time
   read fields. That implementation passed automated verification and the
-  product-owner browser gate on 2026-07-25. TimeLog correction, deletion,
-  Undo, and their mutation-idempotency routes remain unavailable.
+  product-owner browser gate on 2026-07-25. STORY-034 implements TimeLog
+  correction, deletion, Undo, mutation idempotency, audit revisions, and
+  overlapping-review invalidation as a schema-v7 candidate. Automated
+  verification passes; product-owner browser acceptance is still required.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:

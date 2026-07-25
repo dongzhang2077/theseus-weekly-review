@@ -8,7 +8,8 @@ from typing import Iterator
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 V6_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v6.sql"
-SCHEMA_VERSION = 6
+V7_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v7.sql"
+SCHEMA_VERSION = 7
 
 LEGACY_TABLES = (
     "weekly_reviews",
@@ -71,12 +72,14 @@ class Database:
                 self._migrate_v4_schema(connection)
             elif version == 5:
                 self._migrate_v5_schema(connection)
+            elif version == 6:
+                self._migrate_v6_schema(connection)
             elif version == SCHEMA_VERSION:
                 self._apply_schema(connection)
             else:
                 raise RuntimeError(
                     "Unsupported Theseus schema version "
-                    f"{version}; expected 1, 2, 3, 4, 5, or {SCHEMA_VERSION}"
+                    f"{version}; expected 1, 2, 3, 4, 5, 6, or {SCHEMA_VERSION}"
                 )
             version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version != SCHEMA_VERSION:
@@ -89,6 +92,7 @@ class Database:
             connection,
             self._v5_extension_sql(connection)
             + self._v6_extension_sql(connection)
+            + self._v7_extension_sql(connection)
             + SCHEMA_PATH.read_text(encoding="utf-8"),
             "The Theseus v2 database could not be migrated safely",
         )
@@ -99,6 +103,7 @@ class Database:
             "ALTER TABLE auth_credentials DROP COLUMN recovery_code_hash;\n"
             + self._v5_extension_sql(connection)
             + self._v6_extension_sql(connection)
+            + self._v7_extension_sql(connection)
             + SCHEMA_PATH.read_text(encoding="utf-8"),
             "The Theseus v3 database could not be migrated safely",
         )
@@ -108,6 +113,7 @@ class Database:
             connection,
             self._v5_extension_sql(connection)
             + self._v6_extension_sql(connection)
+            + self._v7_extension_sql(connection)
             + SCHEMA_PATH.read_text(encoding="utf-8"),
             "The Theseus v4 database could not be migrated safely",
         )
@@ -116,8 +122,17 @@ class Database:
         self._run_atomic_migration(
             connection,
             self._v6_extension_sql(connection)
+            + self._v7_extension_sql(connection)
             + SCHEMA_PATH.read_text(encoding="utf-8"),
             "The Theseus v5 database could not be migrated safely",
+        )
+
+    def _migrate_v6_schema(self, connection: sqlite3.Connection) -> None:
+        self._run_atomic_migration(
+            connection,
+            self._v7_extension_sql(connection)
+            + SCHEMA_PATH.read_text(encoding="utf-8"),
+            "The Theseus v6 database could not be migrated safely",
         )
 
     @staticmethod
@@ -174,6 +189,24 @@ class Database:
         if time_logs_exists is None:
             return ""
         return V6_MIGRATION_PATH.read_text(encoding="utf-8") + "\n"
+
+    @staticmethod
+    def _v7_extension_sql(connection: sqlite3.Connection) -> str:
+        existing_tables = {
+            row["name"]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+        if "time_logs" not in existing_tables:
+            return ""
+        migration_sql = V7_MIGRATION_PATH.read_text(encoding="utf-8")
+        if "weekly_reviews" not in existing_tables:
+            migration_sql = migration_sql.replace(
+                "ALTER TABLE weekly_reviews\nADD COLUMN stale_at TEXT;\n\n",
+                "",
+            )
+        return migration_sql + "\n"
 
     @staticmethod
     def _run_atomic_migration(

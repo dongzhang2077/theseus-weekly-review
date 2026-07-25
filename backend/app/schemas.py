@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time
+from datetime import date as DateType
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
@@ -435,8 +436,74 @@ class TimeLogRead(APIModel):
     type_source: ActivityTypeSource
     task_title: str | None = None
     note: str = ""
+    version: int = Field(ge=1)
+    deleted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class TimeLogUpdate(APIModel):
+    expected_version: int = Field(ge=1)
+    activity_id: int | None = Field(default=None, gt=0)
+    project_id: int | None = Field(default=None, gt=0)
+    task_id: int | None = Field(default=None, gt=0)
+    date: DateType | None = None
+    start_time: time | None = None
+    end_time: time | None = None
+    duration_minutes: int | None = Field(default=None, ge=0)
+    duration_seconds: int | None = Field(default=None, gt=0)
+    activity_name: str | None = Field(default=None, min_length=1, max_length=240)
+    activity_type: ActivityType | None = None
+    note: str | None = Field(default=None, max_length=4000)
+    reason: str = Field(default="", max_length=1000)
+
+    @field_validator("activity_name")
+    @classmethod
+    def strip_optional_time_log_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+    @model_validator(mode="after")
+    def validate_time_log_patch(self) -> TimeLogUpdate:
+        changed = self.model_fields_set - {"expected_version", "reason"}
+        if not changed:
+            raise ValueError("at least one time-log field is required")
+        required_values = {
+            "date",
+            "duration_minutes",
+            "duration_seconds",
+            "activity_name",
+            "activity_type",
+            "note",
+        }
+        if any(field in changed and getattr(self, field) is None for field in required_values):
+            raise ValueError("required time-log fields cannot be null")
+        if (
+            "duration_minutes" in changed
+            and "duration_seconds" in changed
+            and self.duration_minutes != (self.duration_seconds + 30) // 60
+        ):
+            raise ValueError("duration values are inconsistent")
+        return self
+
+
+class TimeLogUndoRequest(APIModel):
+    expected_version: int = Field(ge=1)
+
+
+class ReviewWeekRange(APIModel):
+    week_start: date
+    week_end: date
+
+
+class TimeLogMutationResult(APIModel):
+    time_log: TimeLogRead
+    revision_id: int
+    affected_review_weeks: list[ReviewWeekRange] = Field(default_factory=list)
 
 
 class FocusSessionCommandResponse(APIModel):
@@ -544,5 +611,6 @@ class WeeklyReviewRead(WeeklyReviewResult):
     id: int
     user_id: int
     model_name: str | None = None
+    stale_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
