@@ -94,8 +94,8 @@ STORY-035 must settle these contracts before persistence changes begin:
   weeks.
 - `Activity` is a reusable way of working or spending time.
 - `PlannedItem` allocates weekly time to a Task or an ad-hoc plan block.
-- `FocusSession` stores a resumable running, paused, completed, or cancelled
-  execution state.
+- `FocusSession` stores a running, completed, or cancelled execution state
+  using exact server timestamps.
 - `TimeLog` is the normalized completed evidence produced by a FocusSession or
   a corrected/imported manual record.
 
@@ -232,7 +232,7 @@ Acceptance and verification are defined in the product backlog.
 Demo evidence: create an Activity, restart backend and browser, select it again,
 and persist a TimeLog referencing its stable ID.
 
-### Module 4: Resumable Focus Sessions
+### Module 4: Persisted Focus Sessions
 
 Story: STORY-037
 
@@ -243,19 +243,21 @@ Depends on: STORY-033 and STORY-036.
 
 Acceptance:
 
-- start, pause, resume, finish, and cancel transitions are user-scoped;
+- Start, End, and recovery-only Cancel transitions are user-scoped;
 - multiple Activities may run independently as the accepted Focus UX requires;
-- elapsed time uses server timestamps plus stored accumulated duration;
-- finishing once creates the correct TimeLog segments atomically;
-- duplicate finish requests return the original result and never double count;
+- elapsed time uses server timestamps rather than a browser-owned clock;
+- End once creates the correct TimeLog segments atomically without a
+  confirmation form;
+- duplicate End requests return the original result and never double count;
 - browser refresh, backend restart, local midnight, timezone, and account
   isolation are covered.
 
 Verification: state-transition, idempotency, cross-midnight, restart, API, and
 frontend integration tests plus the full backend/frontend gates.
 
-Demo evidence: start in the app, restart the backend, resume, finish, and show
-the resulting TimeLogs and Today total.
+Demo evidence: Start in the app, restart the browser and backend, observe the
+same running Session, End it once, and show the resulting TimeLogs and Today
+total.
 
 ### Module 5: Inspectable And Correctable Today History
 
@@ -439,7 +441,7 @@ Use one branch per accepted story:
 feature/035-agent-ready-domain-contract
 feature/036-durable-tasks
 feature/033-persist-focus-activities
-feature/037-resumable-focus-sessions
+feature/037-persisted-focus-sessions
 feature/034-correctable-today-history
 feature/025-agent-trust-records
 feature/038-bounded-assistant-api

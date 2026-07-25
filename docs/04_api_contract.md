@@ -789,7 +789,7 @@ Requires `Idempotency-Key`.
 
 `activity_id` is required. `task_id` is optional. The server derives the
 Project, captures Activity/Task snapshots and the account timezone, creates a
-`running` session, and opens its first segment in one transaction.
+`running` session, and opens its one segment in one transaction.
 
 An `open` Task becomes `in_progress` as part of that transaction. A completed,
 cancelled, or archived Task returns `409 task_not_runnable` until the user
@@ -828,17 +828,17 @@ Response:
 }
 ```
 
-`elapsed_seconds` is calculated at response time from closed segments plus the
-open segment. It is not a background counter.
+`elapsed_seconds` is calculated at response time from the server-owned open
+segment. It is not a background counter.
 
-A second non-terminal session for the same Activity returns
+A second running session for the same Activity returns
 `409 activity_already_open` with the existing same-user session ID. Different
 Activities may run concurrently.
 
 #### GET /focus-sessions
 
-Optional `state=open` returns running and paused sessions. Repeated `status`
-filters exact statuses. Ordering is non-terminal first, then start time and ID.
+Optional `state=open` returns running sessions. Repeated `status` filters exact
+statuses. Ordering is running first, then start time and ID.
 
 #### GET /focus-sessions/{session_id}
 
@@ -849,21 +849,21 @@ inspectable.
 
 Requires `Idempotency-Key`.
 
-Pause:
+End:
 
 ```json
 {
-  "command": "pause",
+  "command": "end",
   "expected_version": 1
 }
 ```
 
-Resume uses `command = resume`; finish and cancel may include a bounded `note`.
-Valid transitions are:
+Cancel uses `command = cancel`. The v6 terminal commands accept no result or
+note form; later notes are edited on the generated TimeLog through the v7
+correction contract. Valid transitions are:
 
 ```text
-running -> paused | completed | cancelled
-paused -> running | completed | cancelled
+running -> completed | cancelled
 completed -> no transitions
 cancelled -> no transitions
 ```
@@ -879,16 +879,18 @@ Command response:
 }
 ```
 
-`time_logs` is populated only by the first successful finish. Finishing closes
-the open segment, groups exact seconds by the session timezone, atomically
-creates at most one TimeLog per affected local date, marks the session
-completed, and stores the idempotency result. A replay returns the same session
-and TimeLogs without creating new rows.
+The first successful End closes the open segment, groups exact seconds by the
+session timezone, atomically creates at most one TimeLog per affected local
+date, stores the final `accumulated_seconds`, increments the session version,
+marks the session completed, and stores a response containing those TimeLogs
+in the idempotency receipt. A replay returns that original session and those
+TimeLogs without creating new rows or incrementing the version again.
 
-Cancelling produces no TimeLogs. A completed or cancelled session cannot be
-reopened; the user starts a new session. Finishing Focus never silently marks a
-linked Task completed, and cancelling Focus does not silently cancel or reopen
-the Task.
+The first successful Cancel closes the segment, increments the session version,
+marks the session cancelled, and returns an empty `time_logs` list. A completed
+or cancelled session cannot be reopened; the user starts a new session. Ending
+Focus never silently marks a linked Task completed, and cancelling Focus does
+not silently cancel or reopen the Task.
 
 ### 11.6 TimeLog Read, Correction, Removal, And Undo
 

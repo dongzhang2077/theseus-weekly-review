@@ -279,8 +279,8 @@ Task + Activity
 
 Accepted contract status: STORY-035. Runtime status: schema v5 durable Tasks
 and nullable Task references are implemented and product-owner accepted
-through STORY-036. Authenticated durable Activity management is implemented
-and automatically verified on the STORY-033 acceptance candidate; durable
+through STORY-036. Authenticated durable Activity management is implemented,
+verified, and product-owner accepted through STORY-033; durable
 FocusSession state and later correction steps remain unavailable.
 
 Implementation sequence:
@@ -322,8 +322,8 @@ Avoid:
 - Treating a WeeklyPlan `PlannedItem` as the only durable Task record.
 - Keeping live Focus state only in one browser once a second channel can
   observe or control it.
-- Calculating elapsed Focus time with one start/end subtraction that ignores
-  pause segments.
+- Calculating elapsed Focus time from browser ticks instead of the persisted
+  server-owned Start/End interval.
 - Letting FastAPI routes, LangGraph nodes, or OpenClaw tools implement different
   Task or timer transitions.
 - Letting OpenClaw reuse browser refresh credentials or access SQLite directly.
