@@ -11,10 +11,12 @@ from ..schemas import (
     AgentActionRead,
     AgentActionStatus,
     PreferenceCreate,
+    PreferenceDetailRead,
     PreferenceRead,
     ProposalCreate,
     ProposalDecisionCreate,
     ProposalDecisionRead,
+    ProposalDetailRead,
     ProposalOutcomeCreate,
     ProposalOutcomeRead,
     ProposalRead,
@@ -80,6 +82,21 @@ class PreferenceService:
         return self.repository.list(
             source=source,
             include_deleted=include_deleted,
+        )
+
+    def detail(
+        self,
+        preference_id: int,
+        *,
+        include_deleted: bool = False,
+    ) -> PreferenceDetailRead:
+        preference = self.get(
+            preference_id,
+            include_deleted=include_deleted,
+        )
+        return PreferenceDetailRead(
+            preference=preference,
+            revisions=self.repository.list_revisions(preference_id),
         )
 
     def replace(
@@ -189,6 +206,15 @@ class ProposalLedgerService:
 
     def list(self, *, status: ProposalStatus | None = None) -> list[ProposalRead]:
         return self.repository.list(status=status)
+
+    def detail(self, proposal_id: int) -> ProposalDetailRead:
+        proposal = self.get(proposal_id)
+        return ProposalDetailRead(
+            proposal=proposal,
+            decisions=self.repository.list_decisions(proposal_id),
+            actions=self.repository.list_actions(proposal_id),
+            outcomes=self.repository.list_outcomes(proposal_id),
+        )
 
     def decide(
         self,

@@ -10,6 +10,7 @@ from ...schemas import (
     AgentActionRead,
     AgentActionStatus,
     PreferenceCreate,
+    PreferenceRevisionRead,
     PreferenceRead,
     ProposalCreate,
     ProposalDecisionCreate,
@@ -210,6 +211,19 @@ class PreferenceRepository:
             (cursor.lastrowid, self.user_id),
         ).fetchone()
         return StoredPreferenceRevision(**dict(require_row(row, "PreferenceRevision", cursor.lastrowid)))
+
+    def list_revisions(self, preference_id: int) -> list[PreferenceRevisionRead]:
+        self.get(preference_id, include_deleted=True)
+        rows = self.connection.execute(
+            """
+            SELECT *
+            FROM preference_revisions
+            WHERE user_id = ? AND preference_id = ?
+            ORDER BY id
+            """,
+            (self.user_id, preference_id),
+        ).fetchall()
+        return [_preference_revision_read(row) for row in rows]
 
 
 class ProposalRepository:
@@ -425,12 +439,55 @@ class ProposalRepository:
         ).fetchone()
         return _outcome_read(require_row(row, "ProposalOutcome", cursor.lastrowid))
 
+    def list_decisions(self, proposal_id: int) -> list[ProposalDecisionRead]:
+        self.get(proposal_id)
+        rows = self.connection.execute(
+            """
+            SELECT * FROM proposal_decisions
+            WHERE user_id = ? AND proposal_id = ?
+            ORDER BY id
+            """,
+            (self.user_id, proposal_id),
+        ).fetchall()
+        return [_decision_read(row) for row in rows]
+
+    def list_actions(self, proposal_id: int) -> list[AgentActionRead]:
+        self.get(proposal_id)
+        rows = self.connection.execute(
+            """
+            SELECT * FROM agent_actions
+            WHERE user_id = ? AND proposal_id = ?
+            ORDER BY id
+            """,
+            (self.user_id, proposal_id),
+        ).fetchall()
+        return [_action_read(row) for row in rows]
+
+    def list_outcomes(self, proposal_id: int) -> list[ProposalOutcomeRead]:
+        self.get(proposal_id)
+        rows = self.connection.execute(
+            """
+            SELECT * FROM proposal_outcomes
+            WHERE user_id = ? AND proposal_id = ?
+            ORDER BY id
+            """,
+            (self.user_id, proposal_id),
+        ).fetchall()
+        return [_outcome_read(row) for row in rows]
+
 
 def _preference_read(row: sqlite3.Row) -> PreferenceRead:
     values = dict(row)
     values["value"] = json.loads(values.pop("value_json"))
     values["provenance"] = json.loads(values.pop("provenance_json"))
     return PreferenceRead.model_validate(values)
+
+
+def _preference_revision_read(row: sqlite3.Row) -> PreferenceRevisionRead:
+    values = dict(row)
+    values["before"] = json.loads(values.pop("before_json"))
+    values["after"] = json.loads(values.pop("after_json"))
+    return PreferenceRevisionRead.model_validate(values)
 
 
 def _proposal_read(row: sqlite3.Row) -> ProposalRead:

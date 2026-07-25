@@ -570,6 +570,14 @@ rollback, provenance, scope-isolation, audit, expiry, and idempotency tests
 pass. Authenticated APIs and Pending/History/Memory UI remain the next two
 acceptance slices. Product-owner acceptance passed.
 
+STORY-025B candidate checkpoint (2026-07-25 PDT): authenticated Preference
+create/list/detail/correct/delete/restore and Proposal
+create/list/detail/decision/outcome routes are implemented. Public schemas
+cannot claim inferred or assistant provenance, Action remains audit-only, and
+focused authentication, OpenAPI, expiry, optimistic conflict, revision,
+cross-account, and restart-safe persistence tests pass. Product-owner
+acceptance remains open before the frontend control surfaces begin.
+
 ### STORY-026 Pilot one LangGraph weekly-adjustment workflow
 
 As a user, I want an approved review-to-plan workflow that can pause and resume

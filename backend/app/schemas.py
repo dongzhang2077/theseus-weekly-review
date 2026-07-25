@@ -614,6 +614,62 @@ class PreferenceRead(PreferenceCreate):
     updated_at: datetime
 
 
+class PreferenceUserCreate(APIModel):
+    preference_key: str = Field(min_length=1, max_length=120)
+    value: Any
+    scope_type: PreferenceScopeType = "global"
+    scope_ref_id: int | None = Field(default=None, gt=0)
+
+    @field_validator("preference_key")
+    @classmethod
+    def strip_user_preference_key(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+    @model_validator(mode="after")
+    def validate_user_preference_scope(self) -> PreferenceUserCreate:
+        if self.scope_type == "global" and self.scope_ref_id is not None:
+            raise ValueError("global preferences cannot have scope_ref_id")
+        if self.scope_type != "global" and self.scope_ref_id is None:
+            raise ValueError("scoped preferences require scope_ref_id")
+        return self
+
+
+class PreferenceCorrection(APIModel):
+    expected_version: int = Field(ge=1)
+    value: Any
+    reason: str = Field(default="", max_length=1000)
+
+
+class PreferenceRestoreRequest(APIModel):
+    expected_version: int = Field(ge=1)
+    reason: str = Field(default="", max_length=1000)
+
+
+class PreferenceRevisionRead(APIModel):
+    id: int
+    user_id: int
+    preference_id: int
+    action: Literal["update", "delete", "restore", "undo"]
+    before: dict[str, Any]
+    after: dict[str, Any]
+    actor_type: Literal["user", "assistant_approved"]
+    reason: str
+    created_at: datetime
+
+
+class PreferenceDetailRead(APIModel):
+    preference: PreferenceRead
+    revisions: list[PreferenceRevisionRead] = Field(default_factory=list)
+
+
+class PreferenceMutationResult(APIModel):
+    preference: PreferenceRead
+    revision_id: int
+
+
 class ProposalCreate(APIModel):
     proposal_type: ProposalType
     source: ProposalSource = "deterministic"
@@ -642,6 +698,24 @@ class ProposalRead(ProposalCreate):
     updated_at: datetime
 
 
+class ProposalDraftCreate(APIModel):
+    proposal_type: ProposalType
+    title: str = Field(min_length=1, max_length=240)
+    rationale: str = Field(default="", max_length=4000)
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
+    before: dict[str, Any]
+    after: dict[str, Any]
+    expires_at: datetime | None = None
+
+    @field_validator("title")
+    @classmethod
+    def strip_draft_proposal_title(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+
 class ProposalDecisionCreate(APIModel):
     decision: ProposalDecisionType
     decided_after: dict[str, Any] | None = None
@@ -659,6 +733,10 @@ class ProposalDecisionRead(ProposalDecisionCreate):
     user_id: int
     proposal_id: int
     created_at: datetime
+
+
+class ProposalDecisionRequest(ProposalDecisionCreate):
+    expected_version: int = Field(ge=1)
 
 
 class AgentActionCreate(APIModel):
@@ -706,6 +784,22 @@ class ProposalOutcomeRead(ProposalOutcomeCreate):
     id: int
     user_id: int
     created_at: datetime
+
+
+class ProposalOutcomeFeedback(APIModel):
+    action_id: int | None = Field(default=None, gt=0)
+    result: ProposalOutcomeResult
+    usefulness: int | None = Field(default=None, ge=1, le=5)
+    actual_duration_minutes: int | None = Field(default=None, ge=0)
+    energy_feedback: ActivityType | None = None
+    note: str = Field(default="", max_length=4000)
+
+
+class ProposalDetailRead(APIModel):
+    proposal: ProposalRead
+    decisions: list[ProposalDecisionRead] = Field(default_factory=list)
+    actions: list[AgentActionRead] = Field(default_factory=list)
+    outcomes: list[ProposalOutcomeRead] = Field(default_factory=list)
 
 
 class WeeklyReviewRequest(APIModel):

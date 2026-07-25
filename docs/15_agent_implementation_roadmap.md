@@ -528,4 +528,6 @@ regression verification pass on `feature/025-trust-ledger`; product-owner
 acceptance is recorded.
 
 Current sequential gate: STORY-025B authenticated preference and ledger APIs.
+The route and error-contract candidate is implemented and focused tests pass
+on `feature/025-trust-ledger`. Product-owner acceptance remains open.
 Arbitrary action execution remains private until the bounded Assistant API.
