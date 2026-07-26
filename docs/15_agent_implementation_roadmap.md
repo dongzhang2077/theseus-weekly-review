@@ -563,7 +563,7 @@ Action result without granting generic execution authority. Focused tests pass
 27 cases; the full 179-test suite, Python compilation, and deterministic sample
 review pass. Product-owner API acceptance passed on 2026-07-26 PDT.
 
-Current sequential gate: STORY-038D typed Weekly Plan Undo. This slice may
+Completed sequential gate: STORY-038D typed Weekly Plan Undo. This slice may
 reverse only one succeeded, reversible STORY-038C Action after proving the
 target Plan still matches the Action's verified result. It restores the exact
 recorded before-state through `WeeklyPlanService`, verifies the result, and
@@ -577,5 +577,13 @@ deterministic sample review pass. The current complete run passed 183 of 184
 tests; prior complete runs passed 182 of 183. Each run had one different
 transient authenticated request failure, every failing test passed in
 isolation, and the complete inventory passed across bounded partitions.
-Product-owner API acceptance and explicit disposition of this full-suite
-authentication flake are the remaining gate items.
+Product-owner API acceptance passed on 2026-07-26 PDT. The product owner
+accepted the full-suite authentication flake as a separate non-blocking
+stability investigation aligned with STORY-031; the flake remains unresolved.
+
+Current sequential gate: STORY-026 bounded LangGraph Weekly Adjustment pilot.
+The accepted STORY-038A-D context, proposal, approval, execution, and typed
+Undo services remain canonical. LangGraph may only orchestrate those services,
+persist resumable workflow checkpoints separately from domain truth, and prove
+pause, resume, rejection, retry, and exact-once execution before STORY-039 or
+OpenClaw write integration proceeds.

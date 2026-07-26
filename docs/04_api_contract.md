@@ -21,8 +21,8 @@ Contract status:
   STORY-038B deterministic Weekly Plan proposal operation.
 - Section 13.3 is the automatically verified and product-owner accepted
   STORY-038C approved Weekly Plan execution operation.
-- Section 13.4 is the focused-test verified STORY-038D typed Weekly Plan Undo
-  candidate. Product-owner API acceptance remains required.
+- Section 13.4 is the focused-test verified and product-owner accepted
+  STORY-038D typed Weekly Plan Undo operation.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -1279,6 +1279,12 @@ controlled `409` responses. Proposal, Action, and Plan success writes commit
 or roll back together.
 
 ### 13.4 Undo A Weekly Plan Action
+
+Implementation status: STORY-038D was product-owner accepted on 2026-07-26
+PDT after focused API, atomic persistence, idempotency, rollback, OpenAPI,
+account-isolation, compilation, and deterministic sample-review verification.
+The independently tracked long-process authentication-test flake does not
+change this public contract.
 
 ```text
 POST /assistant/proposals/{proposal_id}/actions/{action_id}/undo-weekly-plan
