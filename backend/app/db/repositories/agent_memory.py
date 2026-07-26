@@ -282,6 +282,30 @@ class ProposalRepository:
             ).fetchall()
         return [_proposal_read(row) for row in rows]
 
+    def mark_executed(
+        self,
+        proposal_id: int,
+        *,
+        expected_version: int,
+    ) -> ProposalRead:
+        cursor = self.connection.execute(
+            """
+            UPDATE proposals
+            SET status = 'executed',
+                version = version + 1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND user_id = ?
+              AND status = 'approved'
+              AND version = ?
+            """,
+            (proposal_id, self.user_id, expected_version),
+        )
+        if cursor.rowcount != 1:
+            self.get(proposal_id)
+            raise RuntimeError("proposal_execution_conflict")
+        return self.get(proposal_id)
+
     def add_decision(
         self,
         proposal_id: int,

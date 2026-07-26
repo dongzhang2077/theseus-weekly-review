@@ -216,6 +216,22 @@ class ProposalLedgerService:
             outcomes=self.repository.list_outcomes(proposal_id),
         )
 
+    def mark_executed(
+        self,
+        proposal_id: int,
+        *,
+        expected_version: int,
+    ) -> ProposalRead:
+        try:
+            return self.repository.mark_executed(
+                proposal_id,
+                expected_version=expected_version,
+            )
+        except RuntimeError as exc:
+            if str(exc) != "proposal_execution_conflict":
+                raise
+            raise ProposalVersionConflict(self.get(proposal_id)) from exc
+
     def decide(
         self,
         proposal_id: int,
@@ -259,6 +275,9 @@ class ProposalLedgerService:
             if existing is not None and _same_action(existing, action):
                 return existing
             raise ActionIdempotencyConflict from exc
+
+    def get_action_by_key(self, idempotency_key: str) -> AgentActionRead | None:
+        return self.repository.get_action_by_key(idempotency_key)
 
     def finish_action(
         self,
