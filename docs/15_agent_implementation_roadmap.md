@@ -521,3 +521,25 @@ soft deletion, Undo, and stale-review invalidation is implemented and
 automatically verified on `feature/034-correctable-today-history`. The
 product-owner browser gate passed on 2026-07-25 PDT; freeze and merge are
 authorized.
+
+Completed sequential gate: STORY-025A Trust, Memory, and Action Ledger data
+foundation. Schema v8, repositories, domain services, focused tests, and full
+regression verification pass on `feature/025-trust-ledger`; product-owner
+acceptance is recorded.
+
+Completed sequential gate: STORY-025B authenticated preference and ledger
+APIs. The route and error contract are implemented, automatically verified,
+and product-owner accepted on `feature/025-trust-ledger` on 2026-07-25 PDT.
+Arbitrary action execution remains private until the bounded Assistant API.
+
+Completed sequential gate: STORY-025C compact authenticated Pending, History,
+and Memory control surfaces. The automatically verified interface is available
+from Account and remains outside the four primary bottom-navigation tabs. It
+exposes summary/list/detail information layers plus explicit loading, empty,
+error, approval, correction, deletion, and restore states. Product-owner
+browser acceptance passed on 2026-07-26 PDT after reviewing the populated
+Assistant demo.
+
+Current sequential gate: STORY-038A authenticated, read-only Assistant context.
+This slice aggregates stable user-scoped domain reads behind one typed service
+and endpoint without model calls, proposal creation, or write authority.

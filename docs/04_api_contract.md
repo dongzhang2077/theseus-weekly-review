@@ -1057,3 +1057,62 @@ persisted path into the framework-independent review engine.
 
 OpenAPI must not expose any Section 11 operation until its implementation,
 failure tests, migration tests, and current-story acceptance gate pass.
+
+## 12. Trust, Memory, And Action Ledger
+
+STORY-025A is the accepted schema-v8 repository/domain-service foundation.
+STORY-025B implements the following authenticated API and was product-owner
+accepted on 2026-07-25 PDT after automated contract and persistence
+verification.
+
+### 12.1 Preferences
+
+```text
+POST   /preferences
+GET    /preferences?source=&include_deleted=
+GET    /preferences/{preference_id}?include_deleted=
+PATCH  /preferences/{preference_id}
+DELETE /preferences/{preference_id}?expected_version=&reason=
+POST   /preferences/{preference_id}/restore
+```
+
+Public create accepts only `preference_key`, JSON `value`, `scope_type`, and
+`scope_ref_id`. The server records `source = user_stated`; clients cannot claim
+inference provenance or confidence.
+
+Correction accepts `expected_version`, JSON `value`, and optional `reason`.
+Correcting an inferred preference turns the record into a user-stated
+preference and records its former source/version in provenance. Correction,
+soft deletion, and restore return the new record plus `revision_id`. Detail
+returns the owned record and its ordered append-only revisions.
+
+### 12.2 Proposals, Decisions, And Outcomes
+
+```text
+POST /proposals
+GET  /proposals?status=
+GET  /proposals/{proposal_id}
+POST /proposals/{proposal_id}/decisions
+POST /proposals/{proposal_id}/outcomes
+```
+
+Public proposal creation records `source = deterministic`; a client cannot
+claim `assistant`. Proposal detail includes ordered decisions, audit-only
+actions, and outcomes. Decisions accept `expected_version`, `decision`, an
+optional edited after-state, and reason. Expired proposals return
+`409 proposal_expired`; stale or already-decided proposals return
+`409 version_conflict`.
+
+Outcome feedback may record completion, usefulness from 1-5, actual duration,
+energy feedback, and a note. A referenced Action must belong to the same
+account and Proposal.
+
+There is deliberately no public generic Action-create or Action-execute route
+in STORY-025B. Actions retain user-scoped idempotency, request/result,
+verification, failure, reversibility, and Undo links inside the domain
+service. A future bounded Assistant API may call typed execution operations;
+neither a browser nor a model receives arbitrary operation authority.
+
+All requests derive `user_id` from authentication. Cross-account resources
+return a non-disclosing `404`, optimistic conflicts include the current safe
+read representation, and multi-record mutations are transactional.

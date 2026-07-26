@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AccountSheet } from "./features/auth/AccountSheet";
+import { AssistantWorkspace } from "./features/assistant/AssistantWorkspace";
 import { AuthScreen, type AuthGatePhase } from "./features/auth/AuthScreen";
 import { PlanScreen, type PlanDetail } from "./features/plan/PlanScreen";
 import { ReviewScreen } from "./features/review/ReviewScreen";
@@ -50,6 +51,7 @@ export function App() {
   const [account, setAccount] = useState<AuthAccount | null>(null);
   const [authAttempt, setAuthAttempt] = useState(0);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>(() =>
     resolveInitialTab(typeof window === "undefined" ? "" : window.location.search)
   );
@@ -101,6 +103,7 @@ export function App() {
     if (!authClient) return;
     authClient.setSessionExpiredHandler(() => {
       setAccountOpen(false);
+      setAssistantOpen(false);
       setAccount(null);
       setAppPhase("signed_out");
     });
@@ -220,6 +223,7 @@ export function App() {
   function enterSignedIn(nextAccount: AuthAccount) {
     setAccount(nextAccount);
     setAccountOpen(false);
+    setAssistantOpen(false);
     setTrackActivities([]);
     setTrackTimeLogs([]);
     setActivityProjects([]);
@@ -256,6 +260,7 @@ export function App() {
 
   function signedOut() {
     setAccountOpen(false);
+    setAssistantOpen(false);
     setAccount(null);
     setTrackActivities([]);
     setTrackTimeLogs([]);
@@ -372,23 +377,35 @@ export function App() {
     <AppShell
       activeTab={activeTab}
       onTabChange={(tab) => {
-        if (!focusResultOpen && !reviewDetailOpen && !signalsDetailOpen && !planDetailOpen) setActiveTab(tab);
+        if (!focusResultOpen && !reviewDetailOpen && !signalsDetailOpen && !planDetailOpen && !assistantOpen) setActiveTab(tab);
       }}
-      interactionLocked={focusResultOpen || reviewDetailOpen || signalsDetailOpen || planDetailOpen}
-      navigationHidden={reviewDetailOpen || signalsDetailOpen || planDetailOpen}
+      interactionLocked={focusResultOpen || reviewDetailOpen || signalsDetailOpen || planDetailOpen || assistantOpen}
+      navigationHidden={reviewDetailOpen || signalsDetailOpen || planDetailOpen || assistantOpen}
       profileName={account.display_name}
       onProfileChange={() => setAccountOpen(true)}
       notice={notice}
       noticeTitle={loadedWeek.error ?? undefined}
       overlay={
-        <AccountSheet
-          open={accountOpen}
-          account={account}
-          client={authClient}
-          onClose={() => setAccountOpen(false)}
-          onAccountChange={setAccount}
-          onSignedOut={signedOut}
-        />
+        <>
+          <AccountSheet
+            open={accountOpen}
+            account={account}
+            client={authClient}
+            onClose={() => setAccountOpen(false)}
+            onAccountChange={setAccount}
+            onSignedOut={signedOut}
+            onOpenAssistant={() => {
+              setAccountOpen(false);
+              setAssistantOpen(true);
+            }}
+          />
+          <AssistantWorkspace
+            open={assistantOpen}
+            apiBaseUrl={apiBaseUrl}
+            fetchImpl={authClient.fetch}
+            onClose={() => setAssistantOpen(false)}
+          />
+        </>
       }
     >
       {weekLoading ? <StateSurface icon="book" title="Loading your workspace" /> : null}

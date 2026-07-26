@@ -9,6 +9,7 @@ interface AccountSheetProps {
   onClose: () => void;
   onAccountChange: (account: AuthAccount) => void;
   onSignedOut: () => void;
+  onOpenAssistant?: () => void;
 }
 
 type AccountView = "overview" | "profile" | "email" | "password" | "delete";
@@ -19,7 +20,8 @@ export function AccountSheet({
   client,
   onClose,
   onAccountChange,
-  onSignedOut
+  onSignedOut,
+  onOpenAssistant
 }: AccountSheetProps) {
   const [view, setView] = useState<AccountView>("overview");
 
@@ -56,6 +58,7 @@ export function AccountSheet({
               client={client}
               onOpen={setView}
               onSignedOut={onSignedOut}
+              onOpenAssistant={onOpenAssistant}
             />
           ) : null}
           {view === "profile" ? (
@@ -80,12 +83,14 @@ function AccountOverview({
   account,
   client,
   onOpen,
-  onSignedOut
+  onSignedOut,
+  onOpenAssistant
 }: {
   account: AuthAccount;
   client: AuthClient;
   onOpen: (view: AccountView) => void;
   onSignedOut: () => void;
+  onOpenAssistant?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +121,7 @@ function AccountOverview({
         </div>
       </div>
       <div className="overflow-hidden rounded-paper border border-desk-line bg-desk-raised">
+        {onOpenAssistant ? <AccountRow label="Assistant" onClick={onOpenAssistant} /> : null}
         <AccountRow label="Edit profile" onClick={() => onOpen("profile")} />
         <AccountRow label="Change email" onClick={() => onOpen("email")} />
         <AccountRow label="Change password" onClick={() => onOpen("password")} />

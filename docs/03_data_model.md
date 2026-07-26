@@ -11,7 +11,9 @@ including `FocusSession`, `FocusSessionSegment`, Focus idempotency, and exact
 TimeLog seconds, is implemented, automatically verified, and product-owner
 accepted through STORY-037 on 2026-07-25. The schema-v7 correction/audit
 extensions are implemented, automatically verified, and product-owner accepted
-through STORY-034 on 2026-07-25.
+through STORY-034 on 2026-07-25. Schema version 8 is implemented,
+automatically verified, and product-owner accepted through STORY-025A for
+inspectable preferences and the proposal-to-outcome ledger.
 
 ```text
 Account (users + auth_credentials)
@@ -30,6 +32,12 @@ Account (users + auth_credentials)
   │     ├── FocusSessionSegment
   │     └── TimeLog (one per affected local date)
   ├── DailyReflection
+  ├── Preference
+  │     └── PreferenceRevision
+  ├── Proposal
+  │     ├── ProposalDecision
+  │     ├── AgentAction
+  │     └── ProposalOutcome
   └── WeeklyReview
         ├── ReviewFinding
         └── ReviewRecommendation
@@ -433,6 +441,31 @@ payloads are user-owned personal data and cascade on account deletion.
 | created_at | datetime | System timestamp |
 | updated_at | datetime | System timestamp |
 
+### preferences (accepted schema v8)
+
+Stores user-stated and inferred preferences as distinct, inspectable records.
+Every record contains a stable key, JSON value, typed scope, provenance, an
+optimistic version, and optional lifecycle timestamps. Inferred records require
+confidence plus either `review_after` or `expires_at`; user-stated records do
+not pretend to have model confidence. Deletion is soft and every correction,
+deletion, restore, or Undo appends `preference_revisions`.
+
+### proposals, proposal_decisions, agent_actions, proposal_outcomes
+
+These accepted schema-v8 tables form the trust ledger:
+
+- `proposals` preserve rationale, evidence, before/after JSON, expiry, status,
+  and optimistic version;
+- `proposal_decisions` append approve, edit, reject, or expire decisions;
+- `agent_actions` preserve bounded operation requests, results, verification,
+  errors, reversibility, Undo links, and a user-scoped idempotency key;
+- `proposal_outcomes` record completion, usefulness, actual duration, optional
+  energy feedback, and a user note.
+
+Ownership triggers reject cross-account scopes and ledger links. These records
+remain canonical Theseus domain data; future LangGraph checkpoints may refer to
+them but cannot replace them.
+
 ## 4. API Representation Rules
 
 - Create requests do not accept database IDs or system timestamps.
@@ -469,15 +502,16 @@ payloads are user-owned personal data and cascade on account deletion.
 
 ## 5. Accepted Migration Sequence
 
-Version 5 is the durable-Task baseline. Version 6 is the automatically verified
-and product-owner accepted STORY-037 runtime. Version 7 remains an accepted
-contract rather than a current implementation claim:
+Version 5 is the durable-Task baseline. Versions 6 and 7 are automatically
+verified and product-owner accepted runtimes. Version 8 is the accepted
+STORY-025A foundation:
 
 | Version | Story | Additive behavior |
 |---|---|---|
 | 5 | STORY-036 | `tasks`; Activity versions; nullable Task references/snapshots on PlannedItems and TimeLogs; ownership/project triggers |
 | 6 | STORY-037 | `focus_sessions`, segments, idempotency receipts, Focus provenance/exact seconds, and a TimeLog constraint rebuild allowing exact sub-minute slices |
 | 7 | STORY-034 | TimeLog versions/soft deletion, revisions, and WeeklyReview invalidation |
+| 8 | STORY-025A | Preferences/revisions and the Proposal/Decision/Action/Outcome trust ledger |
 
 STORY-033 uses the existing `activities` table plus the `version` column
 introduced by the accepted v5 foundation. It does not require another

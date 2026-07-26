@@ -86,4 +86,23 @@ describe("AccountSheet", () => {
     expect(onSignedOut).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
   });
+
+  it("opens Assistant from the account overview", () => {
+    const onOpenAssistant = vi.fn();
+    render(
+      <AccountSheet
+        open
+        account={account}
+        client={{} as AuthClient}
+        onClose={vi.fn()}
+        onAccountChange={vi.fn()}
+        onSignedOut={vi.fn()}
+        onOpenAssistant={onOpenAssistant}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Assistant" }));
+
+    expect(onOpenAssistant).toHaveBeenCalledTimes(1);
+  });
 });
