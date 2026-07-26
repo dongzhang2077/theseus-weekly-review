@@ -306,6 +306,30 @@ class ProposalRepository:
             raise RuntimeError("proposal_execution_conflict")
         return self.get(proposal_id)
 
+    def mark_undone(
+        self,
+        proposal_id: int,
+        *,
+        expected_version: int,
+    ) -> ProposalRead:
+        cursor = self.connection.execute(
+            """
+            UPDATE proposals
+            SET status = 'undone',
+                version = version + 1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND user_id = ?
+              AND status = 'executed'
+              AND version = ?
+            """,
+            (proposal_id, self.user_id, expected_version),
+        )
+        if cursor.rowcount != 1:
+            self.get(proposal_id)
+            raise RuntimeError("proposal_undo_conflict")
+        return self.get(proposal_id)
+
     def add_decision(
         self,
         proposal_id: int,
@@ -435,6 +459,25 @@ class ProposalRepository:
         if cursor.rowcount != 1:
             self.get_action(action_id)
             raise RuntimeError("action_state_conflict")
+        return self.get_action(action_id)
+
+    def mark_action_undone(self, action_id: int) -> AgentActionRead:
+        cursor = self.connection.execute(
+            """
+            UPDATE agent_actions
+            SET status = 'undone',
+                undone_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND user_id = ?
+              AND status = 'succeeded'
+              AND reversible = 1
+            """,
+            (action_id, self.user_id),
+        )
+        if cursor.rowcount != 1:
+            self.get_action(action_id)
+            raise RuntimeError("action_undo_conflict")
         return self.get_action(action_id)
 
     def add_outcome(self, outcome: ProposalOutcomeCreate) -> ProposalOutcomeRead:

@@ -913,3 +913,14 @@ class AssistantWeeklyPlanExecutionRead(APIModel):
     proposal: ProposalRead
     action: AgentActionRead
     weekly_plan: WeeklyPlanRead
+
+
+class AssistantWeeklyPlanUndoRequest(APIModel):
+    expected_version: int = Field(ge=1)
+
+
+class AssistantWeeklyPlanUndoRead(APIModel):
+    proposal: ProposalRead
+    action: AgentActionRead
+    undone_action: AgentActionRead
+    weekly_plan: WeeklyPlanRead | None = None
