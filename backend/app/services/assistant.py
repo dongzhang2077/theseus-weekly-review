@@ -7,6 +7,8 @@ from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from typing import Any, Iterator
 
+from pydantic import ValidationError
+
 from ..db.repositories import (
     GoalRepository,
     IdempotencyReceiptRepository,
@@ -18,16 +20,28 @@ from ..db.repositories import (
 )
 from ..schemas import (
     AccountRead,
+    AgentActionCreate,
+    AgentActionRead,
     AssistantContextRead,
+    AssistantProposalExecutionRequest,
     AssistantReviewSummary,
+    AssistantWeeklyPlanExecutionRead,
     AssistantWeeklyPlanProposalRequest,
     ProposalCreate,
+    ProposalDecisionRead,
     ProposalRead,
+    WeeklyPlanCreate,
     WeeklyPlanRead,
 )
 from .activities import ActivityService
-from .agent_memory import PreferenceService, ProposalLedgerService
+from .agent_memory import (
+    ActionIdempotencyConflict,
+    PreferenceService,
+    ProposalLedgerService,
+    ProposalVersionConflict,
+)
 from .focus import FocusService, IdempotencyConflict, IdempotencyInProgress
+from .planning import InvalidPlanTaskReference, WeeklyPlanService
 from .tasks import TaskService
 
 
@@ -44,6 +58,34 @@ class AssistantProposalSourceStale(Exception):
 
 
 class AssistantProposalUnavailable(Exception):
+    pass
+
+
+class AssistantProposalNotApproved(Exception):
+    def __init__(self, current: ProposalRead) -> None:
+        super().__init__("The proposal has not been approved")
+        self.current = current
+
+
+class AssistantProposalTypeUnsupported(Exception):
+    pass
+
+
+class AssistantProposalPayloadInvalid(Exception):
+    pass
+
+
+class AssistantPlanStateConflict(Exception):
+    def __init__(self, current: WeeklyPlanRead | None) -> None:
+        super().__init__("The target WeeklyPlan changed after the proposal was drafted")
+        self.current = current
+
+
+class AssistantPlanPersistenceConflict(Exception):
+    pass
+
+
+class AssistantActionInProgress(Exception):
     pass
 
 
@@ -211,6 +253,7 @@ class AssistantWeeklyPlanProposalService:
             baseline,
             week_start=request.target_week_start,
             week_end=request.target_week_end,
+            reset_completion=target_plan is None,
         )
 
         adjustment = _select_adjustment(
@@ -276,11 +319,140 @@ class AssistantWeeklyPlanProposalService:
         )
 
 
+class AssistantWeeklyPlanExecutionService:
+    OPERATION_CREATE = "weekly_plan.create"
+    OPERATION_REPLACE = "weekly_plan.replace"
+
+    def __init__(self, connection: sqlite3.Connection, user_id: int) -> None:
+        self.connection = connection
+        self.user_id = user_id
+        self.ledger = ProposalLedgerService(connection, user_id)
+        self.plans = WeeklyPlanRepository(connection, user_id)
+        self.plan_service = WeeklyPlanService(connection, user_id)
+
+    def execute(
+        self,
+        proposal_id: int,
+        request: AssistantProposalExecutionRequest,
+        *,
+        idempotency_key: str,
+    ) -> AssistantWeeklyPlanExecutionRead:
+        with _savepoint(self.connection, "assistant_weekly_plan_execution"):
+            detail = self.ledger.detail(proposal_id)
+            proposal = detail.proposal
+            if proposal.proposal_type != "weekly_plan_adjustment":
+                raise AssistantProposalTypeUnsupported
+
+            decision = _approved_decision(detail.decisions, proposal)
+            effective_after = (
+                decision.decided_after
+                if decision.decision == "edit"
+                else proposal.after
+            )
+            before_plan, after_plan = _validated_plan_diff(
+                proposal.before,
+                proposal.after,
+                effective_after,
+            )
+            operation = (
+                self.OPERATION_CREATE
+                if before_plan is None
+                else self.OPERATION_REPLACE
+            )
+            action_request = AgentActionCreate(
+                proposal_id=proposal.id,
+                decision_id=decision.id,
+                operation=operation,
+                request={
+                    "expected_version": request.expected_version,
+                    "before": proposal.before,
+                    "after": effective_after,
+                },
+                idempotency_key=idempotency_key,
+                reversible=True,
+            )
+
+            existing = self.ledger.get_action_by_key(
+                action_request.idempotency_key
+            )
+            if existing is not None:
+                return _replay_execution(existing, action_request)
+
+            action = self.ledger.create_action(action_request)
+            if action.status != "pending":
+                return _replay_execution(action, action_request)
+            if proposal.status != "approved":
+                raise AssistantProposalNotApproved(proposal)
+            if proposal.version != request.expected_version:
+                raise ProposalVersionConflict(proposal)
+
+            current = self.plans.get_by_week(
+                after_plan.week_start.isoformat(),
+                after_plan.week_end.isoformat(),
+            )
+            if before_plan is None:
+                if current is not None:
+                    raise AssistantPlanStateConflict(current)
+                persisted = self._create(after_plan)
+            else:
+                if current is None or _stored_plan_payload(current) != before_plan.model_dump(
+                    mode="json"
+                ):
+                    raise AssistantPlanStateConflict(current)
+                persisted = self._replace(current.id, after_plan)
+
+            expected_payload = after_plan.model_dump(mode="json")
+            stored_payload = _stored_plan_payload(persisted)
+            if stored_payload != expected_payload:
+                raise AssistantPlanPersistenceConflict
+
+            executed = self.ledger.mark_executed(
+                proposal.id,
+                expected_version=request.expected_version,
+            )
+            result = {
+                "proposal": executed.model_dump(mode="json"),
+                "weekly_plan": persisted.model_dump(mode="json"),
+            }
+            verification = {
+                "status": "verified",
+                "operation": operation,
+                "weekly_plan_id": persisted.id,
+                "matches_after": True,
+            }
+            finished = self.ledger.finish_action(
+                action.id,
+                status="succeeded",
+                result=result,
+                verification=verification,
+            )
+            return AssistantWeeklyPlanExecutionRead(
+                proposal=executed,
+                action=finished,
+                weekly_plan=persisted,
+            )
+
+    def _create(self, plan: WeeklyPlanCreate) -> WeeklyPlanRead:
+        try:
+            return self.plan_service.create(plan)
+        except (InvalidPlanTaskReference, sqlite3.IntegrityError) as exc:
+            raise AssistantPlanPersistenceConflict from exc
+
+    def _replace(self, plan_id: int, plan: WeeklyPlanCreate) -> WeeklyPlanRead:
+        try:
+            return self.plan_service.replace(plan_id, plan)
+        except LookupError as exc:
+            raise AssistantPlanStateConflict(None) from exc
+        except (InvalidPlanTaskReference, sqlite3.IntegrityError) as exc:
+            raise AssistantPlanPersistenceConflict from exc
+
+
 def _plan_command_payload(
     plan: WeeklyPlanRead,
     *,
     week_start: date,
     week_end: date,
+    reset_completion: bool = False,
 ) -> dict[str, Any]:
     return {
         "week_start": week_start.isoformat(),
@@ -294,12 +466,102 @@ def _plan_command_payload(
                 "title": item.title,
                 "planned_minutes": item.planned_minutes,
                 "priority": item.priority,
-                "is_completed": False,
+                "is_completed": False if reset_completion else item.is_completed,
             }
             for item in plan.items
         ],
         "note": plan.note,
     }
+
+
+def _approved_decision(
+    decisions: list[ProposalDecisionRead],
+    proposal: ProposalRead,
+) -> ProposalDecisionRead:
+    approved = [
+        decision
+        for decision in decisions
+        if decision.decision in {"approve", "edit"}
+    ]
+    if not approved:
+        raise AssistantProposalNotApproved(proposal)
+    return approved[-1]
+
+
+def _validated_plan_diff(
+    before: dict[str, Any],
+    original_after: dict[str, Any],
+    effective_after: dict[str, Any] | None,
+) -> tuple[WeeklyPlanCreate | None, WeeklyPlanCreate]:
+    try:
+        if "weekly_plan" not in before:
+            raise ValueError
+        before_value = before["weekly_plan"]
+        before_plan = (
+            None
+            if before_value is None
+            else WeeklyPlanCreate.model_validate(before_value)
+        )
+        original_plan = WeeklyPlanCreate.model_validate(
+            original_after["weekly_plan"]
+        )
+        if effective_after is None:
+            raise ValueError
+        after_plan = WeeklyPlanCreate.model_validate(
+            effective_after["weekly_plan"]
+        )
+    except (KeyError, TypeError, ValueError, ValidationError) as exc:
+        raise AssistantProposalPayloadInvalid from exc
+    if (
+        after_plan.week_start != original_plan.week_start
+        or after_plan.week_end != original_plan.week_end
+        or (
+            before_plan is not None
+            and (
+                before_plan.week_start != original_plan.week_start
+                or before_plan.week_end != original_plan.week_end
+            )
+        )
+    ):
+        raise AssistantProposalPayloadInvalid
+    return before_plan, after_plan
+
+
+def _stored_plan_payload(plan: WeeklyPlanRead) -> dict[str, Any]:
+    return _plan_command_payload(
+        plan,
+        week_start=plan.week_start,
+        week_end=plan.week_end,
+    )
+
+
+def _replay_execution(
+    action: AgentActionRead,
+    requested: AgentActionCreate,
+) -> AssistantWeeklyPlanExecutionRead:
+    if (
+        action.proposal_id != requested.proposal_id
+        or action.decision_id != requested.decision_id
+        or action.operation != requested.operation
+        or action.request != requested.request
+        or action.reversible != requested.reversible
+        or action.undo_of_action_id != requested.undo_of_action_id
+    ):
+        raise ActionIdempotencyConflict
+    if action.status == "pending":
+        raise AssistantActionInProgress
+    if action.status != "succeeded" or action.result is None:
+        raise ActionIdempotencyConflict
+    try:
+        return AssistantWeeklyPlanExecutionRead(
+            proposal=ProposalRead.model_validate(action.result["proposal"]),
+            action=action,
+            weekly_plan=WeeklyPlanRead.model_validate(
+                action.result["weekly_plan"]
+            ),
+        )
+    except (KeyError, TypeError, ValidationError) as exc:
+        raise AssistantProposalPayloadInvalid from exc
 
 
 def _select_adjustment(

@@ -9,18 +9,30 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from ..schemas import (
     AccountRead,
     AssistantContextRead,
+    AssistantProposalExecutionRequest,
+    AssistantWeeklyPlanExecutionRead,
     AssistantWeeklyPlanProposalRequest,
     ProposalRead,
 )
 from ..services import (
+    ActionIdempotencyConflict,
+    AssistantActionInProgress,
     AssistantContextService,
+    AssistantPlanPersistenceConflict,
+    AssistantPlanStateConflict,
+    AssistantProposalNotApproved,
+    AssistantProposalPayloadInvalid,
     AssistantProposalSourceNotFound,
     AssistantProposalSourceStale,
+    AssistantProposalTypeUnsupported,
     AssistantProposalUnavailable,
+    AssistantWeeklyPlanExecutionService,
     AssistantWeeklyPlanProposalService,
     IdempotencyConflict,
     IdempotencyInProgress,
     InvalidAssistantContextWindow,
+    ProposalNotFound,
+    ProposalVersionConflict,
 )
 from .dependencies import get_connection, get_current_user
 
@@ -31,6 +43,15 @@ IdempotencyKey = Annotated[
     Header(
         alias="Idempotency-Key",
         min_length=1,
+        max_length=200,
+        pattern=r".*\S.*",
+    ),
+]
+ActionIdempotencyKey = Annotated[
+    str,
+    Header(
+        alias="Idempotency-Key",
+        min_length=8,
         max_length=200,
         pattern=r".*\S.*",
     ),
@@ -116,3 +137,92 @@ async def draft_weekly_plan_proposal(
                 "message": "A request with this Idempotency-Key is still in progress",
             },
         ) from exc
+
+
+@router.post(
+    "/proposals/{proposal_id}/execute-weekly-plan",
+    response_model=AssistantWeeklyPlanExecutionRead,
+)
+async def execute_weekly_plan_proposal(
+    proposal_id: int,
+    request: AssistantProposalExecutionRequest,
+    idempotency_key: ActionIdempotencyKey,
+    user: AccountRead = Depends(get_current_user),
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> AssistantWeeklyPlanExecutionRead:
+    try:
+        return AssistantWeeklyPlanExecutionService(connection, user.id).execute(
+            proposal_id,
+            request,
+            idempotency_key=idempotency_key,
+        )
+    except ProposalNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "proposal_not_found",
+                "message": "The proposal was not found",
+            },
+        ) from exc
+    except AssistantProposalTypeUnsupported as exc:
+        raise _execution_conflict(
+            "proposal_type_unsupported",
+            "Only Weekly Plan adjustment proposals can be executed here",
+        ) from exc
+    except AssistantProposalNotApproved as exc:
+        raise _execution_conflict(
+            "proposal_not_approved",
+            "Approve the proposal before executing it",
+            current=exc.current.model_dump(mode="json"),
+        ) from exc
+    except ProposalVersionConflict as exc:
+        raise _execution_conflict(
+            "version_conflict",
+            "The proposal changed after it was loaded",
+            current=exc.current.model_dump(mode="json"),
+        ) from exc
+    except AssistantProposalPayloadInvalid as exc:
+        raise _execution_conflict(
+            "proposal_payload_invalid",
+            "The approved proposal does not contain a valid Weekly Plan change",
+        ) from exc
+    except AssistantPlanStateConflict as exc:
+        raise _execution_conflict(
+            "weekly_plan_state_conflict",
+            "The target Weekly Plan changed after the proposal was drafted",
+            current=(
+                None
+                if exc.current is None
+                else exc.current.model_dump(mode="json")
+            ),
+        ) from exc
+    except AssistantPlanPersistenceConflict as exc:
+        raise _execution_conflict(
+            "weekly_plan_persistence_conflict",
+            "The approved Weekly Plan change could not be persisted",
+        ) from exc
+    except ActionIdempotencyConflict as exc:
+        raise _execution_conflict(
+            "idempotency_conflict",
+            "Idempotency-Key was already used for another action",
+        ) from exc
+    except AssistantActionInProgress as exc:
+        raise _execution_conflict(
+            "idempotency_in_progress",
+            "An action with this Idempotency-Key is still in progress",
+        ) from exc
+
+
+def _execution_conflict(
+    code: str,
+    message: str,
+    *,
+    current: dict | None = None,
+) -> HTTPException:
+    detail: dict[str, object] = {"code": code, "message": message}
+    if current is not None:
+        detail["current"] = current
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=detail,
+    )

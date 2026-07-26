@@ -556,6 +556,9 @@ deterministic sample review pass. Product-owner acceptance passed on
 2026-07-26 PDT.
 
 Current sequential gate: STORY-038C approved Weekly Plan execution. This slice
-will accept only an already-approved weekly-plan Proposal, apply its decided
-after-state exactly once through `WeeklyPlanService`, verify the stored Plan,
-and append the Action result without granting generic execution authority.
+is now an automatically verified candidate. It accepts only an already-approved
+weekly-plan Proposal, applies its decided after-state exactly once through
+`WeeklyPlanService`, verifies the stored Plan, and appends the reversible
+Action result without granting generic execution authority. Focused tests pass
+27 cases; the full 179-test suite, Python compilation, and deterministic sample
+review pass. Product-owner API acceptance remains open.

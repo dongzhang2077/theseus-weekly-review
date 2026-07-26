@@ -903,3 +903,13 @@ class AssistantWeeklyPlanProposalRequest(APIModel):
             if window_days < 1 or window_days > 31:
                 raise ValueError(f"{label} window must cover between 1 and 31 days")
         return self
+
+
+class AssistantProposalExecutionRequest(APIModel):
+    expected_version: int = Field(ge=1)
+
+
+class AssistantWeeklyPlanExecutionRead(APIModel):
+    proposal: ProposalRead
+    action: AgentActionRead
+    weekly_plan: WeeklyPlanRead

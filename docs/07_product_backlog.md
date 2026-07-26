@@ -775,6 +775,19 @@ covered. Focused tests, the full 172-test suite, Python compilation, and the
 deterministic sample review pass. Product-owner acceptance passed on
 2026-07-26 PDT; approval and execution remain later slices.
 
+STORY-038C candidate checkpoint (2026-07-26 PDT): authenticated
+`POST /assistant/proposals/{proposal_id}/execute-weekly-plan` accepts only an
+owned, approved `weekly_plan_adjustment`, honors edited approval, validates the
+complete target Plan, and creates or replaces it through `WeeklyPlanService`.
+The operation detects target drift before writing, verifies the stored
+after-state, marks the Proposal executed, and records one reversible,
+Decision-linked succeeded Action with full before/after provenance. Exact
+replay returns the same Action and Plan. Pending, unsupported, stale,
+cross-account, reused-key, invalid-link, and rollback paths are covered.
+Focused tests pass 27 cases; the full 179-test suite, Python compilation, and
+deterministic sample review pass. Product-owner API acceptance remains open;
+typed Undo remains a later slice.
+
 ### STORY-039 Bind a conversation channel to an account
 
 As a user, I want one external conversation identity securely paired with my

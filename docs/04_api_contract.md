@@ -19,6 +19,8 @@ Contract status:
   STORY-038A read-only Assistant context operation.
 - Section 13.2 is the automatically verified and product-owner accepted
   STORY-038B deterministic Weekly Plan proposal operation.
+- Section 13.3 is the automatically verified STORY-038C approved Weekly Plan
+  execution candidate. Product-owner API acceptance remains required.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -1211,3 +1213,61 @@ the original Proposal; key reuse with another payload returns
 `409 idempotency_conflict`. A different key for the same stored-review version
 and target window reuses the same Proposal rather than creating a duplicate.
 Receipt, Proposal, and failure rollback share one transaction.
+
+### 13.3 Execute An Approved Weekly Plan Proposal
+
+```text
+POST /assistant/proposals/{proposal_id}/execute-weekly-plan
+Idempotency-Key: <opaque action key>
+```
+
+Request:
+
+```json
+{
+  "expected_version": 2
+}
+```
+
+Only an owned `weekly_plan_adjustment` Proposal in `approved` state may enter
+this operation. An `approve` decision uses the Proposal's original
+`after.weekly_plan`; an `edit` decision uses its complete `decided_after`
+WeeklyPlan. Edited approval may change the plan values and items but cannot
+silently move the change to another target week.
+
+Before writing, the service validates the complete `WeeklyPlanCreate` shape
+and compares the target Plan with `before.weekly_plan`. A null before-state
+requires that no target Plan exists and creates one. A populated before-state
+must match the current Plan and is atomically replaced. Any intervening change
+returns `409 weekly_plan_state_conflict` without overwriting it.
+
+Status: `200 OK`. Response:
+
+```json
+{
+  "proposal": {},
+  "action": {},
+  "weekly_plan": {}
+}
+```
+
+The successful transaction:
+
+- creates one Action tied to the approving Decision and opaque idempotency key;
+- creates or replaces the target WeeklyPlan through `WeeklyPlanService`;
+- reads the stored Plan back and verifies it matches the approved after-state;
+- marks the Proposal `executed` with an incremented version;
+- marks the Action `succeeded` with the stored Plan, verification result,
+  operation, and Plan ID.
+
+The Action is marked reversible and retains the full approved before/after
+request for a later typed Undo slice. STORY-038C does not expose generic Action
+execution or an Undo endpoint.
+
+An exact idempotency replay returns the original Proposal, Action, and Plan
+without another write. Key reuse for another action returns
+`409 idempotency_conflict`. Missing/foreign Proposals return `404`; pending or
+rejected Proposals, unsupported proposal types, stale proposal versions,
+invalid stored payloads, invalid links, and verification failures return
+controlled `409` responses. Proposal, Action, and Plan success writes commit
+or roll back together.
