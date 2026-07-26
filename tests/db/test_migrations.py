@@ -91,7 +91,7 @@ def test_v1_database_migrates_to_local_user_ownership(tmp_path) -> None:
         "weekly_reviews": (10, 1),
     }
     assert tuple(item) == (7, 6, 4)
-    assert version == 8
+    assert version == 9
     assert violations == []
 
 
@@ -155,7 +155,7 @@ def test_v2_database_adds_auth_tables_without_rewriting_personal_data(tmp_path) 
     assert tuple(goal) == (7, 4, "Existing goal")
     assert auth_tables == {"auth_credentials", "auth_sessions"}
     assert credential_count == 0
-    assert version == 8
+    assert version == 9
     assert violations == []
 
 
@@ -220,7 +220,7 @@ def test_v3_database_removes_recovery_code_without_rewriting_account(tmp_path) -
         "existing@example.com",
         "$argon2id$preserved-password-hash",
     )
-    assert version == 8
+    assert version == 9
     assert violations == []
 
 
@@ -411,7 +411,7 @@ def test_v4_database_adds_task_foundation_without_rewriting_personal_data(
         }
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 8
+    assert version == 9
     assert tuple(activity) == (6, 1)
     assert tuple(item) == (8, None, "Existing block")
     assert tuple(time_log) == (9, None, None)
@@ -595,7 +595,7 @@ def test_v5_database_adds_focus_foundation_and_preserves_time_logs(
         ).fetchone()
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 8
+    assert version == 9
     assert tables == {
         "focus_sessions",
         "focus_session_segments",
@@ -695,7 +695,7 @@ def test_v6_database_adds_correction_history_and_preserves_evidence(tmp_path) ->
         ).fetchone()
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 8
+    assert version == 9
     assert tuple(time_log) == (9, 1800, 1, None)
     assert tuple(review) == (10, None)
     assert revision_table is not None
@@ -780,7 +780,7 @@ def test_v7_database_adds_trust_ledger_without_rewriting_account(tmp_path) -> No
         }
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 8
+    assert version == 9
     assert tuple(user) == (4, "Existing account")
     assert ledger_tables == {
         "preferences",
@@ -844,6 +844,55 @@ def test_v7_migration_failure_rolls_back_trust_ledger(
     assert preferences == 0
     assert marker == 0
     assert version == 7
+
+
+def test_v8_database_adds_channel_identity_tables_without_rewriting_users(
+    tmp_path,
+) -> None:
+    database_path = tmp_path / "owned-v8.db"
+    database = Database(database_path)
+    database.initialize()
+    with database.session() as connection:
+        connection.execute(
+            """
+            INSERT INTO users (id, display_name, timezone, locale)
+            VALUES (41, 'Version Eight User', 'UTC', 'en')
+            """
+        )
+        connection.executescript(
+            """
+            DROP TABLE integration_message_receipts;
+            DROP TABLE channel_bindings;
+            DROP TABLE integration_credential_scopes;
+            DROP TABLE integration_credentials;
+            PRAGMA user_version = 8;
+            """
+        )
+
+    database.initialize()
+
+    with database.session() as connection:
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+        user = connection.execute(
+            "SELECT display_name FROM users WHERE id = 41"
+        ).fetchone()
+        tables = {
+            row["name"]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+        violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+
+    assert version == 9
+    assert user["display_name"] == "Version Eight User"
+    assert {
+        "integration_credentials",
+        "integration_credential_scopes",
+        "channel_bindings",
+        "integration_message_receipts",
+    } <= tables
+    assert violations == []
 
 
 def _create_v6_database(database_path: Path) -> None:

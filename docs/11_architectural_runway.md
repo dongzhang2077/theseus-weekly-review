@@ -328,6 +328,13 @@ Missing or stale Review Evidence is computed through the existing
 retry, and exact-once integration tests pass. The accepted slice deliberately
 exposes no new channel or generic Agent API.
 
+STORY-039 accepted status (2026-07-26 PDT): scoped integration access is a
+separate authentication boundary from browser JWT sessions. Schema v9 hashes
+high-entropy credentials, HMAC-protects channel/message identifiers, stores
+explicit read/propose/execute scopes, and supports immediate revocation. The
+first channel operation is read-only Assistant context through the same typed
+domain service. Channel code has no direct repository or SQLite access.
+
 ## 10. Anti-Patterns to Avoid
 
 Avoid:

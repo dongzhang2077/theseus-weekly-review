@@ -841,3 +841,21 @@ Acceptance criteria:
 - Revocation immediately blocks the integration without deleting domain data.
 - Pairing, expiry, scope, replay, revocation, redaction, and account-isolation
   tests pass.
+
+STORY-039 accepted checkpoint (2026-07-26 PDT): schema v9 and authenticated
+`/integrations` management now create one scoped, expiring credential and
+channel binding. The token is returned once and stored only as a hash; channel
+identity and external message IDs use keyed HMACs. A separate integration
+Bearer credential can call only the read-only channel context endpoint when it
+has `context:read`; browser JWTs are not reused. Replay receipts contain no
+personal context copies. Pairing, OpenAPI, expiry, scope, replay conflict,
+revocation, redaction, v8 migration, and account-isolation tests pass in the
+focused candidate suite. Real OpenClaw/WhatsApp transport and propose/execute
+channel endpoints remain deferred. Product-owner acceptance passed on
+2026-07-26 PDT.
+
+Acceptance verification: 27 focused Integration/schema/migration tests pass.
+The full suite completed 196 of 197 tests; the sole failure was the previously
+tracked intermittent authenticated Activity request and passed immediately in
+isolation. Python compilation and deterministic sample review pass. This is
+not evidence that the separate authentication flake has been fixed.

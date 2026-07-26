@@ -410,6 +410,12 @@ Rollout order: read-only context and review first; proposal second; approved
 writes last. Keep OpenClaw behind an adapter so it can be replaced without
 changing domain services.
 
+STORY-039 accepted foundation (2026-07-26 PDT): the replaceable channel layer
+can now be paired to one account using a one-time integration token rather than
+browser credentials. Only the read-only context scope is exposed end to end;
+proposal and approved-execution scopes are stored but remain unavailable until
+their bounded adapter gates are implemented and accepted.
+
 ### Phase 4: Learned Personalization
 
 Goal: rank or time suggestions from recorded feedback and outcomes.
