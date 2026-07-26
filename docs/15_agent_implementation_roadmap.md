@@ -540,6 +540,14 @@ error, approval, correction, deletion, and restore states. Product-owner
 browser acceptance passed on 2026-07-26 PDT after reviewing the populated
 Assistant demo.
 
-Current sequential gate: STORY-038A authenticated, read-only Assistant context.
-This slice aggregates stable user-scoped domain reads behind one typed service
-and endpoint without model calls, proposal creation, or write authority.
+Completed sequential gate: STORY-038A authenticated, read-only Assistant
+context. The automatically verified operation aggregates stable user-scoped domain
+reads behind one typed service and endpoint without model calls, proposal
+creation, or write authority. Focused tests, the full 163-test backend suite,
+Python compilation, and deterministic sample review pass. Product-owner API
+acceptance passed on 2026-07-26 PDT.
+
+Current sequential gate: STORY-038B deterministic Weekly Plan proposal. This
+slice will create one evidence-backed Pending proposal with an inspectable
+before/after diff, while preserving the current WeeklyPlan until a later,
+explicit approval-and-execution slice.

@@ -856,3 +856,32 @@ class WeeklyReviewRead(WeeklyReviewResult):
     stale_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class AssistantReviewSummary(APIModel):
+    id: int
+    week_start: date
+    week_end: date
+    wins: list[ReviewFinding] = Field(default_factory=list)
+    risk_flags: list[ReviewRisk] = Field(default_factory=list)
+    next_steps: list[ReviewRecommendation] = Field(default_factory=list)
+    stale_at: datetime | None = None
+    updated_at: datetime
+
+
+class AssistantContextRead(APIModel):
+    context_version: Literal["v1"] = "v1"
+    user_id: int
+    timezone: str
+    locale: str
+    week_start: date
+    week_end: date
+    goals: list[GoalRead] = Field(default_factory=list)
+    projects: list[ProjectRead] = Field(default_factory=list)
+    tasks: list[TaskRead] = Field(default_factory=list)
+    activities: list[ActivityRead] = Field(default_factory=list)
+    weekly_plan: WeeklyPlanRead | None = None
+    open_focus_sessions: list[FocusSessionRead] = Field(default_factory=list)
+    time_logs: list[TimeLogRead] = Field(default_factory=list)
+    latest_review: AssistantReviewSummary | None = None
+    preferences: list[PreferenceRead] = Field(default_factory=list)

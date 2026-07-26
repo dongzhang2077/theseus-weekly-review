@@ -4,6 +4,7 @@ from .activities import (
     ActivityService,
     ActivityVersionConflict,
 )
+from .assistant import AssistantContextService, InvalidAssistantContextWindow
 from .agent_memory import (
     ActionIdempotencyConflict,
     ActionNotFound,
@@ -69,6 +70,7 @@ __all__ = [
     "ActivityNotFound",
     "ActivityService",
     "ActivityVersionConflict",
+    "AssistantContextService",
     "ActivityAlreadyRunning",
     "ActionIdempotencyConflict",
     "ActionNotFound",
@@ -86,6 +88,7 @@ __all__ = [
     "IdempotencyConflict",
     "IdempotencyInProgress",
     "InvalidAccountTimezone",
+    "InvalidAssistantContextWindow",
     "InvalidFocusTransition",
     "InvalidPlanTaskReference",
     "InvalidTaskTransition",
