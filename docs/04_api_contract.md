@@ -17,6 +17,8 @@ Contract status:
   product-owner browser acceptance passed on 2026-07-25.
 - Section 13.1 is the automatically verified and product-owner accepted
   STORY-038A read-only Assistant context operation.
+- Section 13.2 is the automatically verified and product-owner accepted
+  STORY-038B deterministic Weekly Plan proposal operation.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -1160,3 +1162,52 @@ Tasks, completed FocusSessions, and data from every other account.
 `AssistantContextService`, which calls existing user-scoped services and
 repositories. No SQL or review rules live in the route, and no `/assistant`
 write operation is exposed in STORY-038A.
+
+### 13.2 Draft A Weekly Plan Adjustment
+
+Implementation status: STORY-038B was product-owner accepted on 2026-07-26
+PDT after automated API, persistence, idempotency, and rollback verification.
+
+```text
+POST /assistant/proposals/weekly-adjustment
+Idempotency-Key: <opaque client key>
+```
+
+Request:
+
+```json
+{
+  "review_week_start": "2026-06-08",
+  "review_week_end": "2026-06-14",
+  "target_week_start": "2026-06-15",
+  "target_week_end": "2026-06-21"
+}
+```
+
+Each explicit inclusive window must contain between 1 and 31 days. The
+authenticated service requires a current exact-window stored WeeklyReview and
+its reviewed WeeklyPlan. A stale review returns
+`409 weekly_review_stale`; missing source data returns a non-disclosing `404`.
+
+The deterministic policy selects the highest-ratio supported `under_plan`
+Project from `weekly_review.evidence.plan.project_drift`. It proposes a
+bounded restart allocation of `max(30, actual_minutes)` only when that value is
+lower than the current target allocation. If no supported reduction exists,
+the route returns `409 weekly_adjustment_unavailable`.
+
+Status: `201 Created`. The response is the normal `ProposalRead` shape with:
+
+- `proposal_type = weekly_plan_adjustment`;
+- `source = deterministic` and `status = pending`;
+- evidence identifying the stored review and exact Project-drift row;
+- `before.weekly_plan` containing the existing target plan, or null when none
+  exists;
+- `after.weekly_plan` containing a complete future plan command shape with the
+  proposed allocation.
+
+The operation writes only the Proposal and its idempotency receipt. It never
+creates or replaces a WeeklyPlan. Replaying the same key and payload returns
+the original Proposal; key reuse with another payload returns
+`409 idempotency_conflict`. A different key for the same stored-review version
+and target window reuses the same Proposal rather than creating a duplicate.
+Receipt, Proposal, and failure rollback share one transaction.

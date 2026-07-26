@@ -885,3 +885,21 @@ class AssistantContextRead(APIModel):
     time_logs: list[TimeLogRead] = Field(default_factory=list)
     latest_review: AssistantReviewSummary | None = None
     preferences: list[PreferenceRead] = Field(default_factory=list)
+
+
+class AssistantWeeklyPlanProposalRequest(APIModel):
+    review_week_start: date
+    review_week_end: date
+    target_week_start: date
+    target_week_end: date
+
+    @model_validator(mode="after")
+    def validate_windows(self) -> AssistantWeeklyPlanProposalRequest:
+        for label, start, end in (
+            ("review", self.review_week_start, self.review_week_end),
+            ("target", self.target_week_start, self.target_week_end),
+        ):
+            window_days = (end - start).days + 1
+            if window_days < 1 or window_days > 31:
+                raise ValueError(f"{label} window must cover between 1 and 31 days")
+        return self

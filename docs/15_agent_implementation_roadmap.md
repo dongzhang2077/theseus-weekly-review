@@ -547,7 +547,15 @@ creation, or write authority. Focused tests, the full 163-test backend suite,
 Python compilation, and deterministic sample review pass. Product-owner API
 acceptance passed on 2026-07-26 PDT.
 
-Current sequential gate: STORY-038B deterministic Weekly Plan proposal. This
-slice will create one evidence-backed Pending proposal with an inspectable
-before/after diff, while preserving the current WeeklyPlan until a later,
-explicit approval-and-execution slice.
+Completed sequential gate: STORY-038B deterministic Weekly Plan proposal. This
+automatically verified candidate creates one idempotent, evidence-backed
+Pending proposal with an inspectable before/after diff, while preserving the
+current WeeklyPlan until a later, explicit approval-and-execution slice.
+Focused tests, the full 172-test suite, Python compilation, and the
+deterministic sample review pass. Product-owner acceptance passed on
+2026-07-26 PDT.
+
+Current sequential gate: STORY-038C approved Weekly Plan execution. This slice
+will accept only an already-approved weekly-plan Proposal, apply its decided
+after-state exactly once through `WeeklyPlanService`, verify the stored Plan,
+and append the Action result without granting generic execution authority.
