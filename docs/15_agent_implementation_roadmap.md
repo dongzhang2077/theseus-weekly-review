@@ -587,3 +587,18 @@ Undo services remain canonical. LangGraph may only orchestrate those services,
 persist resumable workflow checkpoints separately from domain truth, and prove
 pause, resume, rejection, retry, and exact-once execution before STORY-039 or
 OpenClaw write integration proceeds.
+
+Accepted checkpoint (2026-07-26 PDT): LangGraph 1.x and the official SQLite
+checkpointer now orchestrate one deterministic Weekly Adjustment workflow. The
+approval node has no pre-interrupt side effect; Decision recording is safely
+reusable after a checkpoint failure; execution reuses the accepted idempotent
+STORY-038C service. Seven workflow integration tests and 34 combined
+STORY-038/026 tests pass, including process-boundary restart, edit, reject,
+retry, exact replay, and account-scoped thread isolation. Checkpoints contain
+only dates, status, account ID, and ledger IDs. A local start/resume/status CLI
+is available for demo evidence. Product-owner acceptance passed on 2026-07-26
+PDT.
+
+Verification checkpoint: all 191 backend/workflow tests pass in one run;
+Python compilation, `pip check`, deterministic sample review, and a real
+four-process start/status/resume/replay CLI demonstration pass.

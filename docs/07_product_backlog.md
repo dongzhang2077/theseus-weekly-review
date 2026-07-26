@@ -605,6 +605,22 @@ Acceptance criteria:
 - LangGraph checkpoints do not become the canonical domain database.
 - Retry, resume, rejection, and failure paths have integration tests.
 
+STORY-026 accepted checkpoint (2026-07-26 PDT): a bounded
+`WeeklyAdjustmentWorkflow` uses LangGraph 1.x interrupts and the official
+SQLite checkpointer to orchestrate the accepted STORY-038 proposal, decision,
+execution, verification, and Action services. It pauses with only a Proposal
+ID, survives closing and reopening both databases, supports approve, edit, and
+reject, replays completed approval without another Plan or Action, and retries
+a failed execution without duplicating the Decision. Checkpoints contain only
+account/date/status and ledger IDs; canonical Plan and Evidence data remain in
+Theseus. Seven workflow integration tests and 34 combined STORY-038/026 tests
+pass. No HTTP route, frontend control, model call, or OpenClaw adapter is added
+in this slice. Product-owner acceptance passed on 2026-07-26 PDT.
+
+Verification checkpoint: all 191 backend/workflow tests pass in one run;
+Python compilation, dependency consistency, deterministic sample review, and a
+four-process start/status/resume/replay CLI demonstration also pass.
+
 ### STORY-027 Add an OpenClaw conversation adapter
 
 As a user, I want to reach Theseus through one conversational channel so that I

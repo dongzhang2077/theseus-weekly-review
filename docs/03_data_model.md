@@ -466,6 +466,12 @@ Ownership triggers reject cross-account scopes and ledger links. These records
 remain canonical Theseus domain data; future LangGraph checkpoints may refer to
 them but cannot replace them.
 
+STORY-026 runtime checkpoints are deliberately stored in a separate SQLite
+database. Their state is limited to the account ID, requested date windows,
+workflow status, and Proposal/Decision/Action IDs. WeeklyPlan contents,
+Evidence, preferences, credentials, and outcomes remain in the canonical
+Theseus database and are hydrated through user-scoped services when read.
+
 ## 4. API Representation Rules
 
 - Create requests do not accept database IDs or system timestamps.
