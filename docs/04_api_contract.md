@@ -21,6 +21,8 @@ Contract status:
   STORY-038B deterministic Weekly Plan proposal operation.
 - Section 13.3 is the automatically verified and product-owner accepted
   STORY-038C approved Weekly Plan execution operation.
+- Section 13.4 is the focused-test verified STORY-038D typed Weekly Plan Undo
+  candidate. Product-owner API acceptance remains required.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -1275,3 +1277,58 @@ rejected Proposals, unsupported proposal types, stale proposal versions,
 invalid stored payloads, invalid links, and verification failures return
 controlled `409` responses. Proposal, Action, and Plan success writes commit
 or roll back together.
+
+### 13.4 Undo A Weekly Plan Action
+
+```text
+POST /assistant/proposals/{proposal_id}/actions/{action_id}/undo-weekly-plan
+Idempotency-Key: <opaque action key>
+```
+
+Request:
+
+```json
+{
+  "expected_version": 3
+}
+```
+
+This is a typed inverse of Section 13.3, not a generic Action executor. The
+authenticated account must own both path records. The Proposal must be
+`executed`, and the selected Action must belong to it, be `succeeded`, be
+marked reversible, and use `weekly_plan.create` or `weekly_plan.replace`.
+
+Before writing, the service validates the Action's recorded before/after
+payload and verified persisted Plan. The target Plan must still have the same
+ID and complete command representation as the successful Action result. A
+later edit returns `409 weekly_plan_state_conflict` without creating an Undo
+Action or changing the original Action or Proposal.
+
+Status: `200 OK`. Response:
+
+```json
+{
+  "proposal": {},
+  "action": {},
+  "undone_action": {},
+  "weekly_plan": null
+}
+```
+
+For an original create, Undo deletes that exact target Plan and returns
+`weekly_plan = null`. For an original replace, Undo restores the exact recorded
+before-state while preserving the target Plan ID. The successful transaction:
+
+- creates one non-reversible `weekly_plan.undo_create` or
+  `weekly_plan.undo_replace` Action linked by `undo_of_action_id`;
+- restores the recorded before-state through `WeeklyPlanService`;
+- reads back and verifies absence or exact equality;
+- marks the original Action `undone` and records `undone_at`;
+- marks the Proposal `undone` with an incremented version;
+- finishes the Undo Action as `succeeded` with verification evidence.
+
+All writes commit or roll back together. Exact key replay returns the original
+Undo result; another payload using the key returns `409 idempotency_conflict`.
+Missing or foreign records return non-disclosing `404` responses. Unsupported,
+already-undone, stale-version, malformed-payload, drift, and persistence states
+return controlled `409` responses.

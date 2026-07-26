@@ -52,6 +52,10 @@ class ActionIdempotencyConflict(Exception):
     pass
 
 
+class ActionUndoConflict(Exception):
+    pass
+
+
 class ActionNotFound(Exception):
     pass
 
@@ -232,6 +236,22 @@ class ProposalLedgerService:
                 raise
             raise ProposalVersionConflict(self.get(proposal_id)) from exc
 
+    def mark_undone(
+        self,
+        proposal_id: int,
+        *,
+        expected_version: int,
+    ) -> ProposalRead:
+        try:
+            return self.repository.mark_undone(
+                proposal_id,
+                expected_version=expected_version,
+            )
+        except RuntimeError as exc:
+            if str(exc) != "proposal_undo_conflict":
+                raise
+            raise ProposalVersionConflict(self.get(proposal_id)) from exc
+
     def decide(
         self,
         proposal_id: int,
@@ -278,6 +298,20 @@ class ProposalLedgerService:
 
     def get_action_by_key(self, idempotency_key: str) -> AgentActionRead | None:
         return self.repository.get_action_by_key(idempotency_key)
+
+    def get_action(self, action_id: int) -> AgentActionRead:
+        try:
+            return self.repository.get_action(action_id)
+        except LookupError as exc:
+            raise ActionNotFound from exc
+
+    def mark_action_undone(self, action_id: int) -> AgentActionRead:
+        try:
+            return self.repository.mark_action_undone(action_id)
+        except LookupError as exc:
+            raise ActionNotFound from exc
+        except RuntimeError as exc:
+            raise ActionUndoConflict from exc
 
     def finish_action(
         self,

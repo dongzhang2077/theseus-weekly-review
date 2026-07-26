@@ -22,6 +22,10 @@ class WeeklyPlanService:
         self.plans.get(plan_id)
         return self.plans.replace(plan_id, self._normalize_task_links(plan))
 
+    def delete(self, plan_id: int) -> None:
+        self.plans.get(plan_id)
+        self.plans.delete(plan_id)
+
     def _normalize_task_links(self, plan: WeeklyPlanCreate) -> WeeklyPlanCreate:
         items: list[PlannedItemCreate] = []
         for item in plan.items:

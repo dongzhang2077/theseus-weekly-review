@@ -569,3 +569,13 @@ target Plan still matches the Action's verified result. It restores the exact
 recorded before-state through `WeeklyPlanService`, verifies the result, and
 atomically records the Undo Action plus the original Action and Proposal state
 changes. Generic Undo and unrelated Action operations remain unavailable.
+
+Candidate checkpoint (2026-07-26 PDT): the typed endpoint and atomic service,
+repository, schema, and audit behavior are implemented. Focused Assistant and
+trust-ledger verification passes 29 tests; Python compilation and the
+deterministic sample review pass. The current complete run passed 183 of 184
+tests; prior complete runs passed 182 of 183. Each run had one different
+transient authenticated request failure, every failing test passed in
+isolation, and the complete inventory passed across bounded partitions.
+Product-owner API acceptance and explicit disposition of this full-suite
+authentication flake are the remaining gate items.

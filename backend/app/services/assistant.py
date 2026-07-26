@@ -26,6 +26,8 @@ from ..schemas import (
     AssistantProposalExecutionRequest,
     AssistantReviewSummary,
     AssistantWeeklyPlanExecutionRead,
+    AssistantWeeklyPlanUndoRead,
+    AssistantWeeklyPlanUndoRequest,
     AssistantWeeklyPlanProposalRequest,
     ProposalCreate,
     ProposalDecisionRead,
@@ -36,6 +38,7 @@ from ..schemas import (
 from .activities import ActivityService
 from .agent_memory import (
     ActionIdempotencyConflict,
+    ActionNotFound,
     PreferenceService,
     ProposalLedgerService,
     ProposalVersionConflict,
@@ -86,6 +89,10 @@ class AssistantPlanPersistenceConflict(Exception):
 
 
 class AssistantActionInProgress(Exception):
+    pass
+
+
+class AssistantUndoUnavailable(Exception):
     pass
 
 
@@ -447,6 +454,149 @@ class AssistantWeeklyPlanExecutionService:
             raise AssistantPlanPersistenceConflict from exc
 
 
+class AssistantWeeklyPlanUndoService:
+    OPERATION_UNDO_CREATE = "weekly_plan.undo_create"
+    OPERATION_UNDO_REPLACE = "weekly_plan.undo_replace"
+
+    def __init__(self, connection: sqlite3.Connection, user_id: int) -> None:
+        self.connection = connection
+        self.ledger = ProposalLedgerService(connection, user_id)
+        self.plans = WeeklyPlanRepository(connection, user_id)
+        self.plan_service = WeeklyPlanService(connection, user_id)
+
+    def undo(
+        self,
+        proposal_id: int,
+        action_id: int,
+        request: AssistantWeeklyPlanUndoRequest,
+        *,
+        idempotency_key: str,
+    ) -> AssistantWeeklyPlanUndoRead:
+        with _savepoint(self.connection, "assistant_weekly_plan_undo"):
+            detail = self.ledger.detail(proposal_id)
+            proposal = detail.proposal
+            if proposal.proposal_type != "weekly_plan_adjustment":
+                raise AssistantProposalTypeUnsupported
+            original = self.ledger.get_action(action_id)
+            if original.proposal_id != proposal.id:
+                raise ActionNotFound
+            if (
+                original.status not in {"succeeded", "undone"}
+                or not original.reversible
+            ):
+                raise AssistantUndoUnavailable
+            before_plan, after_plan, persisted_after = _validated_undo_action(
+                original
+            )
+            operation = (
+                self.OPERATION_UNDO_CREATE
+                if original.operation
+                == AssistantWeeklyPlanExecutionService.OPERATION_CREATE
+                else self.OPERATION_UNDO_REPLACE
+            )
+            undo_request = AgentActionCreate(
+                proposal_id=proposal.id,
+                decision_id=original.decision_id,
+                operation=operation,
+                request={
+                    "expected_version": request.expected_version,
+                    "original_action_id": original.id,
+                    "before": original.request["before"],
+                    "after": original.request["after"],
+                },
+                idempotency_key=idempotency_key,
+                reversible=False,
+                undo_of_action_id=original.id,
+            )
+            existing = self.ledger.get_action_by_key(idempotency_key)
+            if existing is not None:
+                return _replay_undo(existing, undo_request)
+
+            if original.status != "succeeded":
+                raise AssistantUndoUnavailable
+            if proposal.status != "executed":
+                raise AssistantUndoUnavailable
+            if proposal.version != request.expected_version:
+                raise ProposalVersionConflict(proposal)
+
+            current = self.plans.get_by_week(
+                after_plan.week_start.isoformat(),
+                after_plan.week_end.isoformat(),
+            )
+            if (
+                current is None
+                or current.id != persisted_after.id
+                or _stored_plan_payload(current)
+                != after_plan.model_dump(mode="json")
+            ):
+                raise AssistantPlanStateConflict(current)
+
+            undo_action = self.ledger.create_action(undo_request)
+            if undo_action.status != "pending":
+                return _replay_undo(undo_action, undo_request)
+
+            restored: WeeklyPlanRead | None
+            try:
+                if before_plan is None:
+                    self.plan_service.delete(current.id)
+                    restored = None
+                else:
+                    restored = self.plan_service.replace(current.id, before_plan)
+            except (
+                LookupError,
+                InvalidPlanTaskReference,
+                sqlite3.IntegrityError,
+            ) as exc:
+                raise AssistantPlanPersistenceConflict from exc
+
+            stored = self.plans.get_by_week(
+                after_plan.week_start.isoformat(),
+                after_plan.week_end.isoformat(),
+            )
+            if before_plan is None:
+                verified = stored is None
+            else:
+                verified = (
+                    stored is not None
+                    and stored.id == current.id
+                    and _stored_plan_payload(stored)
+                    == before_plan.model_dump(mode="json")
+                )
+            if not verified:
+                raise AssistantPlanPersistenceConflict
+
+            undone_original = self.ledger.mark_action_undone(original.id)
+            undone_proposal = self.ledger.mark_undone(
+                proposal.id,
+                expected_version=request.expected_version,
+            )
+            result = {
+                "proposal": undone_proposal.model_dump(mode="json"),
+                "undone_action": undone_original.model_dump(mode="json"),
+                "weekly_plan": (
+                    None if restored is None else restored.model_dump(mode="json")
+                ),
+            }
+            verification = {
+                "status": "verified",
+                "operation": operation,
+                "weekly_plan_id": current.id,
+                "matches_before": True,
+            }
+            finished = self.ledger.finish_action(
+                undo_action.id,
+                status="succeeded",
+                result=result,
+                verification=verification,
+            )
+            return AssistantWeeklyPlanUndoRead(
+                proposal=undone_proposal,
+                action=finished,
+                undone_action=undone_original,
+                weekly_plan=restored,
+            )
+
+
 def _plan_command_payload(
     plan: WeeklyPlanRead,
     *,
@@ -527,6 +677,39 @@ def _validated_plan_diff(
     return before_plan, after_plan
 
 
+def _validated_undo_action(
+    action: AgentActionRead,
+) -> tuple[WeeklyPlanCreate | None, WeeklyPlanCreate, WeeklyPlanRead]:
+    if action.operation not in {
+        AssistantWeeklyPlanExecutionService.OPERATION_CREATE,
+        AssistantWeeklyPlanExecutionService.OPERATION_REPLACE,
+    }:
+        raise AssistantUndoUnavailable
+    try:
+        before_plan, after_plan = _validated_plan_diff(
+            action.request["before"],
+            action.request["after"],
+            action.request["after"],
+        )
+        if action.result is None:
+            raise ValueError
+        persisted_after = WeeklyPlanRead.model_validate(
+            action.result["weekly_plan"]
+        )
+    except (KeyError, TypeError, ValueError, ValidationError) as exc:
+        raise AssistantProposalPayloadInvalid from exc
+    if (
+        (
+            action.operation
+            == AssistantWeeklyPlanExecutionService.OPERATION_CREATE
+        )
+        != (before_plan is None)
+        or _stored_plan_payload(persisted_after) != after_plan.model_dump(mode="json")
+    ):
+        raise AssistantProposalPayloadInvalid
+    return before_plan, after_plan, persisted_after
+
+
 def _stored_plan_payload(plan: WeeklyPlanRead) -> dict[str, Any]:
     return _plan_command_payload(
         plan,
@@ -558,6 +741,41 @@ def _replay_execution(
             action=action,
             weekly_plan=WeeklyPlanRead.model_validate(
                 action.result["weekly_plan"]
+            ),
+        )
+    except (KeyError, TypeError, ValidationError) as exc:
+        raise AssistantProposalPayloadInvalid from exc
+
+
+def _replay_undo(
+    action: AgentActionRead,
+    requested: AgentActionCreate,
+) -> AssistantWeeklyPlanUndoRead:
+    if (
+        action.proposal_id != requested.proposal_id
+        or action.decision_id != requested.decision_id
+        or action.operation != requested.operation
+        or action.request != requested.request
+        or action.reversible != requested.reversible
+        or action.undo_of_action_id != requested.undo_of_action_id
+    ):
+        raise ActionIdempotencyConflict
+    if action.status == "pending":
+        raise AssistantActionInProgress
+    if action.status != "succeeded" or action.result is None:
+        raise ActionIdempotencyConflict
+    try:
+        weekly_plan_payload = action.result["weekly_plan"]
+        return AssistantWeeklyPlanUndoRead(
+            proposal=ProposalRead.model_validate(action.result["proposal"]),
+            action=action,
+            undone_action=AgentActionRead.model_validate(
+                action.result["undone_action"]
+            ),
+            weekly_plan=(
+                None
+                if weekly_plan_payload is None
+                else WeeklyPlanRead.model_validate(weekly_plan_payload)
             ),
         )
     except (KeyError, TypeError, ValidationError) as exc:

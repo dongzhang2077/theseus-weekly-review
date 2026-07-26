@@ -788,6 +788,22 @@ Focused tests pass 27 cases; the full 179-test suite, Python compilation, and
 deterministic sample review pass. Product-owner API acceptance passed on
 2026-07-26 PDT; typed Undo remains the next bounded slice.
 
+STORY-038D candidate checkpoint (2026-07-26 PDT): authenticated
+`POST /assistant/proposals/{proposal_id}/actions/{action_id}/undo-weekly-plan`
+reverses only one owned, succeeded, reversible STORY-038C Weekly Plan Action.
+It proves the target still matches the verified Action result, restores the
+recorded before-state through `WeeklyPlanService`, verifies the result, and
+atomically records the Undo Action while marking the original Action and
+Proposal undone. Exact replay, create deletion, replace restoration, stale
+version, target drift, rollback, OpenAPI typing, and account isolation are
+covered by 29 focused Assistant/ledger tests. Python compilation and deterministic sample
+review pass. Repeated full-suite runs consistently complete with exactly one
+transient authenticated request failure: the current inventory passed 183 of
+184, and the prior inventory passed 182 of 183. Different tests fail each run,
+every isolated failure passes on rerun, and the complete inventory passes
+across bounded partitions. Product-owner API acceptance and resolution or
+formal tracking of that authentication-suite flake remain open.
+
 ### STORY-039 Bind a conversation channel to an account
 
 As a user, I want one external conversation identity securely paired with my
