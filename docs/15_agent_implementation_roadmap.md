@@ -548,6 +548,8 @@ Python compilation, and deterministic sample review pass. Product-owner API
 acceptance passed on 2026-07-26 PDT.
 
 Current sequential gate: STORY-038B deterministic Weekly Plan proposal. This
-slice will create one evidence-backed Pending proposal with an inspectable
-before/after diff, while preserving the current WeeklyPlan until a later,
-explicit approval-and-execution slice.
+automatically verified candidate creates one idempotent, evidence-backed
+Pending proposal with an inspectable before/after diff, while preserving the
+current WeeklyPlan until a later, explicit approval-and-execution slice.
+Focused tests, the full 172-test suite, Python compilation, and the
+deterministic sample review pass. Product-owner API acceptance remains open.
