@@ -532,9 +532,14 @@ APIs. The route and error contract are implemented, automatically verified,
 and product-owner accepted on `feature/025-trust-ledger` on 2026-07-25 PDT.
 Arbitrary action execution remains private until the bounded Assistant API.
 
-Current sequential gate: STORY-025C compact authenticated Pending, History,
-and Memory control surfaces. The automatically verified candidate is available
+Completed sequential gate: STORY-025C compact authenticated Pending, History,
+and Memory control surfaces. The automatically verified interface is available
 from Account and remains outside the four primary bottom-navigation tabs. It
 exposes summary/list/detail information layers plus explicit loading, empty,
 error, approval, correction, deletion, and restore states. Product-owner
-browser acceptance remains open.
+browser acceptance passed on 2026-07-26 PDT after reviewing the populated
+Assistant demo.
+
+Current sequential gate: STORY-038A authenticated, read-only Assistant context.
+This slice aggregates stable user-scoped domain reads behind one typed service
+and endpoint without model calls, proposal creation, or write authority.
