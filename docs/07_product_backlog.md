@@ -764,7 +764,7 @@ OpenAPI, cross-account isolation, and invalid/unbounded-window tests pass.
 Product-owner acceptance passed on 2026-07-26 PDT.
 Proposal and execution operations remain deferred to later STORY-038 slices.
 
-STORY-038B candidate checkpoint (2026-07-26 PDT): authenticated
+STORY-038B accepted checkpoint (2026-07-26 PDT): authenticated
 `POST /assistant/proposals/weekly-adjustment` deterministically turns one
 current stored review's Project-drift Evidence into one Pending
 `weekly_plan_adjustment` Proposal. The response exposes exact review/Project
@@ -772,8 +772,8 @@ provenance plus a complete before/after WeeklyPlan diff; it does not write the
 Plan. Required idempotency, existing-proposal reuse, rollback after failure,
 stale/missing/unsupported states, OpenAPI shape, and account isolation are
 covered. Focused tests, the full 172-test suite, Python compilation, and the
-deterministic sample review pass. Product-owner API acceptance remains open;
-approval and execution remain later slices.
+deterministic sample review pass. Product-owner acceptance passed on
+2026-07-26 PDT; approval and execution remain later slices.
 
 ### STORY-039 Bind a conversation channel to an account
 

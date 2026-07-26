@@ -17,8 +17,8 @@ Contract status:
   product-owner browser acceptance passed on 2026-07-25.
 - Section 13.1 is the automatically verified and product-owner accepted
   STORY-038A read-only Assistant context operation.
-- Section 13.2 is the automatically verified STORY-038B deterministic Weekly
-  Plan proposal candidate. Product-owner API acceptance remains required.
+- Section 13.2 is the automatically verified and product-owner accepted
+  STORY-038B deterministic Weekly Plan proposal operation.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -1164,6 +1164,9 @@ repositories. No SQL or review rules live in the route, and no `/assistant`
 write operation is exposed in STORY-038A.
 
 ### 13.2 Draft A Weekly Plan Adjustment
+
+Implementation status: STORY-038B was product-owner accepted on 2026-07-26
+PDT after automated API, persistence, idempotency, and rollback verification.
 
 ```text
 POST /assistant/proposals/weekly-adjustment
