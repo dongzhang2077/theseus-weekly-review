@@ -15,8 +15,8 @@ Contract status:
   correction, deletion, Undo, mutation idempotency, audit revisions, and
   overlapping-review invalidation on schema v7. Automated verification and
   product-owner browser acceptance passed on 2026-07-25.
-- Section 13.1 is the automatically verified STORY-038A read-only Assistant
-  context candidate. Product-owner API acceptance remains required.
+- Section 13.1 is the automatically verified and product-owner accepted
+  STORY-038A read-only Assistant context operation.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -1121,10 +1121,10 @@ read representation, and multi-record mutations are transactional.
 
 ## 13. Bounded Assistant API
 
-STORY-038A introduces the first automatically verified candidate operation.
-It is read-only, deterministic, and available without an external model key.
-Proposal drafting, approval, execution, and language interpretation remain
-outside this slice.
+STORY-038A introduced the first automatically verified and product-owner
+accepted operation on 2026-07-26 PDT. It is read-only, deterministic, and
+available without an external model key. Proposal drafting, approval,
+execution, and language interpretation remain outside this slice.
 
 ### 13.1 Read Assistant Context
 

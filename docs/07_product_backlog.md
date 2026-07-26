@@ -752,7 +752,7 @@ Acceptance criteria:
   attempts cannot leave partial changes.
 - A deterministic local path remains available without an external model key.
 
-STORY-038A candidate checkpoint (2026-07-26 PDT): authenticated
+STORY-038A accepted checkpoint (2026-07-26 PDT): authenticated
 `GET /assistant/context` aggregates one bounded date window of stable
 user-scoped active Goals/Projects, open or in-progress Tasks, relevant
 Activities, WeeklyPlan,
@@ -761,6 +761,7 @@ WeeklyReview summary through `AssistantContextService`. The route exposes no
 write method, SQL, email, credentials, full review prose, or full review
 evidence. Authentication, stable empty shape, exact-window aggregation,
 OpenAPI, cross-account isolation, and invalid/unbounded-window tests pass.
+Product-owner acceptance passed on 2026-07-26 PDT.
 Proposal and execution operations remain deferred to later STORY-038 slices.
 
 ### STORY-039 Bind a conversation channel to an account
