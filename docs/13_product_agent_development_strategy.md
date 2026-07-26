@@ -389,6 +389,17 @@ Entry gate: Phase 1 contracts and policy rules are stable.
 Exit gate: pause/resume, retry, approval, idempotency, verification, and audit
 are covered by integration tests.
 
+Accepted checkpoint (2026-07-26 PDT): the bounded Weekly Adjustment workflow
+is implemented with a separate SQLite checkpointer and the already accepted
+Assistant/domain services. Automated restart, approve/edit/reject, retry,
+idempotency, verification, and account-thread isolation tests pass. No model or
+conversation channel is part of this slice. Product-owner acceptance passed on
+2026-07-26 PDT.
+
+Verification checkpoint: 191 backend/workflow tests, Python compilation,
+dependency consistency, deterministic sample review, and the multi-process
+restart CLI demonstration pass.
+
 ### Phase 3: OpenClaw Conversation Adapter
 
 Goal: expose Theseus through one conversational channel.

@@ -319,6 +319,15 @@ LangGraph may orchestrate this sequence after the explicit service workflow is
 tested. OpenClaw remains a replaceable transport adapter and uses scoped
 integration identity rather than browser cookies or direct database access.
 
+STORY-026 accepted status (2026-07-26 PDT): the first LangGraph workflow now
+orchestrates the accepted Weekly Adjustment services behind a separate SQLite
+checkpointer. The runtime thread is account-scoped, stores only domain IDs and
+workflow metadata, and uses deterministic draft/execute idempotency keys.
+Missing or stale Review Evidence is computed through the existing
+`ReviewService`; current Evidence is reused. Restart, approval, edit, rejection,
+retry, and exact-once integration tests pass. The accepted slice deliberately
+exposes no new channel or generic Agent API.
+
 ## 10. Anti-Patterns to Avoid
 
 Avoid:
