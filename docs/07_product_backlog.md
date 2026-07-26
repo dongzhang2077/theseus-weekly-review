@@ -752,6 +752,17 @@ Acceptance criteria:
   attempts cannot leave partial changes.
 - A deterministic local path remains available without an external model key.
 
+STORY-038A candidate checkpoint (2026-07-26 PDT): authenticated
+`GET /assistant/context` aggregates one bounded date window of stable
+user-scoped active Goals/Projects, open or in-progress Tasks, relevant
+Activities, WeeklyPlan,
+running FocusSessions, non-deleted TimeLogs, active Preferences, and a compact
+WeeklyReview summary through `AssistantContextService`. The route exposes no
+write method, SQL, email, credentials, full review prose, or full review
+evidence. Authentication, stable empty shape, exact-window aggregation,
+OpenAPI, cross-account isolation, and invalid/unbounded-window tests pass.
+Proposal and execution operations remain deferred to later STORY-038 slices.
+
 ### STORY-039 Bind a conversation channel to an account
 
 As a user, I want one external conversation identity securely paired with my

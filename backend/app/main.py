@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .api.activities import router as activities_router
 from .api.agent_memory import router as agent_memory_router
+from .api.assistant import router as assistant_router
 from .api.auth import router as auth_router
 from .api.focus_sessions import router as focus_sessions_router
 from .api.goals import router as goals_router
@@ -67,6 +68,7 @@ def create_app(
     application.state.auth_service = None
     application.include_router(auth_router)
     application.include_router(agent_memory_router)
+    application.include_router(assistant_router)
     application.include_router(focus_sessions_router)
     application.include_router(activities_router)
     application.include_router(goals_router)

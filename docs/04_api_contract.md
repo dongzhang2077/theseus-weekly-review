@@ -15,6 +15,8 @@ Contract status:
   correction, deletion, Undo, mutation idempotency, audit revisions, and
   overlapping-review invalidation on schema v7. Automated verification and
   product-owner browser acceptance passed on 2026-07-25.
+- Section 13.1 is the automatically verified STORY-038A read-only Assistant
+  context candidate. Product-owner API acceptance remains required.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -1116,3 +1118,45 @@ neither a browser nor a model receives arbitrary operation authority.
 All requests derive `user_id` from authentication. Cross-account resources
 return a non-disclosing `404`, optimistic conflicts include the current safe
 read representation, and multi-record mutations are transactional.
+
+## 13. Bounded Assistant API
+
+STORY-038A introduces the first automatically verified candidate operation.
+It is read-only, deterministic, and available without an external model key.
+Proposal drafting, approval, execution, and language interpretation remain
+outside this slice.
+
+### 13.1 Read Assistant Context
+
+```text
+GET /assistant/context?week_start=YYYY-MM-DD&week_end=YYYY-MM-DD
+```
+
+Both dates are required and the inclusive window must contain between 1 and
+31 days. Invalid or unbounded windows return:
+
+```json
+{
+  "detail": {
+    "code": "invalid_context_window",
+    "message": "Assistant context must cover between 1 and 31 days"
+  }
+}
+```
+
+The authenticated response has `context_version = "v1"` and includes the
+account's timezone and locale, current Goals, Projects, Tasks, Activities, the
+exact-window WeeklyPlan, running FocusSessions, non-deleted TimeLogs in the
+window, active Preferences, and an optional exact-window WeeklyReview summary.
+
+The review summary contains Wins, Risks, Next Steps, staleness, and timestamps.
+It deliberately excludes generated prose and the full evidence JSON. The
+context includes only active Goals, active Projects, open/in-progress Tasks,
+and Activities that are unbound or belong to an active Project. It excludes
+email, credentials, auth sessions, deleted Preferences, completed/cancelled
+Tasks, completed FocusSessions, and data from every other account.
+
+`GET /assistant/context` delegates aggregation to
+`AssistantContextService`, which calls existing user-scoped services and
+repositories. No SQL or review rules live in the route, and no `/assistant`
+write operation is exposed in STORY-038A.

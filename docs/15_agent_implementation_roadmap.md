@@ -541,5 +541,8 @@ browser acceptance passed on 2026-07-26 PDT after reviewing the populated
 Assistant demo.
 
 Current sequential gate: STORY-038A authenticated, read-only Assistant context.
-This slice aggregates stable user-scoped domain reads behind one typed service
-and endpoint without model calls, proposal creation, or write authority.
+The automatically verified candidate aggregates stable user-scoped domain
+reads behind one typed service and endpoint without model calls, proposal
+creation, or write authority. Focused tests, the full 163-test backend suite,
+Python compilation, and deterministic sample review pass. Product-owner API
+acceptance remains open.
