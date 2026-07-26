@@ -19,8 +19,8 @@ Contract status:
   STORY-038A read-only Assistant context operation.
 - Section 13.2 is the automatically verified and product-owner accepted
   STORY-038B deterministic Weekly Plan proposal operation.
-- Section 13.3 is the automatically verified STORY-038C approved Weekly Plan
-  execution candidate. Product-owner API acceptance remains required.
+- Section 13.3 is the automatically verified and product-owner accepted
+  STORY-038C approved Weekly Plan execution operation.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -1215,6 +1215,10 @@ and target window reuses the same Proposal rather than creating a duplicate.
 Receipt, Proposal, and failure rollback share one transaction.
 
 ### 13.3 Execute An Approved Weekly Plan Proposal
+
+Implementation status: STORY-038C was product-owner accepted on 2026-07-26
+PDT after focused API, persistence, idempotency, rollback, full-suite,
+compilation, and deterministic sample-review verification.
 
 ```text
 POST /assistant/proposals/{proposal_id}/execute-weekly-plan
