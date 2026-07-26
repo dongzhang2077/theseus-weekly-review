@@ -1338,3 +1338,41 @@ Undo result; another payload using the key returns `409 idempotency_conflict`.
 Missing or foreign records return non-disclosing `404` responses. Unsupported,
 already-undone, stale-version, malformed-payload, drift, and persistence states
 return controlled `409` responses.
+
+## 14. Channel Identity And Scoped Integration Access
+
+Implementation status: STORY-039 was product-owner accepted on 2026-07-26
+PDT. Browser-authenticated management operations are:
+
+```text
+POST   /integrations/pair
+GET    /integrations
+DELETE /integrations/{credential_id}
+```
+
+Pairing accepts `label`, `channel_type`, raw `external_identity`, one or more
+of `context:read`, `proposal:create`, and `action:execute`, and an expiry from
+300 to 2,592,000 seconds. The response returns the integration `access_token`
+exactly once. Lists return only its prefix and lifecycle metadata; neither raw
+token nor raw external identity is readable later. Duplicate active channel
+identity returns `409 channel_identity_already_paired`; foreign management is
+non-disclosing `404`. Delete returns `204` and revokes the credential/binding
+without deleting domain data.
+
+The first channel-authenticated operation is:
+
+```text
+GET /integrations/channel/context?week_start=&week_end=
+Authorization: Bearer <integration token>
+X-Channel-Type: local_test | openclaw | whatsapp
+X-External-Identity: <paired external identity>
+X-External-Message-ID: <channel message ID>
+```
+
+It requires `context:read` and delegates to `AssistantContextService`. Invalid,
+expired, revoked, or mismatched credentials return one redacted
+`401 integration_access_denied`; insufficient scope returns
+`403 integration_scope_denied`. Reusing one external message ID with another
+request returns `409 external_message_replay_conflict`. The receipt stores only
+HMAC/hash metadata, not the external identifiers or Assistant context payload.
+No channel proposal or execution operation is exposed in this candidate.

@@ -23,6 +23,8 @@ ProposalStatus = Literal["pending", "approved", "rejected", "expired", "executed
 ProposalDecisionType = Literal["approve", "edit", "reject", "expire"]
 AgentActionStatus = Literal["pending", "succeeded", "failed", "undone"]
 ProposalOutcomeResult = Literal["completed", "partial", "not_completed", "dismissed"]
+IntegrationChannelType = Literal["local_test", "openclaw", "whatsapp"]
+IntegrationScope = Literal["context:read", "proposal:create", "action:execute"]
 ReviewMode = Literal["deterministic_first", "supportive_text"]
 RiskType = Literal[
     "alignment_gap",
@@ -98,6 +100,49 @@ class AccountRead(APIModel):
     locale: str
     created_at: datetime
     updated_at: datetime
+
+
+class IntegrationPairCreate(APIModel):
+    label: str = Field(min_length=1, max_length=80)
+    channel_type: IntegrationChannelType
+    external_identity: str = Field(min_length=1, max_length=256, repr=False)
+    scopes: list[IntegrationScope] = Field(min_length=1, max_length=3)
+    expires_in_seconds: int = Field(default=86400, ge=300, le=2592000)
+
+    @field_validator("label", "external_identity")
+    @classmethod
+    def strip_integration_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+    @field_validator("scopes")
+    @classmethod
+    def require_unique_scopes(
+        cls, value: list[IntegrationScope]
+    ) -> list[IntegrationScope]:
+        if len(set(value)) != len(value):
+            raise ValueError("scopes must be unique")
+        return sorted(value)
+
+
+class IntegrationCredentialRead(APIModel):
+    id: int
+    user_id: int
+    label: str
+    channel_type: IntegrationChannelType
+    scopes: list[IntegrationScope]
+    token_prefix: str
+    expires_at: datetime
+    revoked_at: datetime | None = None
+    last_used_at: datetime | None = None
+    created_at: datetime
+
+
+class IntegrationPairRead(APIModel):
+    credential: IntegrationCredentialRead
+    access_token: str = Field(repr=False)
 
 
 class AuthTokenResponse(APIModel):

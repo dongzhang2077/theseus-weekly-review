@@ -602,3 +602,17 @@ PDT.
 Verification checkpoint: all 191 backend/workflow tests pass in one run;
 Python compilation, `pip check`, deterministic sample review, and a real
 four-process start/status/resume/replay CLI demonstration pass.
+
+Current sequential gate: STORY-039 Channel Identity And Scoped Integration
+Access. Candidate schema v9, pairing/list/revoke management, hashed expiring
+credentials, HMAC-protected channel/message identities, explicit scopes, and a
+read-only channel context operation are implemented. Replay receipts store
+only minimized request metadata. Focused pairing, OpenAPI, scope, expiry,
+replay, revocation, redaction, v8 migration, and account-isolation verification
+passes. OpenClaw/WhatsApp transport and channel proposal/execution remain out
+of scope. Product-owner acceptance passed on 2026-07-26 PDT.
+
+Acceptance verification: 27 focused tests pass. The complete inventory reached
+196 of 197 with one previously tracked intermittent authenticated Activity
+request failure, which passed in isolation. Compilation and deterministic
+sample review pass; STORY-031 remains responsible for the unrelated flake.

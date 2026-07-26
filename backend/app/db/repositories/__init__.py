@@ -11,6 +11,11 @@ from .focus import (
     StoredFocusSession,
     StoredIdempotencyReceipt,
 )
+from .integrations import (
+    IntegrationRepository,
+    StoredIntegrationAuth,
+    StoredIntegrationReceipt,
+)
 from .planning import (
     FocusTimeLogInsert,
     StoredTimeLogRevision,
@@ -32,10 +37,13 @@ __all__ = [
     "GoalRepository",
     "ProjectRepository",
     "IdempotencyReceiptRepository",
+    "IntegrationRepository",
     "StoredAuthIdentity",
     "StoredAuthSession",
     "StoredFocusSession",
     "StoredIdempotencyReceipt",
+    "StoredIntegrationAuth",
+    "StoredIntegrationReceipt",
     "StoredPreferenceRevision",
     "StoredTimeLogRevision",
     "TimeLogRepository",

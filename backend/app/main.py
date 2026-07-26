@@ -14,6 +14,7 @@ from .api.auth import router as auth_router
 from .api.focus_sessions import router as focus_sessions_router
 from .api.goals import router as goals_router
 from .api.imports import router as imports_router
+from .api.integrations import router as integrations_router
 from .api.projects import router as projects_router
 from .api.reviews import router as reviews_router
 from .api.time_logs import router as time_logs_router
@@ -73,6 +74,7 @@ def create_app(
     application.include_router(activities_router)
     application.include_router(goals_router)
     application.include_router(imports_router)
+    application.include_router(integrations_router)
     application.include_router(projects_router)
     application.include_router(reviews_router)
     application.include_router(time_logs_router)

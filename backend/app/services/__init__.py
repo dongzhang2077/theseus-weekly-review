@@ -55,6 +55,15 @@ from .focus import (
     InvalidFocusTransition,
     TaskNotRunnable,
 )
+from .integrations import (
+    IntegrationAccessContext,
+    IntegrationAccessDenied,
+    IntegrationBindingConflict,
+    IntegrationCredentialNotFound,
+    IntegrationReplayConflict,
+    IntegrationScopeDenied,
+    IntegrationService,
+)
 from .review_service import ReviewService, WeeklyPlanNotFound
 from .review_writer import (
     OpenCodeGoReviewWriter,
@@ -119,6 +128,13 @@ __all__ = [
     "IdempotencyConflict",
     "IdempotencyInProgress",
     "InvalidAccountTimezone",
+    "IntegrationAccessContext",
+    "IntegrationAccessDenied",
+    "IntegrationBindingConflict",
+    "IntegrationCredentialNotFound",
+    "IntegrationReplayConflict",
+    "IntegrationScopeDenied",
+    "IntegrationService",
     "InvalidAssistantContextWindow",
     "InvalidFocusTransition",
     "InvalidPlanTaskReference",
