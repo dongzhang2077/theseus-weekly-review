@@ -476,7 +476,8 @@ Theseus database and are hydrated through user-scoped services when read.
 
 ### integration_credentials, channel_bindings, integration_message_receipts
 
-Schema v9 stores high-entropy integration credential hashes, explicit scopes,
+Schema v10 stores high-entropy integration credential hashes, explicit scopes
+(`context:read`, `proposal:create`, `proposal:decide`, and `action:execute`),
 expiry/revocation timestamps, and one HMAC-protected channel identity binding.
 Raw tokens and raw external identities are never stored. Replay receipts keep
 only the credential ID, HMAC-protected message ID, operation, and request hash;

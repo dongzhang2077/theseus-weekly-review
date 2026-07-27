@@ -1351,7 +1351,8 @@ DELETE /integrations/{credential_id}
 ```
 
 Pairing accepts `label`, `channel_type`, raw `external_identity`, one or more
-of `context:read`, `proposal:create`, and `action:execute`, and an expiry from
+of `context:read`, `proposal:create`, `proposal:decide`, and `action:execute`,
+and an expiry from
 300 to 2,592,000 seconds. The response returns the integration `access_token`
 exactly once. Lists return only its prefix and lifecycle metadata; neither raw
 token nor raw external identity is readable later. Duplicate active channel
@@ -1403,4 +1404,32 @@ payload returns `409 external_message_replay_conflict`. Integration receipts
 retain only HMAC/hash metadata and never store the proposal response. Invalid,
 expired, revoked, or mismatched credentials return the same redacted `401
 integration_access_denied`; missing scope returns `403
-integration_scope_denied`. Channel approval and execution are not exposed.
+integration_scope_denied`.
+
+### 14.2 Decide A Channel Weekly Plan Proposal
+
+Implementation status: STORY-027 rollout gate three records only a narrow
+approval response. It never executes a plan change.
+
+```text
+POST /integrations/channel/proposals/{proposal_id}/decision
+Authorization: Bearer <integration token>
+X-Channel-Type: local_test | openclaw | whatsapp
+X-External-Identity: <paired external identity>
+X-External-Message-ID: <channel message ID>
+```
+
+The JSON body accepts `expected_version`, `decision` (`approve` or `reject`),
+and an optional `reason`. It requires the distinct `proposal:decide` scope and
+delegates to `ProposalLedgerService`, which appends the decision and changes the
+owned pending Proposal to `approved` or `rejected`. It cannot accept `edit` or
+`expire`, writes neither a WeeklyPlan nor an Action, and exposes no channel
+execution endpoint.
+
+The same HMAC-protected message receipt contract applies: an exact retry
+returns the original decision, whereas reusing its message ID for a different
+proposal or payload returns `409 external_message_replay_conflict`. Stale,
+already decided, or expired proposals return controlled `409` responses;
+missing proposals return `404 proposal_not_found`. Invalid, expired, revoked,
+or mismatched credentials return redacted `401 integration_access_denied`, and
+missing scope returns `403 integration_scope_denied`.

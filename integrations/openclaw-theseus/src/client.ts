@@ -22,6 +22,13 @@ export interface TheseusWeeklyProposalRequest {
   targetWeekEnd: string;
 }
 
+export interface TheseusWeeklyProposalDecisionRequest {
+  proposalId: number;
+  expectedVersion: number;
+  decision: "approve" | "reject";
+  reason?: string;
+}
+
 interface TheseusRequestOptions {
   fetch?: typeof fetch;
   messageId?: string;
@@ -86,6 +93,34 @@ export async function draftTheseusWeeklyPlanProposal(
   );
 }
 
+/**
+ * Records a narrowly scoped proposal decision. This never executes the
+ * approved plan change.
+ */
+export async function decideTheseusWeeklyPlanProposal(
+  config: TheseusClientConfig,
+  request: TheseusWeeklyProposalDecisionRequest,
+  options: TheseusRequestOptions = {},
+): Promise<unknown> {
+  const messageId = requiredMessageId(options.messageId);
+  return requestTheseus(
+    config,
+    new URL(
+      `/integrations/channel/proposals/${request.proposalId}/decision`,
+      normalizedBase(config.baseUrl),
+    ),
+    "POST",
+    messageId,
+    options.fetch,
+    {
+      expected_version: request.expectedVersion,
+      decision: request.decision,
+      ...(request.reason === undefined ? {} : {reason: request.reason}),
+    },
+    "decision",
+  );
+}
+
 async function requestTheseus(
   config: TheseusClientConfig,
   url: URL,
@@ -93,7 +128,7 @@ async function requestTheseus(
   messageId: string,
   fetchOverride: typeof fetch | undefined,
   body: object | undefined,
-  operation: "context" | "proposal",
+  operation: "context" | "proposal" | "decision",
 ): Promise<unknown> {
   const fetcher = fetchOverride ?? fetch;
   const controller = new AbortController();
@@ -135,7 +170,7 @@ function requiredMessageId(value: string | undefined): string {
   if (typeof value === "string" && value.trim()) return value;
   throw new TheseusAdapterError(
     "external_message_id_required",
-    "A trusted channel message ID is required to create a Theseus proposal",
+    "A trusted channel message ID is required to change a Theseus proposal",
   );
 }
 
@@ -154,7 +189,7 @@ async function safeJson(response: Response): Promise<unknown> {
 function mappedError(
   status: number,
   payload: unknown,
-  operation: "context" | "proposal",
+  operation: "context" | "proposal" | "decision",
 ): TheseusAdapterError {
   const code = errorCode(payload);
   if (status === 401) {
@@ -165,7 +200,9 @@ function mappedError(
       "integration_scope_denied",
       operation === "context"
         ? "Theseus read access is not allowed"
-        : "Theseus proposal creation is not allowed",
+        : operation === "proposal"
+          ? "Theseus proposal creation is not allowed"
+          : "Theseus proposal decision is not allowed",
       status,
     );
   }

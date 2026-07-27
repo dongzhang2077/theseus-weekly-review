@@ -16,6 +16,12 @@ export interface TheseusWeeklyProposalRequest {
     targetWeekStart: string;
     targetWeekEnd: string;
 }
+export interface TheseusWeeklyProposalDecisionRequest {
+    proposalId: number;
+    expectedVersion: number;
+    decision: "approve" | "reject";
+    reason?: string;
+}
 interface TheseusRequestOptions {
     fetch?: typeof fetch;
     messageId?: string;
@@ -31,4 +37,9 @@ export declare function readTheseusContext(config: TheseusClientConfig, request:
  * a model tool-call ID and a generated UUID are not valid substitutes.
  */
 export declare function draftTheseusWeeklyPlanProposal(config: TheseusClientConfig, request: TheseusWeeklyProposalRequest, options?: TheseusRequestOptions): Promise<unknown>;
+/**
+ * Records a narrowly scoped proposal decision. This never executes the
+ * approved plan change.
+ */
+export declare function decideTheseusWeeklyPlanProposal(config: TheseusClientConfig, request: TheseusWeeklyProposalDecisionRequest, options?: TheseusRequestOptions): Promise<unknown>;
 export {};

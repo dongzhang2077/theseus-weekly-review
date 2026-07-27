@@ -633,8 +633,9 @@ Acceptance criteria:
 - OpenClaw calls a typed Theseus adapter and does not access the database
   directly.
 - Rollout gate one is read-only. Gate two may create a pending proposal only
-  from a trusted inbound message ID; it cannot approve or execute a plan
-  change.
+  from a trusted inbound message ID. Gate three may record only an `approve`
+  or `reject` decision with a distinct scope, replay protection, and audit
+  record; it cannot edit or execute a plan change.
 - Any approved write operation requires bounded permissions, approval,
   idempotency, audit, verification, and Undo where practical.
 - High-risk tools are denied by default.

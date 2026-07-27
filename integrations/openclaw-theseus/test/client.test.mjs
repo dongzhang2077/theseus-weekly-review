@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   TheseusAdapterError,
+  decideTheseusWeeklyPlanProposal,
   draftTheseusWeeklyPlanProposal,
   readTheseusContext,
 } from "../dist/client.js";
@@ -93,6 +94,49 @@ test("draft proposal requires a trusted message ID and sends only the draft cont
     review_week_end: "2026-07-26",
     target_week_start: "2026-07-27",
     target_week_end: "2026-08-02",
+  });
+});
+
+test("proposal decision accepts only the decision contract and trusted message ID", async () => {
+  await assert.rejects(
+    decideTheseusWeeklyPlanProposal(
+      config,
+      {proposalId: 8, expectedVersion: 1, decision: "approve"},
+    ),
+    (error) => {
+      assert(error instanceof TheseusAdapterError);
+      assert.equal(error.code, "external_message_id_required");
+      return true;
+    },
+  );
+
+  let captured;
+  const result = await decideTheseusWeeklyPlanProposal(
+    config,
+    {proposalId: 8, expectedVersion: 1, decision: "reject", reason: "Not this week"},
+    {
+      messageId: "trusted-decision-001",
+      fetch: async (url, init) => {
+        captured = {url: String(url), init};
+        return new Response(JSON.stringify({id: 13, proposal_id: 8, decision: "reject"}), {
+          status: 200,
+          headers: {"content-type": "application/json"},
+        });
+      },
+    },
+  );
+
+  assert.deepEqual(result, {id: 13, proposal_id: 8, decision: "reject"});
+  assert.equal(
+    captured.url,
+    "http://127.0.0.1:8000/integrations/channel/proposals/8/decision",
+  );
+  assert.equal(captured.init.method, "POST");
+  assert.equal(captured.init.headers["X-External-Message-ID"], "trusted-decision-001");
+  assert.deepEqual(JSON.parse(captured.init.body), {
+    expected_version: 1,
+    decision: "reject",
+    reason: "Not this week",
   });
 });
 

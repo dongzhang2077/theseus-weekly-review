@@ -16,12 +16,16 @@ from ..db.repositories.integrations import IntegrationRepository, StoredIntegrat
 from ..schemas import (
     AssistantContextRead,
     AssistantWeeklyPlanProposalRequest,
+    ChannelProposalDecisionRequest,
     IntegrationCredentialRead,
+    ProposalDecisionCreate,
+    ProposalDecisionRead,
     ProposalRead,
     IntegrationPairCreate,
     IntegrationPairRead,
     IntegrationScope,
 )
+from .agent_memory import ProposalLedgerService
 from .assistant import AssistantContextService, AssistantWeeklyPlanProposalService
 
 
@@ -215,6 +219,56 @@ class IntegrationService:
             self.repository.touch(access.credential_id, self._now())
             return proposal
 
+    def decide_weekly_plan_proposal(
+        self,
+        *,
+        token: str,
+        channel_type: str,
+        external_identity: str,
+        external_message_id: str,
+        proposal_id: int,
+        request: ChannelProposalDecisionRequest,
+    ) -> ProposalDecisionRead:
+        access = self.authenticate(
+            token=token,
+            channel_type=channel_type,
+            external_identity=external_identity,
+            required_scope="proposal:decide",
+        )
+        operation = "proposal.decide.weekly_plan_adjustment"
+        message_hash = self._message_hash(access.credential_id, external_message_id)
+        request_hash = self._request_hash(
+            operation,
+            {"proposal_id": proposal_id, **request.model_dump(mode="json")},
+        )
+        ledger = ProposalLedgerService(self.connection, access.user_id)
+        with _savepoint(self.connection, "integration_channel_proposal_decision"):
+            receipt = self._existing_receipt(
+                access.credential_id, message_hash, request_hash
+            )
+            if receipt is not None:
+                decision = _replayed_channel_decision(ledger, proposal_id, request)
+                if decision is None:
+                    raise IntegrationReplayConflict
+                self.repository.touch(access.credential_id, self._now())
+                return decision
+
+            decision = ledger.decide(
+                proposal_id,
+                ProposalDecisionCreate(decision=request.decision, reason=request.reason),
+                expected_version=request.expected_version,
+                now=self._now(),
+            )
+            self._save_receipt(
+                access=access,
+                message_hash=message_hash,
+                operation=operation,
+                request_hash=request_hash,
+                created_at=self._now(),
+            )
+            self.repository.touch(access.credential_id, self._now())
+            return decision
+
     def _message_hash(self, credential_id: int, external_message_id: str) -> str:
         return self._protected_hash("message", str(credential_id), external_message_id)
 
@@ -287,6 +341,24 @@ def _sha256(value: str) -> str:
 def _parse_datetime(value: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _replayed_channel_decision(
+    ledger: ProposalLedgerService,
+    proposal_id: int,
+    request: ChannelProposalDecisionRequest,
+) -> ProposalDecisionRead | None:
+    decisions = ledger.detail(proposal_id).decisions
+    if not decisions:
+        return None
+    decision = decisions[-1]
+    if (
+        decision.decision != request.decision
+        or decision.reason != request.reason
+        or decision.decided_after is not None
+    ):
+        return None
+    return decision
 
 
 @contextmanager

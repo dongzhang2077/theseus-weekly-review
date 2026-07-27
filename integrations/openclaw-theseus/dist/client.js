@@ -28,6 +28,18 @@ export async function draftTheseusWeeklyPlanProposal(config, request, options = 
         target_week_end: request.targetWeekEnd,
     }, "proposal");
 }
+/**
+ * Records a narrowly scoped proposal decision. This never executes the
+ * approved plan change.
+ */
+export async function decideTheseusWeeklyPlanProposal(config, request, options = {}) {
+    const messageId = requiredMessageId(options.messageId);
+    return requestTheseus(config, new URL(`/integrations/channel/proposals/${request.proposalId}/decision`, normalizedBase(config.baseUrl)), "POST", messageId, options.fetch, {
+        expected_version: request.expectedVersion,
+        decision: request.decision,
+        ...(request.reason === undefined ? {} : { reason: request.reason }),
+    }, "decision");
+}
 async function requestTheseus(config, url, method, messageId, fetchOverride, body, operation) {
     const fetcher = fetchOverride ?? fetch;
     const controller = new AbortController();
@@ -66,7 +78,7 @@ async function requestTheseus(config, url, method, messageId, fetchOverride, bod
 function requiredMessageId(value) {
     if (typeof value === "string" && value.trim())
         return value;
-    throw new TheseusAdapterError("external_message_id_required", "A trusted channel message ID is required to create a Theseus proposal");
+    throw new TheseusAdapterError("external_message_id_required", "A trusted channel message ID is required to change a Theseus proposal");
 }
 function normalizedBase(value) {
     return value.endsWith("/") ? value : `${value}/`;
@@ -87,7 +99,9 @@ function mappedError(status, payload, operation) {
     if (status === 403) {
         return new TheseusAdapterError("integration_scope_denied", operation === "context"
             ? "Theseus read access is not allowed"
-            : "Theseus proposal creation is not allowed", status);
+            : operation === "proposal"
+                ? "Theseus proposal creation is not allowed"
+                : "Theseus proposal decision is not allowed", status);
     }
     if (status === 409) {
         return new TheseusAdapterError(code ?? "theseus_conflict", "Theseus rejected the repeated request", status);

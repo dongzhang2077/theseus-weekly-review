@@ -24,7 +24,12 @@ ProposalDecisionType = Literal["approve", "edit", "reject", "expire"]
 AgentActionStatus = Literal["pending", "succeeded", "failed", "undone"]
 ProposalOutcomeResult = Literal["completed", "partial", "not_completed", "dismissed"]
 IntegrationChannelType = Literal["local_test", "openclaw", "whatsapp"]
-IntegrationScope = Literal["context:read", "proposal:create", "action:execute"]
+IntegrationScope = Literal[
+    "context:read",
+    "proposal:create",
+    "proposal:decide",
+    "action:execute",
+]
 ReviewMode = Literal["deterministic_first", "supportive_text"]
 RiskType = Literal[
     "alignment_gap",
@@ -106,7 +111,7 @@ class IntegrationPairCreate(APIModel):
     label: str = Field(min_length=1, max_length=80)
     channel_type: IntegrationChannelType
     external_identity: str = Field(min_length=1, max_length=256, repr=False)
-    scopes: list[IntegrationScope] = Field(min_length=1, max_length=3)
+    scopes: list[IntegrationScope] = Field(min_length=1, max_length=4)
     expires_in_seconds: int = Field(default=86400, ge=300, le=2592000)
 
     @field_validator("label", "external_identity")
@@ -782,6 +787,14 @@ class ProposalDecisionRead(ProposalDecisionCreate):
 
 class ProposalDecisionRequest(ProposalDecisionCreate):
     expected_version: int = Field(ge=1)
+
+
+class ChannelProposalDecisionRequest(APIModel):
+    """The intentionally narrow decision shape available to channel adapters."""
+
+    expected_version: int = Field(ge=1)
+    decision: Literal["approve", "reject"]
+    reason: str = Field(default="", max_length=1000)
 
 
 class AgentActionCreate(APIModel):

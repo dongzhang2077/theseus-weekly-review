@@ -42,11 +42,16 @@ async def _pair(
     return response.json()
 
 
-def _channel_headers(pairing: dict, *, message_id: str = "message-001") -> dict:
+def _channel_headers(
+    pairing: dict,
+    *,
+    message_id: str = "message-001",
+    identity: str = "local-user-001",
+) -> dict:
     return {
         "Authorization": f"Bearer {pairing['access_token']}",
         "X-Channel-Type": "local_test",
-        "X-External-Identity": "local-user-001",
+        "X-External-Identity": identity,
         "X-External-Message-ID": message_id,
     }
 
@@ -221,6 +226,127 @@ async def test_channel_proposal_requires_proposal_scope(database) -> None:
     assert denied.status_code == 403
     assert denied.json()["detail"]["code"] == "integration_scope_denied"
     assert "proposal:create" not in denied.text
+
+
+async def test_channel_proposal_decision_is_scoped_replay_safe_and_never_executes(
+    database,
+) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        user = await create_and_select_api_user(client, "Channel decision owner")
+        with database.session() as connection:
+            import_sample_week(connection, user["id"], load_sample_payload())
+        generated = await client.post("/reviews/weekly/generate", json=WEEK_QUERY)
+        identity = f"decision-user-{id(client)}"
+        pairing = await _pair(
+            client,
+            identity=identity,
+            scopes=["proposal:create", "proposal:decide"],
+        )
+        proposal = await client.post(
+            "/integrations/channel/proposals/weekly-adjustment",
+            json=WEEKLY_PROPOSAL_REQUEST,
+            headers=_channel_headers(
+                pairing,
+                message_id="proposal-decision-source",
+                identity=identity,
+            ),
+        )
+        plans_before = (await client.get("/weekly-plans")).json()
+        payload = {"expected_version": proposal.json()["version"], "decision": "approve"}
+        first = await client.post(
+            f"/integrations/channel/proposals/{proposal.json()['id']}/decision",
+            json=payload,
+            headers=_channel_headers(
+                pairing,
+                message_id="proposal-decision-001",
+                identity=identity,
+            ),
+        )
+        replay = await client.post(
+            f"/integrations/channel/proposals/{proposal.json()['id']}/decision",
+            json=payload,
+            headers=_channel_headers(
+                pairing,
+                message_id="proposal-decision-001",
+                identity=identity,
+            ),
+        )
+        conflict = await client.post(
+            f"/integrations/channel/proposals/{proposal.json()['id']}/decision",
+            json={**payload, "decision": "reject"},
+            headers=_channel_headers(
+                pairing,
+                message_id="proposal-decision-001",
+                identity=identity,
+            ),
+        )
+        edit = await client.post(
+            f"/integrations/channel/proposals/{proposal.json()['id']}/decision",
+            json={"expected_version": proposal.json()["version"], "decision": "edit"},
+            headers=_channel_headers(
+                pairing,
+                message_id="proposal-decision-edit",
+                identity=identity,
+            ),
+        )
+        plans_after = (await client.get("/weekly-plans")).json()
+        detail = await client.get(f"/proposals/{proposal.json()['id']}")
+        schema = (await client.get("/openapi.json")).json()
+
+    assert generated.status_code == 200
+    assert proposal.status_code == 201
+    assert first.status_code == 200
+    assert replay.status_code == 200
+    assert replay.json() == first.json()
+    assert first.json()["decision"] == "approve"
+    assert first.json()["proposal_id"] == proposal.json()["id"]
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["code"] == "external_message_replay_conflict"
+    assert edit.status_code == 422
+    assert plans_after == plans_before
+    assert detail.json()["proposal"]["status"] == "approved"
+    assert len(detail.json()["decisions"]) == 1
+    assert detail.json()["actions"] == []
+    operation = schema["paths"][
+        "/integrations/channel/proposals/{proposal_id}/decision"
+    ]["post"]
+    assert operation["security"] == [{"HTTPBearer": []}]
+    assert operation["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ChannelProposalDecisionRequest"
+    }
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ProposalDecisionRead"
+    }
+    with database.session() as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM integration_message_receipts"
+        ).fetchone()[0] == 2
+
+
+async def test_channel_proposal_decision_requires_its_own_scope(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        user = await create_and_select_api_user(client, "Proposal-only channel owner")
+        identity = f"decision-user-{id(client)}"
+        pairing = await _pair(
+            client, identity=identity, scopes=["proposal:create"]
+        )
+        denied = await client.post(
+            "/integrations/channel/proposals/1/decision",
+            json={"expected_version": 1, "decision": "approve"},
+            headers=_channel_headers(
+                pairing,
+                message_id="proposal-decision-denied",
+                identity=identity,
+            ),
+        )
+
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "integration_scope_denied"
+    assert "proposal:decide" not in denied.text
 
 
 async def test_scope_expiry_identity_and_replay_conflicts_are_controlled(

@@ -11,7 +11,8 @@ V6_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v6.sql"
 V7_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v7.sql"
 V8_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v8.sql"
 V9_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v9.sql"
-SCHEMA_VERSION = 9
+V10_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v10.sql"
+SCHEMA_VERSION = 10
 
 LEGACY_TABLES = (
     "weekly_reviews",
@@ -80,14 +81,19 @@ class Database:
                 self._migrate_v7_schema(connection)
             elif version == 8:
                 self._migrate_v8_schema(connection)
+            elif version == 9:
+                self._migrate_v9_schema(connection)
             elif version == SCHEMA_VERSION:
                 self._apply_schema(connection)
             else:
                 raise RuntimeError(
                     "Unsupported Theseus schema version "
-                    f"{version}; expected 1, 2, 3, 4, 5, 6, 7, 8, or {SCHEMA_VERSION}"
+                    f"{version}; expected 1, 2, 3, 4, 5, 6, 7, 8, 9, or {SCHEMA_VERSION}"
                 )
             version = connection.execute("PRAGMA user_version").fetchone()[0]
+            if version == 9:
+                self._migrate_v9_schema(connection)
+                version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version != SCHEMA_VERSION:
                 raise RuntimeError(
                     f"Unsupported Theseus schema version {version}; expected {SCHEMA_VERSION}"
@@ -173,6 +179,13 @@ class Database:
             + SCHEMA_PATH.read_text(encoding="utf-8")
             + "\nPRAGMA user_version = 9;\n",
             "The Theseus v8 database could not be migrated safely",
+        )
+
+    def _migrate_v9_schema(self, connection: sqlite3.Connection) -> None:
+        self._run_atomic_migration(
+            connection,
+            V10_MIGRATION_PATH.read_text(encoding="utf-8") + "\n",
+            "The Theseus v9 database could not be migrated safely",
         )
 
     @staticmethod

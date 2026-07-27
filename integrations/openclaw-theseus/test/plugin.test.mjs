@@ -3,7 +3,7 @@ import test from "node:test";
 
 import plugin from "../dist/index.js";
 
-test("registers optional context and proposal tools through the native OpenClaw SDK", () => {
+test("registers optional context, proposal, and decision tools through the native OpenClaw SDK", () => {
   const registrations = [];
   const hooks = new Map();
   plugin.register({
@@ -25,12 +25,13 @@ test("registers optional context and proposal tools through the native OpenClaw 
 
   assert.deepEqual(
     registrations.map(({tool}) => tool.name),
-    ["theseus_context_read", "theseus_weekly_plan_proposal"],
+    ["theseus_context_read", "theseus_weekly_plan_proposal", "theseus_weekly_plan_decision"],
   );
   assert.equal(registrations[0].options.optional, true);
   assert.equal(typeof registrations[0].tool.execute, "function");
   assert.deepEqual(registrations[0].tool.parameters.required, ["weekStart", "weekEnd"]);
   assert.equal(registrations[1].options.optional, true);
+  assert.equal(registrations[2].options.optional, true);
   assert.equal(typeof hooks.get("message_received"), "function");
   assert.equal(typeof hooks.get("before_tool_call"), "function");
 });
@@ -68,7 +69,7 @@ test("proposal uses only a matching trusted inbound message", async () => {
     await beforeToolCall({toolName: "theseus_weekly_plan_proposal", runId: "run-1", params: proposalParams}),
     {
       block: true,
-      blockReason: "Theseus proposal creation requires a trusted inbound message from the configured channel and sender.",
+      blockReason: "Theseus proposal changes require a trusted inbound message from the configured channel and sender.",
     },
   );
 
@@ -96,4 +97,12 @@ test("proposal uses only a matching trusted inbound message", async () => {
   assert.notEqual(accepted.params.trustedMessageReference, "model-controlled");
 
   assert.equal(registrations[1].tool.name, "theseus_weekly_plan_proposal");
+  assert.equal(registrations[2].tool.name, "theseus_weekly_plan_decision");
+  const decisionAccepted = await beforeToolCall({
+    toolName: "theseus_weekly_plan_decision",
+    runId: "run-1",
+    params: {proposalId: 7, expectedVersion: 1, decision: "approve"},
+  });
+  assert.equal(decisionAccepted.block, undefined);
+  assert.equal(typeof decisionAccepted.params.trustedMessageReference, "string");
 });

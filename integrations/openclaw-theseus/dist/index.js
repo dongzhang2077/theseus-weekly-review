@@ -1,9 +1,11 @@
 import { Type } from "typebox";
 import { buildJsonPluginConfigSchema, definePluginEntry, } from "openclaw/plugin-sdk/plugin-entry";
 import { jsonResult } from "openclaw/plugin-sdk/tool-results";
-import { draftTheseusWeeklyPlanProposal, readTheseusContext, } from "./client.js";
+import { decideTheseusWeeklyPlanProposal, draftTheseusWeeklyPlanProposal, readTheseusContext, } from "./client.js";
 import { TrustedMessageBridge } from "./trusted-message-bridge.js";
 const proposalToolName = "theseus_weekly_plan_proposal";
+const proposalDecisionToolName = "theseus_weekly_plan_decision";
+const trustedProposalToolNames = new Set([proposalToolName, proposalDecisionToolName]);
 const pluginConfigSchema = buildJsonPluginConfigSchema({
     type: "object",
     required: ["baseUrl", "accessToken", "channelType", "externalIdentity"],
@@ -21,7 +23,7 @@ const pluginConfigSchema = buildJsonPluginConfigSchema({
 const plugin = definePluginEntry({
     id: "theseus",
     name: "Theseus",
-    description: "Read Theseus context and draft user-approved weekly-plan proposals through scoped integration access.",
+    description: "Read Theseus context, draft weekly-plan proposals, and record narrow user decisions through scoped integration access.",
     configSchema: pluginConfigSchema,
     register(api) {
         const config = requirePluginConfig(api.pluginConfig);
@@ -46,19 +48,19 @@ const plugin = definePluginEntry({
             });
         });
         api.on("before_tool_call", (event) => {
-            if (event.toolName !== proposalToolName)
+            if (!trustedProposalToolNames.has(event.toolName))
                 return;
             if (!event.runId) {
                 return {
                     block: true,
-                    blockReason: "Theseus proposal creation requires a trusted inbound message from the configured channel and sender.",
+                    blockReason: "Theseus proposal changes require a trusted inbound message from the configured channel and sender.",
                 };
             }
             const reference = bridge.createProposalReference(event.runId);
             if (!reference) {
                 return {
                     block: true,
-                    blockReason: "Theseus proposal creation requires a trusted inbound message from the configured channel and sender.",
+                    blockReason: "Theseus proposal changes require a trusted inbound message from the configured channel and sender.",
                 };
             }
             return {
@@ -102,6 +104,33 @@ const plugin = definePluginEntry({
                     reviewWeekEnd: params.reviewWeekEnd,
                     targetWeekStart: params.targetWeekStart,
                     targetWeekEnd: params.targetWeekEnd,
+                }, { messageId }));
+            },
+        }, { optional: true });
+        api.registerTool({
+            name: proposalDecisionToolName,
+            label: "Theseus Weekly Plan Decision",
+            description: "Record an approve or reject decision for a pending weekly-plan proposal. It never executes a plan change.",
+            parameters: Type.Object({
+                proposalId: Type.Integer({ minimum: 1, description: "Pending Theseus proposal ID." }),
+                expectedVersion: Type.Integer({ minimum: 1, description: "Proposal version shown to the user." }),
+                decision: Type.Union([Type.Literal("approve"), Type.Literal("reject")]),
+                reason: Type.Optional(Type.String({ maxLength: 1000 })),
+                trustedMessageReference: Type.Optional(Type.String({
+                    description: "Internal runtime field. OpenClaw injects it; callers must not set it.",
+                })),
+            }, { additionalProperties: false }),
+            async execute(_toolCallId, params, signal) {
+                signal?.throwIfAborted();
+                const messageId = bridge.resolveProposalReference(params.trustedMessageReference);
+                if (!messageId) {
+                    throw new Error("Theseus proposal changes require a trusted runtime message reference");
+                }
+                return jsonResult(await decideTheseusWeeklyPlanProposal(config, {
+                    proposalId: params.proposalId,
+                    expectedVersion: params.expectedVersion,
+                    decision: params.decision,
+                    ...(params.reason === undefined ? {} : { reason: params.reason }),
                 }, { messageId }));
             },
         }, { optional: true });
