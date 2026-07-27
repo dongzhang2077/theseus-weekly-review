@@ -1359,7 +1359,7 @@ identity returns `409 channel_identity_already_paired`; foreign management is
 non-disclosing `404`. Delete returns `204` and revokes the credential/binding
 without deleting domain data.
 
-The first channel-authenticated operation is:
+The read-only channel operation is:
 
 ```text
 GET /integrations/channel/context?week_start=&week_end=
@@ -1375,4 +1375,32 @@ expired, revoked, or mismatched credentials return one redacted
 `403 integration_scope_denied`. Reusing one external message ID with another
 request returns `409 external_message_replay_conflict`. The receipt stores only
 HMAC/hash metadata, not the external identifiers or Assistant context payload.
-No channel proposal or execution operation is exposed in this candidate.
+
+### 14.1 Draft A Channel Weekly Plan Adjustment
+
+Implementation status: STORY-027 rollout gate two is a draft-only channel
+operation. It never approves or executes a proposal.
+
+```text
+POST /integrations/channel/proposals/weekly-adjustment
+Authorization: Bearer <integration token>
+X-Channel-Type: local_test | openclaw | whatsapp
+X-External-Identity: <paired external identity>
+X-External-Message-ID: <channel message ID>
+```
+
+The JSON body is the `AssistantWeeklyPlanProposalRequest` date-window shape
+from Section 13.2. The endpoint requires `proposal:create`, authenticates the
+same scoped channel binding, and delegates to
+`AssistantWeeklyPlanProposalService`. It returns `201 Created` with the normal
+`ProposalRead` response, whose status is always `pending`; it writes neither a
+WeeklyPlan nor an Action.
+
+The server derives an opaque, user-scoped Assistant idempotency key from the
+paired credential and external message ID. Thus an exact channel retry returns
+the original proposal, while reusing a message ID for another operation or
+payload returns `409 external_message_replay_conflict`. Integration receipts
+retain only HMAC/hash metadata and never store the proposal response. Invalid,
+expired, revoked, or mismatched credentials return the same redacted `401
+integration_access_denied`; missing scope returns `403
+integration_scope_denied`. Channel approval and execution are not exposed.

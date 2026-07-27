@@ -6,19 +6,23 @@ import json
 import secrets
 import sqlite3
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from typing import Iterator
 
 from ..db.repositories import AuthRepository
-from ..db.repositories.integrations import IntegrationRepository
+from ..db.repositories.integrations import IntegrationRepository, StoredIntegrationReceipt
 from ..schemas import (
     AssistantContextRead,
+    AssistantWeeklyPlanProposalRequest,
     IntegrationCredentialRead,
+    ProposalRead,
     IntegrationPairCreate,
     IntegrationPairRead,
     IntegrationScope,
 )
-from .assistant import AssistantContextService
+from .assistant import AssistantContextService, AssistantWeeklyPlanProposalService
 
 
 class IntegrationAccessDenied(Exception):
@@ -137,9 +141,7 @@ class IntegrationService:
             external_identity=external_identity,
             required_scope="context:read",
         )
-        message_hash = self._protected_hash(
-            "message", str(access.credential_id), external_message_id
-        )
+        message_hash = self._message_hash(access.credential_id, external_message_id)
         request_hash = _sha256(
             json.dumps(
                 {
@@ -151,10 +153,9 @@ class IntegrationService:
                 separators=(",", ":"),
             )
         )
-        receipt = self.repository.get_receipt(access.credential_id, message_hash)
-        if receipt is not None:
-            if not hmac.compare_digest(receipt.request_hash, request_hash):
-                raise IntegrationReplayConflict
+        receipt = self._existing_receipt(
+            access.credential_id, message_hash, request_hash
+        )
 
         identity = AuthRepository(self.connection).get_by_user_id(access.user_id)
         if identity is None:
@@ -164,25 +165,102 @@ class IntegrationService:
         ).read(week_start=week_start, week_end=week_end)
         now = self._now()
         if receipt is None:
-            try:
-                self.repository.save_receipt(
-                    user_id=access.user_id,
-                    credential_id=access.credential_id,
-                    message_id_hash=message_hash,
-                    operation="context.read",
-                    request_hash=request_hash,
-                    created_at=now,
-                )
-            except sqlite3.IntegrityError as exc:
-                concurrent = self.repository.get_receipt(
-                    access.credential_id, message_hash
-                )
-                if concurrent is None or not hmac.compare_digest(
-                    concurrent.request_hash, request_hash
-                ):
-                    raise IntegrationReplayConflict from exc
+            self._save_receipt(
+                access=access,
+                message_hash=message_hash,
+                operation="context.read",
+                request_hash=request_hash,
+                created_at=now,
+            )
         self.repository.touch(access.credential_id, now)
         return response
+
+    def draft_weekly_plan_proposal(
+        self,
+        *,
+        token: str,
+        channel_type: str,
+        external_identity: str,
+        external_message_id: str,
+        request: AssistantWeeklyPlanProposalRequest,
+    ) -> ProposalRead:
+        access = self.authenticate(
+            token=token,
+            channel_type=channel_type,
+            external_identity=external_identity,
+            required_scope="proposal:create",
+        )
+        operation = "proposal.create.weekly_plan_adjustment"
+        message_hash = self._message_hash(access.credential_id, external_message_id)
+        request_hash = self._request_hash(operation, request.model_dump(mode="json"))
+        with _savepoint(self.connection, "integration_channel_proposal"):
+            self._existing_receipt(access.credential_id, message_hash, request_hash)
+            proposal = AssistantWeeklyPlanProposalService(
+                self.connection, access.user_id
+            ).draft(
+                request,
+                idempotency_key=self._protected_hash(
+                    "proposal-idempotency",
+                    str(access.credential_id),
+                    external_message_id,
+                ),
+            )
+            self._save_receipt(
+                access=access,
+                message_hash=message_hash,
+                operation=operation,
+                request_hash=request_hash,
+                created_at=self._now(),
+            )
+            self.repository.touch(access.credential_id, self._now())
+            return proposal
+
+    def _message_hash(self, credential_id: int, external_message_id: str) -> str:
+        return self._protected_hash("message", str(credential_id), external_message_id)
+
+    def _request_hash(self, operation: str, payload: dict[str, object]) -> str:
+        return _sha256(
+            json.dumps(
+                {"operation": operation, "payload": payload},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+
+    def _existing_receipt(
+        self, credential_id: int, message_hash: str, request_hash: str
+    ) -> StoredIntegrationReceipt | None:
+        receipt = self.repository.get_receipt(credential_id, message_hash)
+        if receipt is not None and not hmac.compare_digest(
+            receipt.request_hash, request_hash
+        ):
+            raise IntegrationReplayConflict
+        return receipt
+
+    def _save_receipt(
+        self,
+        *,
+        access: IntegrationAccessContext,
+        message_hash: str,
+        operation: str,
+        request_hash: str,
+        created_at: datetime,
+    ) -> None:
+        try:
+            self.repository.save_receipt(
+                user_id=access.user_id,
+                credential_id=access.credential_id,
+                message_id_hash=message_hash,
+                operation=operation,
+                request_hash=request_hash,
+                created_at=created_at,
+            )
+        except sqlite3.IntegrityError as exc:
+            concurrent = self._existing_receipt(
+                access.credential_id, message_hash, request_hash
+            )
+            if concurrent is None:
+                raise IntegrationReplayConflict from exc
 
     def _protected_hash(self, namespace: str, *values: str) -> str:
         normalized = "\0".join(
@@ -209,3 +287,15 @@ def _sha256(value: str) -> str:
 def _parse_datetime(value: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+@contextmanager
+def _savepoint(connection: sqlite3.Connection, name: str) -> Iterator[None]:
+    connection.execute(f"SAVEPOINT {name}")
+    try:
+        yield
+    except Exception:
+        connection.execute(f"ROLLBACK TO SAVEPOINT {name}")
+        connection.execute(f"RELEASE SAVEPOINT {name}")
+        raise
+    connection.execute(f"RELEASE SAVEPOINT {name}")
