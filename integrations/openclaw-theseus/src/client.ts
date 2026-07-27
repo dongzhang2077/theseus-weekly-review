@@ -15,6 +15,18 @@ export interface TheseusContextRequest {
   weekEnd: string;
 }
 
+export interface TheseusWeeklyProposalRequest {
+  reviewWeekStart: string;
+  reviewWeekEnd: string;
+  targetWeekStart: string;
+  targetWeekEnd: string;
+}
+
+interface TheseusRequestOptions {
+  fetch?: typeof fetch;
+  messageId?: string;
+}
+
 export class TheseusAdapterError extends Error {
   constructor(
     readonly code: string,
@@ -29,32 +41,83 @@ export class TheseusAdapterError extends Error {
 export async function readTheseusContext(
   config: TheseusClientConfig,
   request: TheseusContextRequest,
-  options: {fetch?: typeof fetch; messageId?: string} = {},
+  options: TheseusRequestOptions = {},
 ): Promise<unknown> {
-  const fetcher = options.fetch ?? fetch;
+  const url = new URL("/integrations/channel/context", normalizedBase(config.baseUrl));
+  url.searchParams.set("week_start", request.weekStart);
+  url.searchParams.set("week_end", request.weekEnd);
+  return requestTheseus(
+    config,
+    url,
+    "GET",
+    options.messageId ?? randomUUID(),
+    options.fetch,
+    undefined,
+    "context",
+  );
+}
+
+/**
+ * Draft only. The caller must supply the trusted inbound channel message ID;
+ * a model tool-call ID and a generated UUID are not valid substitutes.
+ */
+export async function draftTheseusWeeklyPlanProposal(
+  config: TheseusClientConfig,
+  request: TheseusWeeklyProposalRequest,
+  options: TheseusRequestOptions = {},
+): Promise<unknown> {
+  const messageId = requiredMessageId(options.messageId);
+  return requestTheseus(
+    config,
+    new URL(
+      "/integrations/channel/proposals/weekly-adjustment",
+      normalizedBase(config.baseUrl),
+    ),
+    "POST",
+    messageId,
+    options.fetch,
+    {
+      review_week_start: request.reviewWeekStart,
+      review_week_end: request.reviewWeekEnd,
+      target_week_start: request.targetWeekStart,
+      target_week_end: request.targetWeekEnd,
+    },
+    "proposal",
+  );
+}
+
+async function requestTheseus(
+  config: TheseusClientConfig,
+  url: URL,
+  method: "GET" | "POST",
+  messageId: string,
+  fetchOverride: typeof fetch | undefined,
+  body: object | undefined,
+  operation: "context" | "proposal",
+): Promise<unknown> {
+  const fetcher = fetchOverride ?? fetch;
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
     config.timeoutMs ?? 10_000,
   );
-  const url = new URL("/integrations/channel/context", normalizedBase(config.baseUrl));
-  url.searchParams.set("week_start", request.weekStart);
-  url.searchParams.set("week_end", request.weekEnd);
 
   try {
     const response = await fetcher(url, {
-      method: "GET",
+      method,
       headers: {
         Authorization: `Bearer ${config.accessToken}`,
         "X-Channel-Type": config.channelType,
         "X-External-Identity": config.externalIdentity,
-        "X-External-Message-ID": options.messageId ?? randomUUID(),
+        "X-External-Message-ID": messageId,
+        ...(body ? {"Content-Type": "application/json"} : {}),
       },
+      ...(body ? {body: JSON.stringify(body)} : {}),
       signal: controller.signal,
     });
     const payload = await safeJson(response);
     if (!response.ok) {
-      throw mappedError(response.status, payload);
+      throw mappedError(response.status, payload, operation);
     }
     return payload;
   } catch (error) {
@@ -66,6 +129,14 @@ export async function readTheseusContext(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function requiredMessageId(value: string | undefined): string {
+  if (typeof value === "string" && value.trim()) return value;
+  throw new TheseusAdapterError(
+    "external_message_id_required",
+    "A trusted channel message ID is required to create a Theseus proposal",
+  );
 }
 
 function normalizedBase(value: string): string {
@@ -80,19 +151,33 @@ async function safeJson(response: Response): Promise<unknown> {
   }
 }
 
-function mappedError(status: number, payload: unknown): TheseusAdapterError {
+function mappedError(
+  status: number,
+  payload: unknown,
+  operation: "context" | "proposal",
+): TheseusAdapterError {
   const code = errorCode(payload);
   if (status === 401) {
     return new TheseusAdapterError("integration_access_denied", "Theseus pairing is unavailable", status);
   }
   if (status === 403) {
-    return new TheseusAdapterError("integration_scope_denied", "Theseus read access is not allowed", status);
+    return new TheseusAdapterError(
+      "integration_scope_denied",
+      operation === "context"
+        ? "Theseus read access is not allowed"
+        : "Theseus proposal creation is not allowed",
+      status,
+    );
   }
   if (status === 409) {
     return new TheseusAdapterError(code ?? "theseus_conflict", "Theseus rejected the repeated request", status);
   }
   if (status === 422) {
-    return new TheseusAdapterError(code ?? "invalid_context_window", "The requested week is invalid", status);
+    return new TheseusAdapterError(
+      code ?? "invalid_context_window",
+      "The requested week is invalid",
+      status,
+    );
   }
   return new TheseusAdapterError("theseus_request_failed", "Theseus could not complete the request", status);
 }

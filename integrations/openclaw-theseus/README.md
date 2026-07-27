@@ -4,6 +4,13 @@ This package exposes one read-only OpenClaw tool: `theseus_context_read`.
 It calls the scoped STORY-039 Integration API and never accesses SQLite,
 the filesystem, a shell, or Theseus write operations.
 
+The package also exports a draft-only `draftTheseusWeeklyPlanProposal` client
+for a future trusted channel bridge. It requires the real inbound channel
+message ID, so the current generic tool-plugin does **not** expose it to a
+model. OpenClaw's documented tool context provides a tool-call ID and delivery
+route, but not a trusted inbound message ID; substituting a generated or
+model-supplied value would weaken Theseus replay/audit guarantees.
+
 ## Runtime requirements
 
 - Node 22.22.3+, 24.15+, or a currently supported OpenClaw Node runtime
@@ -33,4 +40,6 @@ commit them or place them in this package.
 The plugin is deliberately optional. Enable or allowlist `theseus_context_read`
 only for a paired account, and revoke the Theseus integration credential when
 the channel should no longer receive personal context. This release never
-creates proposals, approves actions, or changes Theseus data.
+creates proposals, approves actions, or changes Theseus data. Enable proposal
+creation only after a channel-specific bridge passes an authentic inbound
+message ID through the exported client.

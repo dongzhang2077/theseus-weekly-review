@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { TheseusAdapterError, readTheseusContext } from "../dist/client.js";
+import {
+  TheseusAdapterError,
+  draftTheseusWeeklyPlanProposal,
+  readTheseusContext,
+} from "../dist/client.js";
 
 const config = {
   baseUrl: "http://127.0.0.1:8000",
@@ -35,6 +39,61 @@ test("read context sends only the scoped integration contract", async () => {
   assert.equal(captured.init.headers["X-Channel-Type"], "openclaw");
   assert.equal(captured.init.headers["X-External-Identity"], "gateway-owner");
   assert.equal(captured.init.headers["X-External-Message-ID"], "message-001");
+});
+
+test("draft proposal requires a trusted message ID and sends only the draft contract", async () => {
+  await assert.rejects(
+    draftTheseusWeeklyPlanProposal(
+      config,
+      {
+        reviewWeekStart: "2026-07-20",
+        reviewWeekEnd: "2026-07-26",
+        targetWeekStart: "2026-07-27",
+        targetWeekEnd: "2026-08-02",
+      },
+    ),
+    (error) => {
+      assert(error instanceof TheseusAdapterError);
+      assert.equal(error.code, "external_message_id_required");
+      return true;
+    },
+  );
+
+  let captured;
+  const result = await draftTheseusWeeklyPlanProposal(
+    config,
+    {
+      reviewWeekStart: "2026-07-20",
+      reviewWeekEnd: "2026-07-26",
+      targetWeekStart: "2026-07-27",
+      targetWeekEnd: "2026-08-02",
+    },
+    {
+      messageId: "trusted-message-001",
+      fetch: async (url, init) => {
+        captured = {url: String(url), init};
+        return new Response(JSON.stringify({id: 8, status: "pending"}), {
+          status: 201,
+          headers: {"content-type": "application/json"},
+        });
+      },
+    },
+  );
+
+  assert.deepEqual(result, {id: 8, status: "pending"});
+  assert.equal(
+    captured.url,
+    "http://127.0.0.1:8000/integrations/channel/proposals/weekly-adjustment",
+  );
+  assert.equal(captured.init.method, "POST");
+  assert.equal(captured.init.headers["X-External-Message-ID"], "trusted-message-001");
+  assert.equal(captured.init.headers["Content-Type"], "application/json");
+  assert.deepEqual(JSON.parse(captured.init.body), {
+    review_week_start: "2026-07-20",
+    review_week_end: "2026-07-26",
+    target_week_start: "2026-07-27",
+    target_week_end: "2026-08-02",
+  });
 });
 
 test("authentication failures are redacted", async () => {
