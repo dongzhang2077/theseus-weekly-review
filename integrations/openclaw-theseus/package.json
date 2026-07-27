@@ -10,6 +10,8 @@
     "README.md"
   ],
   "scripts": {
+    "check:runtime": "node ./scripts/require-supported-node.mjs",
+    "prebuild": "npm run check:runtime",
     "build": "tsc --project tsconfig.json",
     "plugin:build": "npm run build && openclaw plugins build --entry ./dist/index.js",
     "plugin:validate": "npm run plugin:build && openclaw plugins validate --entry ./dist/index.js",
@@ -32,7 +34,7 @@
     "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=22.22.3"
+    "node": ">=22.22.3 <23 || >=24.15.0 <25 || >=25.9.0"
   },
   "openclaw": {
     "extensions": [

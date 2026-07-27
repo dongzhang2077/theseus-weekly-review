@@ -20,9 +20,9 @@ npm run plugin:validate
 ```
 
 Run these commands with a supported Node runtime; the package enforces Node
-22.22.3+ and OpenClaw 2026.5.17+. The unit suite includes an SDK registration
-test, so it validates the plugin boundary without a configured Gateway or a
-real Theseus credential.
+22.22.3+, 24.15+, or 25.9+ and OpenClaw 2026.5.17+. The unit suite includes an
+SDK registration test, so it validates the plugin boundary without a configured
+Gateway or a real Theseus credential.
 
 Install the local package with `openclaw plugins install` only after the
 Theseus API is running and a scoped integration token has been created.
