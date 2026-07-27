@@ -12,6 +12,8 @@ venv/
 # Node / frontend
 node_modules/
 dist/
+!integrations/openclaw-theseus/dist/
+!integrations/openclaw-theseus/dist/**
 build/
 .next/
 coverage/

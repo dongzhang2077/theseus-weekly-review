@@ -1,0 +1,85 @@
+{
+  "id": "theseus",
+  "name": "Theseus",
+  "description": "Read evidence-backed Theseus context through scoped integration access.",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "required": [
+      "baseUrl",
+      "accessToken",
+      "channelType",
+      "externalIdentity"
+    ],
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "minLength": 1
+      },
+      "accessToken": {
+        "type": "string",
+        "minLength": 16
+      },
+      "channelType": {
+        "anyOf": [
+          {
+            "type": "string",
+            "const": "local_test"
+          },
+          {
+            "type": "string",
+            "const": "openclaw"
+          },
+          {
+            "type": "string",
+            "const": "whatsapp"
+          }
+        ]
+      },
+      "externalIdentity": {
+        "type": "string",
+        "minLength": 1
+      },
+      "timeoutMs": {
+        "type": "integer",
+        "minimum": 1000,
+        "maximum": 30000
+      }
+    },
+    "additionalProperties": false
+  },
+  "activation": {
+    "onStartup": false
+  },
+  "uiHints": {
+    "baseUrl": {
+      "label": "Theseus API URL"
+    },
+    "accessToken": {
+      "label": "Integration token",
+      "sensitive": true
+    },
+    "channelType": {
+      "label": "Channel type"
+    },
+    "externalIdentity": {
+      "label": "Paired identity",
+      "sensitive": true
+    },
+    "timeoutMs": {
+      "label": "Timeout (ms)",
+      "advanced": true
+    }
+  },
+  "contracts": {
+    "tools": [
+      "theseus_context_read"
+    ]
+  },
+  "toolMetadata": {
+    "theseus_context_read": {
+      "replaySafe": true,
+      "optional": true
+    }
+  }
+}
