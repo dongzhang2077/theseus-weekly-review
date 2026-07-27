@@ -78,7 +78,7 @@ async def get_assistant_context(
         )
     except InvalidAssistantContextWindow as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
                 "code": "invalid_context_window",
                 "message": "Assistant context must cover between 1 and 31 days",
