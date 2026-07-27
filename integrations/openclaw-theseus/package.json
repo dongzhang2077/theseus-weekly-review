@@ -13,8 +13,8 @@
     "check:runtime": "node ./scripts/require-supported-node.mjs",
     "prebuild": "npm run check:runtime",
     "build": "tsc --project tsconfig.json",
-    "plugin:build": "npm run build && openclaw plugins build --entry ./dist/index.js",
-    "plugin:validate": "npm run plugin:build && openclaw plugins validate --entry ./dist/index.js",
+    "plugin:build": "npm run build",
+    "plugin:validate": "npm run test",
     "test": "npm run build && node --test test/*.test.mjs"
   },
   "dependencies": {

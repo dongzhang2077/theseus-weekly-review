@@ -1,2 +1,3 @@
-declare const _default: import("openclaw/plugin-sdk/tool-plugin").DefinedToolPluginEntry;
-export default _default;
+import { type OpenClawPluginDefinition } from "openclaw/plugin-sdk/plugin-entry";
+declare const plugin: OpenClawPluginDefinition;
+export default plugin;

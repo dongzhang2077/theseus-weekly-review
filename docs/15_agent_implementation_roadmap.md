@@ -603,14 +603,16 @@ Verification checkpoint: all 191 backend/workflow tests pass in one run;
 Python compilation, `pip check`, deterministic sample review, and a real
 four-process start/status/resume/replay CLI demonstration pass.
 
-Current sequential gate: STORY-039 Channel Identity And Scoped Integration
-Access. Candidate schema v9, pairing/list/revoke management, hashed expiring
-credentials, HMAC-protected channel/message identities, explicit scopes, and a
-read-only channel context operation are implemented. Replay receipts store
-only minimized request metadata. Focused pairing, OpenAPI, scope, expiry,
-replay, revocation, redaction, v8 migration, and account-isolation verification
-passes. OpenClaw/WhatsApp transport and channel proposal/execution remain out
-of scope. Product-owner acceptance passed on 2026-07-26 PDT.
+Current sequential gate: STORY-027 OpenClaw Conversation Adapter, rollout gate
+two. The schema-v9 pairing/list/revoke path, HMAC-protected channel/message
+identities, explicit scopes, read-only context operation, and pending-only
+channel proposal endpoint are implemented. The native OpenClaw package binds
+the host-provided inbound message ID to the single runtime `runId`, rejects an
+unconfigured channel or sender, and passes an opaque short-lived reference to
+the proposal client. It has package-style isolated-runtime proof. Approval and
+execution remain out of scope; the next gate is an explicit approval response,
+not a direct-write tool. Product-owner acceptance is still required for this
+gate.
 
 Acceptance verification: 27 focused tests pass. The complete inventory reached
 196 of 197 with one previously tracked intermittent authenticated Activity

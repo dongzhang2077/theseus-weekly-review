@@ -632,9 +632,11 @@ Acceptance criteria:
 
 - OpenClaw calls a typed Theseus adapter and does not access the database
   directly.
-- The first release is read-only.
-- Write operations require bounded permissions, approval, idempotency, audit,
-  verification, and Undo where practical.
+- Rollout gate one is read-only. Gate two may create a pending proposal only
+  from a trusted inbound message ID; it cannot approve or execute a plan
+  change.
+- Any approved write operation requires bounded permissions, approval,
+  idempotency, audit, verification, and Undo where practical.
 - High-risk tools are denied by default.
 - Removing the adapter does not change domain or review-engine behavior.
 
@@ -850,8 +852,9 @@ Bearer credential can call only the read-only channel context endpoint when it
 has `context:read`; browser JWTs are not reused. Replay receipts contain no
 personal context copies. Pairing, OpenAPI, expiry, scope, replay conflict,
 revocation, redaction, v8 migration, and account-isolation tests pass in the
-focused candidate suite. Real OpenClaw/WhatsApp transport and propose/execute
-channel endpoints remain deferred. Product-owner acceptance passed on
+focused candidate suite. The backend's pending-only channel proposal endpoint
+is now available behind `proposal:create`; OpenClaw runtime transport, channel
+approval, and execution remain deferred. Product-owner acceptance passed on
 2026-07-26 PDT.
 
 Acceptance verification: 27 focused Integration/schema/migration tests pass.

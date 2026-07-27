@@ -335,6 +335,15 @@ explicit read/propose/execute scopes, and supports immediate revocation. The
 first channel operation is read-only Assistant context through the same typed
 domain service. Channel code has no direct repository or SQLite access.
 
+STORY-027 gate-two implementation checkpoint (2026-07-27 PDT): the native
+OpenClaw adapter now registers optional context and pending-proposal tools.
+Proposal invocation is blocked unless the host supplies a matching inbound
+`messageId`, `runId`, configured channel, and configured sender. The runtime
+passes only an opaque, short-lived reference into the tool; model input never
+becomes the external message ID. A package-style isolated OpenClaw install
+loads both tools and the two typed hooks without diagnostics. Approval and
+execution remain deliberately absent.
+
 ## 10. Anti-Patterns to Avoid
 
 Avoid:

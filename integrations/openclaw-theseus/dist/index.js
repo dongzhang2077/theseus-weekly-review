@@ -1,37 +1,123 @@
 import { Type } from "typebox";
-import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
-import { readTheseusContext } from "./client.js";
-const configSchema = Type.Object({
-    baseUrl: Type.String({ minLength: 1 }),
-    accessToken: Type.String({ minLength: 16 }),
-    channelType: Type.Union([
-        Type.Literal("local_test"),
-        Type.Literal("openclaw"),
-        Type.Literal("whatsapp"),
-    ]),
-    externalIdentity: Type.String({ minLength: 1 }),
-    timeoutMs: Type.Optional(Type.Integer({ minimum: 1000, maximum: 30000 })),
-}, { additionalProperties: false });
-export default defineToolPlugin({
+import { buildJsonPluginConfigSchema, definePluginEntry, } from "openclaw/plugin-sdk/plugin-entry";
+import { jsonResult } from "openclaw/plugin-sdk/tool-results";
+import { draftTheseusWeeklyPlanProposal, readTheseusContext, } from "./client.js";
+import { TrustedMessageBridge } from "./trusted-message-bridge.js";
+const proposalToolName = "theseus_weekly_plan_proposal";
+const pluginConfigSchema = buildJsonPluginConfigSchema({
+    type: "object",
+    required: ["baseUrl", "accessToken", "channelType", "externalIdentity"],
+    properties: {
+        baseUrl: { type: "string", minLength: 1 },
+        accessToken: { type: "string", minLength: 16 },
+        channelType: { enum: ["local_test", "openclaw", "whatsapp"] },
+        externalIdentity: { type: "string", minLength: 1 },
+        timeoutMs: { type: "integer", minimum: 1000, maximum: 30000 },
+        trustedChannelId: { type: "string", minLength: 1 },
+        trustedSenderId: { type: "string", minLength: 1 },
+    },
+    additionalProperties: false,
+});
+const plugin = definePluginEntry({
     id: "theseus",
     name: "Theseus",
-    description: "Read evidence-backed Theseus context through scoped integration access.",
-    configSchema,
-    activation: { onStartup: false },
-    tools: (tool) => [
-        tool({
+    description: "Read Theseus context and draft user-approved weekly-plan proposals through scoped integration access.",
+    configSchema: pluginConfigSchema,
+    register(api) {
+        const config = requirePluginConfig(api.pluginConfig);
+        const bridge = new TrustedMessageBridge();
+        api.on("message_received", (event, context) => {
+            const runId = event.runId ?? context.runId;
+            const messageId = event.messageId ?? context.messageId;
+            const senderId = event.senderId ?? context.senderId;
+            if (!hasTrustedSource(config) ||
+                !runId ||
+                !messageId ||
+                !senderId ||
+                context.channelId !== config.trustedChannelId ||
+                senderId !== config.trustedSenderId) {
+                return;
+            }
+            bridge.recordInbound({
+                runId,
+                messageId,
+                channelId: context.channelId,
+                senderId,
+            });
+        });
+        api.on("before_tool_call", (event) => {
+            if (event.toolName !== proposalToolName)
+                return;
+            if (!event.runId) {
+                return {
+                    block: true,
+                    blockReason: "Theseus proposal creation requires a trusted inbound message from the configured channel and sender.",
+                };
+            }
+            const reference = bridge.createProposalReference(event.runId);
+            if (!reference) {
+                return {
+                    block: true,
+                    blockReason: "Theseus proposal creation requires a trusted inbound message from the configured channel and sender.",
+                };
+            }
+            return {
+                params: { ...event.params, trustedMessageReference: reference },
+            };
+        });
+        api.registerTool({
             name: "theseus_context_read",
             label: "Theseus Context",
             description: "Read the paired user's evidence-backed context for one date window.",
-            optional: true,
             parameters: Type.Object({
                 weekStart: Type.String({ format: "date", description: "Start date in YYYY-MM-DD format." }),
                 weekEnd: Type.String({ format: "date", description: "End date in YYYY-MM-DD format." }),
             }, { additionalProperties: false }),
-            async execute({ weekStart, weekEnd }, config, context) {
-                context.signal?.throwIfAborted();
-                return readTheseusContext(config, { weekStart, weekEnd });
+            async execute(_toolCallId, { weekStart, weekEnd }, signal) {
+                signal?.throwIfAborted();
+                return jsonResult(await readTheseusContext(config, { weekStart, weekEnd }));
             },
-        }),
-    ],
+        }, { optional: true });
+        api.registerTool({
+            name: proposalToolName,
+            label: "Theseus Weekly Plan Proposal",
+            description: "Draft a pending weekly-plan proposal for the paired user. It never approves or executes changes.",
+            parameters: Type.Object({
+                reviewWeekStart: Type.String({ format: "date", description: "Reviewed week start in YYYY-MM-DD format." }),
+                reviewWeekEnd: Type.String({ format: "date", description: "Reviewed week end in YYYY-MM-DD format." }),
+                targetWeekStart: Type.String({ format: "date", description: "Target week start in YYYY-MM-DD format." }),
+                targetWeekEnd: Type.String({ format: "date", description: "Target week end in YYYY-MM-DD format." }),
+                trustedMessageReference: Type.Optional(Type.String({
+                    description: "Internal runtime field. OpenClaw injects it; callers must not set it.",
+                })),
+            }, { additionalProperties: false }),
+            async execute(_toolCallId, params, signal) {
+                signal?.throwIfAborted();
+                const messageId = bridge.resolveProposalReference(params.trustedMessageReference);
+                if (!messageId) {
+                    throw new Error("Theseus proposal creation requires a trusted runtime message reference");
+                }
+                return jsonResult(await draftTheseusWeeklyPlanProposal(config, {
+                    reviewWeekStart: params.reviewWeekStart,
+                    reviewWeekEnd: params.reviewWeekEnd,
+                    targetWeekStart: params.targetWeekStart,
+                    targetWeekEnd: params.targetWeekEnd,
+                }, { messageId }));
+            },
+        }, { optional: true });
+    },
 });
+export default plugin;
+function requirePluginConfig(value) {
+    if (!value ||
+        typeof value.baseUrl !== "string" ||
+        typeof value.accessToken !== "string" ||
+        typeof value.channelType !== "string" ||
+        typeof value.externalIdentity !== "string") {
+        throw new Error("Theseus plugin configuration is invalid");
+    }
+    return value;
+}
+function hasTrustedSource(config) {
+    return Boolean(config.trustedChannelId?.trim() && config.trustedSenderId?.trim());
+}

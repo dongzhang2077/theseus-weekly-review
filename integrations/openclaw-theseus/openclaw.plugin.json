@@ -1,7 +1,7 @@
 {
   "id": "theseus",
   "name": "Theseus",
-  "description": "Read evidence-backed Theseus context through scoped integration access.",
+  "description": "Read Theseus context and draft user-approved weekly-plan proposals through scoped integration access.",
   "version": "0.1.0",
   "configSchema": {
     "type": "object",
@@ -44,6 +44,14 @@
         "type": "integer",
         "minimum": 1000,
         "maximum": 30000
+      },
+      "trustedChannelId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "trustedSenderId": {
+        "type": "string",
+        "minLength": 1
       }
     },
     "additionalProperties": false
@@ -69,16 +77,29 @@
     "timeoutMs": {
       "label": "Timeout (ms)",
       "advanced": true
+    },
+    "trustedChannelId": {
+      "label": "Trusted OpenClaw channel",
+      "advanced": true
+    },
+    "trustedSenderId": {
+      "label": "Trusted OpenClaw sender",
+      "sensitive": true,
+      "advanced": true
     }
   },
   "contracts": {
     "tools": [
-      "theseus_context_read"
+      "theseus_context_read",
+      "theseus_weekly_plan_proposal"
     ]
   },
   "toolMetadata": {
     "theseus_context_read": {
       "replaySafe": true,
+      "optional": true
+    },
+    "theseus_weekly_plan_proposal": {
       "optional": true
     }
   }
