@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   listIntegrations,
   pairIntegration,
+  readIntegrationContext,
   revokeIntegration,
   type IntegrationCredential,
   type IntegrationScope
@@ -169,6 +170,8 @@ function IntegrationSettings({ apiBaseUrl, fetchImpl }: { apiBaseUrl: string; fe
   const [pairToken, setPairToken] = useState<string | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<IntegrationCredential | null>(null);
   const [revoking, setRevoking] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState<string | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -239,12 +242,68 @@ function IntegrationSettings({ apiBaseUrl, fetchImpl }: { apiBaseUrl: string; fe
     }
   }
 
+  async function runConnectionCheck() {
+    if (checking) return;
+    const identity = `browser-check-${uniqueSuffix()}`;
+    const range = currentWeekRange();
+    let credentialId: number | null = null;
+    setChecking(true);
+    setCheckResult(null);
+    setError(null);
+    try {
+      const pairing = await pairIntegration(
+        { apiBaseUrl, fetchImpl },
+        {
+          label: "Temporary OpenClaw check",
+          channelType: "openclaw",
+          externalIdentity: identity,
+          scopes: ["context:read"],
+          expiresInSeconds: 300
+        }
+      );
+      if (pairing.status !== "ok" || !pairing.data) {
+        setError(pairing.error ?? "Connection check could not create a temporary pairing.");
+        return;
+      }
+      credentialId = pairing.data.credential.id;
+      const context = await readIntegrationContext({
+        apiBaseUrl,
+        accessToken: pairing.data.access_token,
+        externalIdentity: identity,
+        weekStart: range.start,
+        weekEnd: range.end,
+        messageId: `browser-check-message-${uniqueSuffix()}`
+      });
+      if (context.status !== "ok" || !context.data) {
+        setError(context.error ?? "OpenClaw connection check failed.");
+        return;
+      }
+      setCheckResult("Connection check passed. The temporary credential was revoked.");
+    } finally {
+      if (credentialId !== null) {
+        const cleanup = await revokeIntegration({ apiBaseUrl, fetchImpl }, credentialId);
+        if (cleanup.status !== "ok") {
+          setCheckResult(null);
+          setError("Connection check finished, but its temporary credential could not be revoked. Revoke it from the list.");
+        }
+        setReload((value) => value + 1);
+      }
+      setChecking(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div>
         <p className="mb-1 mt-0 text-sm leading-5 text-desk-muted">Pair an OpenClaw instance with your Theseus account.</p>
         <p className="m-0 text-xs leading-5 text-desk-subtle">The access token is displayed once. Theseus stores only a protected token record.</p>
       </div>
+
+      <div className="flex items-center justify-between gap-3 rounded-[14px] border border-desk-line bg-desk-raised p-3">
+        <div className="text-sm font-bold">Test OpenClaw access</div>
+        <button className="min-h-10 rounded-paper border border-desk-accent bg-desk-accent px-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:border-desk-line disabled:bg-desk-sunk disabled:text-desk-subtle" type="button" disabled={checking} onClick={runConnectionCheck}>{checking ? "Checking" : "Run check"}</button>
+      </div>
+      {checkResult ? <div className="rounded-paper border border-desk-accent/30 bg-desk-accent-soft px-3 py-2 text-sm font-medium text-desk-ink" role="status">{checkResult}</div> : null}
 
       {pairToken ? (
         <div className="rounded-paper border border-desk-accent/30 bg-desk-accent-soft p-3" role="status">
@@ -489,4 +548,25 @@ const scopeOptions: Array<{ scope: IntegrationScope; label: string }> = [
 function shortDate(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+}
+
+function currentWeekRange(now = new Date()): { start: string; end: string } {
+  const date = new Date(now);
+  const day = date.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + mondayOffset);
+  const start = localIsoDate(date);
+  date.setDate(date.getDate() + 6);
+  return { start, end: localIsoDate(date) };
+}
+
+function localIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function uniqueSuffix(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }

@@ -868,6 +868,9 @@ scopes, and expiry; it displays the raw token only in the one-time pairing
 result, lists lifecycle metadata, and requires confirmation before revocation.
 It uses the existing browser-authenticated management API and deliberately
 does not store integration tokens or identities in browser persistence.
+A one-click check creates a five-minute read-only pairing, validates the
+channel context request, and revokes that temporary credential before success
+is displayed.
 
 Acceptance verification: 27 focused Integration/schema/migration tests pass.
 The full suite completed 196 of 197 tests; the sole failure was the previously

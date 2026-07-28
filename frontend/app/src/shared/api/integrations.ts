@@ -26,6 +26,13 @@ export interface IntegrationPair {
   access_token: string;
 }
 
+export interface IntegrationContext {
+  context_version: "v1";
+  user_id: number;
+  week_start: string;
+  week_end: string;
+}
+
 export interface PairIntegrationInput {
   label: string;
   channelType: IntegrationChannelType;
@@ -71,6 +78,49 @@ export function revokeIntegration(
   credentialId: number
 ): Promise<IntegrationApiResult<null>> {
   return request(options, `/integrations/${credentialId}`, "DELETE");
+}
+
+export async function readIntegrationContext(
+  options: {
+    apiBaseUrl: string;
+    accessToken: string;
+    externalIdentity: string;
+    weekStart: string;
+    weekEnd: string;
+    messageId: string;
+    fetchImpl?: FetchLike;
+  }
+): Promise<IntegrationApiResult<IntegrationContext>> {
+  const baseUrl = options.apiBaseUrl.trim().replace(/\/$/, "");
+  if (!baseUrl) return failure("API base URL is not configured");
+  try {
+    const query = new URLSearchParams({
+      week_start: options.weekStart,
+      week_end: options.weekEnd
+    });
+    const response = await (options.fetchImpl ?? fetch)(
+      `${baseUrl}/integrations/channel/context?${query}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${options.accessToken}`,
+          "X-Channel-Type": "openclaw",
+          "X-External-Identity": options.externalIdentity,
+          "X-External-Message-ID": options.messageId
+        }
+      }
+    );
+    if (!response.ok) {
+      return {
+        status: response.status === 409 ? "conflict" : "error",
+        data: null,
+        error: await responseDetail(response) ?? `Backend returned ${response.status}`
+      };
+    }
+    return { status: "ok", data: await response.json() as IntegrationContext, error: null };
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "OpenClaw connection check failed");
+  }
 }
 
 async function request<T>(

@@ -626,6 +626,9 @@ lifecycle metadata, and revoke a pairing after confirmation. The browser uses
 only its existing authenticated API client; it does not retain the one-time
 integration token or raw external identity after pairing. This is management
 UI only: it does not embed an OpenClaw runtime or bypass the typed channel API.
+The same surface offers a one-click API connection check: it creates a
+five-minute, read-only temporary pairing, reads channel context, and revokes
+the credential before reporting success.
 
 Acceptance verification: 27 focused tests pass. The complete inventory reached
 196 of 197 with one previously tracked intermittent authenticated Activity

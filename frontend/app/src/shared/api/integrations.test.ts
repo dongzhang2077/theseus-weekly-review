@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   listIntegrations,
   pairIntegration,
+  readIntegrationContext,
   revokeIntegration,
   type IntegrationCredential
 } from "./integrations";
@@ -95,5 +96,41 @@ describe("integrations API", () => {
     expect(revoked).toEqual({ status: "ok", data: null, error: null });
     expect(fetchImpl.mock.calls[1]?.[0]).toBe("http://127.0.0.1:8765/integrations/5");
     expect(fetchImpl.mock.calls[1]?.[1].method).toBe("DELETE");
+  });
+
+  it("uses the temporary integration credential for a channel context check", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        context_version: "v1",
+        user_id: 2,
+        week_start: "2026-07-27",
+        week_end: "2026-08-02"
+      })
+    });
+
+    const result = await readIntegrationContext({
+      apiBaseUrl: "http://127.0.0.1:8765",
+      accessToken: "ths_int_temporary",
+      externalIdentity: "browser-check-1",
+      weekStart: "2026-07-27",
+      weekEnd: "2026-08-02",
+      messageId: "browser-check-message-1",
+      fetchImpl
+    });
+
+    expect(result.status).toBe("ok");
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "http://127.0.0.1:8765/integrations/channel/context?week_start=2026-07-27&week_end=2026-08-02",
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.objectContaining({
+          Authorization: "Bearer ths_int_temporary",
+          "X-Channel-Type": "openclaw",
+          "X-External-Identity": "browser-check-1"
+        })
+      })
+    );
   });
 });
