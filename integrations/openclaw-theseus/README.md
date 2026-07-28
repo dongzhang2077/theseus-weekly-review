@@ -62,3 +62,19 @@ All tools are deliberately optional. Enable or allowlist them only for a
 paired account, and revoke the Theseus integration credential when the channel
 should no longer receive personal context. The plugin never accesses SQLite,
 the filesystem, or a shell.
+
+## Real API smoke check
+
+After starting a local Theseus API and creating an `openclaw` pairing with
+`context:read`, run this read-only check from the plugin directory. It requires
+explicit values and prints only a success marker and context schema version;
+never put the token in a committed file.
+
+```bash
+THESEUS_BASE_URL=http://127.0.0.1:8000 \
+THESEUS_ACCESS_TOKEN='<pairing token>' \
+THESEUS_EXTERNAL_IDENTITY='<paired identity>' \
+THESEUS_WEEK_START=2026-06-08 \
+THESEUS_WEEK_END=2026-06-14 \
+node scripts/smoke-context.mjs
+```
