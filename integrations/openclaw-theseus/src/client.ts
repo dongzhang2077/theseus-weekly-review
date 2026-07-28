@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-export type TheseusChannelType = "local_test" | "openclaw" | "whatsapp";
+export type TheseusChannelType = "local_test" | "openclaw" | "telegram" | "whatsapp";
 
 export interface TheseusClientConfig {
   baseUrl: string;

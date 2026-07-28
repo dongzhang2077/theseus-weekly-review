@@ -872,6 +872,12 @@ A one-click check creates a five-minute read-only pairing, validates the
 channel context request, and revokes that temporary credential before success
 is displayed.
 
+Telegram private-pilot checkpoint (2026-07-28 PDT): Telegram is an allowed
+scoped channel type. The first production configuration is private-chat only,
+with an exact numeric trusted sender and only `context:read` plus
+`proposal:create`; decision, execution, and undo remain disabled until a later
+explicit approval gate.
+
 Acceptance verification: 27 focused Integration/schema/migration tests pass.
 The full suite completed 196 of 197 tests; the sole failure was the previously
 tracked intermittent authenticated Activity request and passed immediately in

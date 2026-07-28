@@ -23,7 +23,7 @@ ProposalStatus = Literal["pending", "approved", "rejected", "expired", "executed
 ProposalDecisionType = Literal["approve", "edit", "reject", "expire"]
 AgentActionStatus = Literal["pending", "succeeded", "failed", "undone"]
 ProposalOutcomeResult = Literal["completed", "partial", "not_completed", "dismissed"]
-IntegrationChannelType = Literal["local_test", "openclaw", "whatsapp"]
+IntegrationChannelType = Literal["local_test", "openclaw", "telegram", "whatsapp"]
 IntegrationScope = Literal[
     "context:read",
     "proposal:create",

@@ -60,7 +60,7 @@ const pluginConfigSchema = buildJsonPluginConfigSchema({
   properties: {
     baseUrl: {type: "string", minLength: 1},
     accessToken: {type: "string", minLength: 16},
-    channelType: {enum: ["local_test", "openclaw", "whatsapp"]},
+    channelType: {enum: ["local_test", "openclaw", "telegram", "whatsapp"]},
     externalIdentity: {type: "string", minLength: 1},
     timeoutMs: {type: "integer", minimum: 1000, maximum: 30000},
     trustedChannelId: {type: "string", minLength: 1},

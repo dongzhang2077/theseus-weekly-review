@@ -1366,7 +1366,7 @@ The read-only channel operation is:
 ```text
 GET /integrations/channel/context?week_start=&week_end=
 Authorization: Bearer <integration token>
-X-Channel-Type: local_test | openclaw | whatsapp
+X-Channel-Type: local_test | openclaw | telegram | whatsapp
 X-External-Identity: <paired external identity>
 X-External-Message-ID: <channel message ID>
 ```
@@ -1386,7 +1386,7 @@ operation. It never approves or executes a proposal.
 ```text
 POST /integrations/channel/proposals/weekly-adjustment
 Authorization: Bearer <integration token>
-X-Channel-Type: local_test | openclaw | whatsapp
+X-Channel-Type: local_test | openclaw | telegram | whatsapp
 X-External-Identity: <paired external identity>
 X-External-Message-ID: <channel message ID>
 ```
@@ -1415,7 +1415,7 @@ approval response. It never executes a plan change.
 ```text
 POST /integrations/channel/proposals/{proposal_id}/decision
 Authorization: Bearer <integration token>
-X-Channel-Type: local_test | openclaw | whatsapp
+X-Channel-Type: local_test | openclaw | telegram | whatsapp
 X-External-Identity: <paired external identity>
 X-External-Message-ID: <channel message ID>
 ```
@@ -1440,7 +1440,7 @@ missing scope returns `403 integration_scope_denied`.
 ```text
 POST /integrations/channel/proposals/{proposal_id}/execute-weekly-plan
 Authorization: Bearer <integration token>
-X-Channel-Type: local_test | openclaw | whatsapp
+X-Channel-Type: local_test | openclaw | telegram | whatsapp
 X-External-Identity: <paired external identity>
 X-External-Message-ID: <channel message ID>
 ```
@@ -1458,7 +1458,7 @@ generic execution or arbitrary plan-write shape.
 ```text
 POST /integrations/channel/proposals/{proposal_id}/actions/{action_id}/undo-weekly-plan
 Authorization: Bearer <integration token>
-X-Channel-Type: local_test | openclaw | whatsapp
+X-Channel-Type: local_test | openclaw | telegram | whatsapp
 X-External-Identity: <paired external identity>
 X-External-Message-ID: <channel message ID>
 ```

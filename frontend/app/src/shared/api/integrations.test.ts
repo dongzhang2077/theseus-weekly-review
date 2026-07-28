@@ -113,6 +113,7 @@ describe("integrations API", () => {
     const result = await readIntegrationContext({
       apiBaseUrl: "http://127.0.0.1:8765",
       accessToken: "ths_int_temporary",
+      channelType: "telegram",
       externalIdentity: "browser-check-1",
       weekStart: "2026-07-27",
       weekEnd: "2026-08-02",
@@ -127,7 +128,7 @@ describe("integrations API", () => {
         method: "GET",
         headers: expect.objectContaining({
           Authorization: "Bearer ths_int_temporary",
-          "X-Channel-Type": "openclaw",
+          "X-Channel-Type": "telegram",
           "X-External-Identity": "browser-check-1"
         })
       })

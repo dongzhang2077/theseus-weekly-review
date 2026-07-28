@@ -4,6 +4,7 @@ import {
   pairIntegration,
   readIntegrationContext,
   revokeIntegration,
+  type IntegrationChannelType,
   type IntegrationCredential,
   type IntegrationScope
 } from "../../shared/api/integrations";
@@ -163,6 +164,7 @@ function IntegrationSettings({ apiBaseUrl, fetchImpl }: { apiBaseUrl: string; fe
   const [reload, setReload] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [label, setLabel] = useState("OpenClaw");
+  const [channelType, setChannelType] = useState<IntegrationChannelType>("telegram");
   const [identity, setIdentity] = useState("");
   const [scopes, setScopes] = useState<IntegrationScope[]>(["context:read"]);
   const [expiry, setExpiry] = useState("86400");
@@ -201,7 +203,7 @@ function IntegrationSettings({ apiBaseUrl, fetchImpl }: { apiBaseUrl: string; fe
       { apiBaseUrl, fetchImpl },
       {
         label,
-        channelType: "openclaw",
+        channelType,
         externalIdentity: identity,
         scopes,
         expiresInSeconds: Number(expiry)
@@ -254,8 +256,8 @@ function IntegrationSettings({ apiBaseUrl, fetchImpl }: { apiBaseUrl: string; fe
       const pairing = await pairIntegration(
         { apiBaseUrl, fetchImpl },
         {
-          label: "Temporary OpenClaw check",
-          channelType: "openclaw",
+          label: `Temporary ${channelLabel(channelType)} check`,
+          channelType,
           externalIdentity: identity,
           scopes: ["context:read"],
           expiresInSeconds: 300
@@ -269,6 +271,7 @@ function IntegrationSettings({ apiBaseUrl, fetchImpl }: { apiBaseUrl: string; fe
       const context = await readIntegrationContext({
         apiBaseUrl,
         accessToken: pairing.data.access_token,
+        channelType,
         externalIdentity: identity,
         weekStart: range.start,
         weekEnd: range.end,
@@ -295,12 +298,12 @@ function IntegrationSettings({ apiBaseUrl, fetchImpl }: { apiBaseUrl: string; fe
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <p className="mb-1 mt-0 text-sm leading-5 text-desk-muted">Pair an OpenClaw instance with your Theseus account.</p>
+        <p className="mb-1 mt-0 text-sm leading-5 text-desk-muted">Pair a trusted channel with your Theseus account.</p>
         <p className="m-0 text-xs leading-5 text-desk-subtle">The access token is displayed once. Theseus stores only a protected token record.</p>
       </div>
 
       <div className="flex items-center justify-between gap-3 rounded-[14px] border border-desk-line bg-desk-raised p-3">
-        <div className="text-sm font-bold">Test OpenClaw access</div>
+        <div className="text-sm font-bold">Test channel access</div>
         <button className="min-h-10 rounded-paper border border-desk-accent bg-desk-accent px-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:border-desk-line disabled:bg-desk-sunk disabled:text-desk-subtle" type="button" disabled={checking} onClick={runConnectionCheck}>{checking ? "Checking" : "Run check"}</button>
       </div>
       {checkResult ? <div className="rounded-paper border border-desk-accent/30 bg-desk-accent-soft px-3 py-2 text-sm font-medium text-desk-ink" role="status">{checkResult}</div> : null}
@@ -316,7 +319,13 @@ function IntegrationSettings({ apiBaseUrl, fetchImpl }: { apiBaseUrl: string; fe
         </div>
       ) : (
         <form className="flex flex-col gap-4 rounded-[14px] border border-desk-line bg-desk-raised p-4" onSubmit={submit}>
-          <div className="text-sm font-bold">New OpenClaw pairing</div>
+          <div className="text-sm font-bold">New channel pairing</div>
+          <Field label="Channel">
+            <select className={fieldClass} value={channelType} onChange={(event) => setChannelType(event.currentTarget.value as IntegrationChannelType)}>
+              <option value="telegram">Telegram</option>
+              <option value="openclaw">OpenClaw local</option>
+            </select>
+          </Field>
           <Field label="Label"><input className={fieldClass} maxLength={80} required value={label} onChange={(event) => setLabel(event.currentTarget.value)} /></Field>
           <Field label="OpenClaw identity" hint="Used only to verify requests"><input className={fieldClass} autoComplete="off" maxLength={256} required value={identity} onChange={(event) => setIdentity(event.currentTarget.value)} /></Field>
           <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
@@ -345,7 +354,7 @@ function IntegrationSettings({ apiBaseUrl, fetchImpl }: { apiBaseUrl: string; fe
           <button className="min-h-10 rounded-paper border-0 bg-transparent px-2 text-sm font-bold text-desk-accent hover:bg-desk-sunk" type="button" disabled={loading} onClick={() => setReload((value) => value + 1)}>Refresh</button>
         </div>
         {loading ? <div className="rounded-paper border border-desk-line bg-desk-raised px-3 py-4 text-sm text-desk-muted">Loading integrations</div> : null}
-        {!loading && credentials.length === 0 ? <div className="rounded-paper border border-desk-line bg-desk-raised px-3 py-4 text-sm text-desk-muted">No OpenClaw pairing yet.</div> : null}
+        {!loading && credentials.length === 0 ? <div className="rounded-paper border border-desk-line bg-desk-raised px-3 py-4 text-sm text-desk-muted">No channel pairing yet.</div> : null}
         {!loading && credentials.length ? <div className="overflow-hidden rounded-paper border border-desk-line bg-desk-raised">{credentials.map((credential) => (
           <div key={credential.id} className="border-b border-desk-line p-3 last:border-b-0">
             <div className="flex items-start justify-between gap-3"><div><div className="text-sm font-bold">{credential.label}</div><div className="mt-1 text-xs text-desk-muted">{credential.token_prefix} · {credential.scopes.length} permission{credential.scopes.length === 1 ? "" : "s"}</div></div><span className={credential.revoked_at ? "text-xs font-bold text-desk-subtle" : "text-xs font-bold text-desk-accent"}>{credential.revoked_at ? "Revoked" : "Active"}</span></div>
@@ -569,4 +578,8 @@ function localIsoDate(date: Date): string {
 
 function uniqueSuffix(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function channelLabel(channelType: IntegrationChannelType): string {
+  return channelType === "telegram" ? "Telegram" : channelType === "openclaw" ? "OpenClaw" : channelType;
 }

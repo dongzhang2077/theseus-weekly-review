@@ -1,6 +1,6 @@
 import type { FetchLike } from "./loadAppWeek";
 
-export type IntegrationChannelType = "local_test" | "openclaw" | "whatsapp";
+export type IntegrationChannelType = "local_test" | "openclaw" | "telegram" | "whatsapp";
 export type IntegrationScope =
   | "context:read"
   | "proposal:create"
@@ -84,6 +84,7 @@ export async function readIntegrationContext(
   options: {
     apiBaseUrl: string;
     accessToken: string;
+    channelType: IntegrationChannelType;
     externalIdentity: string;
     weekStart: string;
     weekEnd: string;
@@ -104,7 +105,7 @@ export async function readIntegrationContext(
         method: "GET",
         headers: {
           Authorization: `Bearer ${options.accessToken}`,
-          "X-Channel-Type": "openclaw",
+          "X-Channel-Type": options.channelType,
           "X-External-Identity": options.externalIdentity,
           "X-External-Message-ID": options.messageId
         }

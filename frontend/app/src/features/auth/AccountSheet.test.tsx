@@ -147,14 +147,14 @@ describe("AccountSheet", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Integrations" }));
-    expect(await screen.findByText("No OpenClaw pairing yet.")).toBeInTheDocument();
+    expect(await screen.findByText("No channel pairing yet.")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Label"), { target: { value: "OpenClaw desk" } });
     fireEvent.change(screen.getByLabelText(/OpenClaw identity/), { target: { value: "openclaw-desk-1" } });
     fireEvent.click(screen.getByRole("button", { name: "Create pairing" }));
 
     expect(await screen.findByText("ths_int_once_only")).toBeInTheDocument();
     expect(JSON.parse(String(fetchImpl.mock.calls[1]?.[1].body))).toMatchObject({
-      channel_type: "openclaw",
+      channel_type: "telegram",
       external_identity: "openclaw-desk-1",
       scopes: ["context:read"]
     });
@@ -210,14 +210,14 @@ describe("AccountSheet", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Integrations" }));
-    await screen.findByText("No OpenClaw pairing yet.");
+    await screen.findByText("No channel pairing yet.");
     fireEvent.click(screen.getByRole("button", { name: "Run check" }));
 
     expect(await screen.findByText("Connection check passed. The temporary credential was revoked.")).toBeInTheDocument();
     expect(channelFetch).toHaveBeenCalledWith(
       expect.stringContaining("/integrations/channel/context?week_start="),
       expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: "Bearer ths_int_browser_only" })
+        headers: expect.objectContaining({ Authorization: "Bearer ths_int_browser_only", "X-Channel-Type": "telegram" })
       })
     );
     expect(authFetch.mock.calls[2]?.[0]).toBe("http://127.0.0.1:8765/integrations/9");

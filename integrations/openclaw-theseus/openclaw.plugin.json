@@ -32,6 +32,10 @@
           },
           {
             "type": "string",
+            "const": "telegram"
+          },
+          {
+            "type": "string",
             "const": "whatsapp"
           }
         ]
