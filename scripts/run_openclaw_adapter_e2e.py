@@ -38,6 +38,7 @@ def main() -> None:
         help="Supported Node executable (defaults to THESEUS_NODE or node).",
     )
     args = parser.parse_args()
+    require_supported_node(args.node)
 
     with tempfile.TemporaryDirectory(prefix="theseus-openclaw-e2e-") as directory:
         workspace = Path(directory)
@@ -90,11 +91,6 @@ def main() -> None:
             )
             wait_for_health(server, port)
             subprocess.run(
-                [args.node, "scripts/require-supported-node.mjs"],
-                cwd=PLUGIN_DIRECTORY,
-                check=True,
-            )
-            subprocess.run(
                 [args.node, "scripts/smoke-workflow.mjs"],
                 cwd=PLUGIN_DIRECTORY,
                 env=environment
@@ -127,6 +123,29 @@ def available_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
         listener.bind(("127.0.0.1", 0))
         return int(listener.getsockname()[1])
+
+
+def require_supported_node(node: str) -> None:
+    try:
+        result = subprocess.run(
+            [node, "scripts/require-supported-node.mjs"],
+            cwd=PLUGIN_DIRECTORY,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise SystemExit(
+            f"Could not find Node executable: {node}. "
+            "Set THESEUS_NODE to a supported Node 22.22.3+, 24.15+, or 25.9+ executable."
+        ) from exc
+    if result.returncode == 0:
+        return
+    detail = (result.stderr or result.stdout).strip()
+    raise SystemExit(
+        f"{detail}\n"
+        "Re-run with THESEUS_NODE=/path/to/supported-node "
+        "or pass --node /path/to/supported-node."
+    )
 
 
 def wait_for_health(server: subprocess.Popen[bytes], port: int) -> None:
