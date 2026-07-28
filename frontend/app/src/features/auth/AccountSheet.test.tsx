@@ -105,4 +105,54 @@ describe("AccountSheet", () => {
 
     expect(onOpenAssistant).toHaveBeenCalledTimes(1);
   });
+
+  it("creates an OpenClaw pairing and displays its token exactly in the active view", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          credential: {
+            id: 8,
+            user_id: 7,
+            label: "OpenClaw desk",
+            channel_type: "openclaw",
+            scopes: ["context:read"],
+            token_prefix: "ths_int_once",
+            expires_at: "2026-07-29T12:00:00Z",
+            revoked_at: null,
+            last_used_at: null,
+            created_at: "2026-07-28T12:00:00Z"
+          },
+          access_token: "ths_int_once_only"
+        })
+      });
+
+    render(
+      <AccountSheet
+        open
+        account={account}
+        client={{} as AuthClient}
+        apiBaseUrl="http://127.0.0.1:8765"
+        fetchImpl={fetchImpl}
+        onClose={vi.fn()}
+        onAccountChange={vi.fn()}
+        onSignedOut={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Integrations" }));
+    expect(await screen.findByText("No OpenClaw pairing yet.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Label"), { target: { value: "OpenClaw desk" } });
+    fireEvent.change(screen.getByLabelText(/OpenClaw identity/), { target: { value: "openclaw-desk-1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create pairing" }));
+
+    expect(await screen.findByText("ths_int_once_only")).toBeInTheDocument();
+    expect(JSON.parse(String(fetchImpl.mock.calls[1]?.[1].body))).toMatchObject({
+      channel_type: "openclaw",
+      external_identity: "openclaw-desk-1",
+      scopes: ["context:read"]
+    });
+  });
 });

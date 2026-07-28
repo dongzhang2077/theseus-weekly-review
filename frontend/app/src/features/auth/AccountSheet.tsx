@@ -1,4 +1,12 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import {
+  listIntegrations,
+  pairIntegration,
+  revokeIntegration,
+  type IntegrationCredential,
+  type IntegrationScope
+} from "../../shared/api/integrations";
+import type { FetchLike } from "../../shared/api/loadAppWeek";
 import { AuthClient, type AuthAccount } from "../../shared/auth/AuthClient";
 import { Icon } from "../../shared/icons/Icon";
 
@@ -10,9 +18,11 @@ interface AccountSheetProps {
   onAccountChange: (account: AuthAccount) => void;
   onSignedOut: () => void;
   onOpenAssistant?: () => void;
+  apiBaseUrl?: string;
+  fetchImpl?: FetchLike;
 }
 
-type AccountView = "overview" | "profile" | "email" | "password" | "delete";
+type AccountView = "overview" | "profile" | "email" | "password" | "integrations" | "delete";
 
 export function AccountSheet({
   open,
@@ -21,7 +31,9 @@ export function AccountSheet({
   onClose,
   onAccountChange,
   onSignedOut,
-  onOpenAssistant
+  onOpenAssistant,
+  apiBaseUrl,
+  fetchImpl
 }: AccountSheetProps) {
   const [view, setView] = useState<AccountView>("overview");
 
@@ -59,6 +71,7 @@ export function AccountSheet({
               onOpen={setView}
               onSignedOut={onSignedOut}
               onOpenAssistant={onOpenAssistant}
+              integrationsAvailable={Boolean(apiBaseUrl && fetchImpl)}
             />
           ) : null}
           {view === "profile" ? (
@@ -69,6 +82,9 @@ export function AccountSheet({
           ) : null}
           {view === "password" ? (
             <PasswordForm client={client} onSaved={(updated) => { onAccountChange(updated); setView("overview"); }} />
+          ) : null}
+          {view === "integrations" && apiBaseUrl && fetchImpl ? (
+            <IntegrationSettings apiBaseUrl={apiBaseUrl} fetchImpl={fetchImpl} />
           ) : null}
           {view === "delete" ? (
             <DeleteForm client={client} onDeleted={onSignedOut} />
@@ -84,13 +100,15 @@ function AccountOverview({
   client,
   onOpen,
   onSignedOut,
-  onOpenAssistant
+  onOpenAssistant,
+  integrationsAvailable
 }: {
   account: AuthAccount;
   client: AuthClient;
   onOpen: (view: AccountView) => void;
   onSignedOut: () => void;
   onOpenAssistant?: () => void;
+  integrationsAvailable: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,6 +140,7 @@ function AccountOverview({
       </div>
       <div className="overflow-hidden rounded-paper border border-desk-line bg-desk-raised">
         {onOpenAssistant ? <AccountRow label="Assistant" onClick={onOpenAssistant} /> : null}
+        {integrationsAvailable ? <AccountRow label="Integrations" onClick={() => onOpen("integrations")} /> : null}
         <AccountRow label="Edit profile" onClick={() => onOpen("profile")} />
         <AccountRow label="Change email" onClick={() => onOpen("email")} />
         <AccountRow label="Change password" onClick={() => onOpen("password")} />
@@ -133,6 +152,152 @@ function AccountOverview({
       <button className="mt-3 min-h-11 w-full rounded-paper border-0 bg-transparent px-4 text-sm font-bold text-desk-danger hover:bg-desk-danger-soft" type="button" onClick={() => onOpen("delete")}>
         Delete account
       </button>
+    </div>
+  );
+}
+
+function IntegrationSettings({ apiBaseUrl, fetchImpl }: { apiBaseUrl: string; fetchImpl: FetchLike }) {
+  const [credentials, setCredentials] = useState<IntegrationCredential[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [reload, setReload] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [label, setLabel] = useState("OpenClaw");
+  const [identity, setIdentity] = useState("");
+  const [scopes, setScopes] = useState<IntegrationScope[]>(["context:read"]);
+  const [expiry, setExpiry] = useState("86400");
+  const [pairing, setPairing] = useState(false);
+  const [pairToken, setPairToken] = useState<string | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<IntegrationCredential | null>(null);
+  const [revoking, setRevoking] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    setLoading(true);
+    setError(null);
+    listIntegrations({ apiBaseUrl, fetchImpl }).then((result) => {
+      if (ignore) return;
+      if (result.status === "ok" && result.data) setCredentials(result.data);
+      else setError(result.error ?? "Integrations could not be loaded.");
+      setLoading(false);
+    });
+    return () => { ignore = true; };
+  }, [apiBaseUrl, fetchImpl, reload]);
+
+  function toggleScope(scope: IntegrationScope) {
+    setScopes((current) => current.includes(scope)
+      ? current.filter((item) => item !== scope)
+      : [...current, scope]);
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pairing || !label.trim() || !identity.trim() || !scopes.length) return;
+    setPairing(true);
+    setError(null);
+    const result = await pairIntegration(
+      { apiBaseUrl, fetchImpl },
+      {
+        label,
+        channelType: "openclaw",
+        externalIdentity: identity,
+        scopes,
+        expiresInSeconds: Number(expiry)
+      }
+    );
+    setPairing(false);
+    if (result.status === "ok" && result.data) {
+      setCredentials((current) => [result.data!.credential, ...current]);
+      setIdentity("");
+      setPairToken(result.data.access_token);
+      return;
+    }
+    setError(result.error ?? "OpenClaw pairing could not be created.");
+  }
+
+  async function revoke() {
+    if (!revokeTarget || revoking) return;
+    setRevoking(true);
+    setError(null);
+    const result = await revokeIntegration({ apiBaseUrl, fetchImpl }, revokeTarget.id);
+    setRevoking(false);
+    if (result.status === "ok") {
+      setCredentials((current) => current.map((credential) => credential.id === revokeTarget.id
+        ? { ...credential, revoked_at: new Date().toISOString() }
+        : credential));
+      setRevokeTarget(null);
+      return;
+    }
+    setError(result.error ?? "Integration could not be revoked.");
+  }
+
+  async function copyToken() {
+    if (!pairToken) return;
+    try {
+      await navigator.clipboard.writeText(pairToken);
+    } catch {
+      setError("Copy is unavailable. Select the token and copy it manually.");
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <p className="mb-1 mt-0 text-sm leading-5 text-desk-muted">Pair an OpenClaw instance with your Theseus account.</p>
+        <p className="m-0 text-xs leading-5 text-desk-subtle">The access token is displayed once. Theseus stores only a protected token record.</p>
+      </div>
+
+      {pairToken ? (
+        <div className="rounded-paper border border-desk-accent/30 bg-desk-accent-soft p-3" role="status">
+          <div className="text-sm font-bold text-desk-ink">Copy this token into OpenClaw now</div>
+          <code className="mt-2 block break-all rounded-[10px] border border-desk-line bg-desk-raised p-3 text-xs text-desk-ink">{pairToken}</code>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button className={secondaryButtonClass} type="button" onClick={copyToken}>Copy token</button>
+            <button className={primaryButtonClass} type="button" onClick={() => { setPairToken(null); setReload((value) => value + 1); }}>Done</button>
+          </div>
+        </div>
+      ) : (
+        <form className="flex flex-col gap-4 rounded-[14px] border border-desk-line bg-desk-raised p-4" onSubmit={submit}>
+          <div className="text-sm font-bold">New OpenClaw pairing</div>
+          <Field label="Label"><input className={fieldClass} maxLength={80} required value={label} onChange={(event) => setLabel(event.currentTarget.value)} /></Field>
+          <Field label="OpenClaw identity" hint="Used only to verify requests"><input className={fieldClass} autoComplete="off" maxLength={256} required value={identity} onChange={(event) => setIdentity(event.currentTarget.value)} /></Field>
+          <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+            <legend className="text-sm font-bold">Permissions</legend>
+            {scopeOptions.map(({ scope, label: scopeLabel }) => (
+              <label key={scope} className="flex min-h-10 items-center gap-3 rounded-[10px] px-1 text-sm text-desk-ink hover:bg-desk-sunk">
+                <input type="checkbox" checked={scopes.includes(scope)} onChange={() => toggleScope(scope)} />
+                {scopeLabel}
+              </label>
+            ))}
+          </fieldset>
+          <Field label="Expiry">
+            <select className={fieldClass} value={expiry} onChange={(event) => setExpiry(event.currentTarget.value)}>
+              <option value="86400">24 hours</option>
+              <option value="604800">7 days</option>
+              <option value="2592000">30 days</option>
+            </select>
+          </Field>
+          <SubmitButton disabled={pairing || !label.trim() || !identity.trim() || !scopes.length}>{pairing ? "Creating pairing" : "Create pairing"}</SubmitButton>
+        </form>
+      )}
+
+      <section aria-labelledby="paired-integrations-title">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h3 id="paired-integrations-title" className="m-0 text-sm font-bold">Paired integrations</h3>
+          <button className="min-h-10 rounded-paper border-0 bg-transparent px-2 text-sm font-bold text-desk-accent hover:bg-desk-sunk" type="button" disabled={loading} onClick={() => setReload((value) => value + 1)}>Refresh</button>
+        </div>
+        {loading ? <div className="rounded-paper border border-desk-line bg-desk-raised px-3 py-4 text-sm text-desk-muted">Loading integrations</div> : null}
+        {!loading && credentials.length === 0 ? <div className="rounded-paper border border-desk-line bg-desk-raised px-3 py-4 text-sm text-desk-muted">No OpenClaw pairing yet.</div> : null}
+        {!loading && credentials.length ? <div className="overflow-hidden rounded-paper border border-desk-line bg-desk-raised">{credentials.map((credential) => (
+          <div key={credential.id} className="border-b border-desk-line p-3 last:border-b-0">
+            <div className="flex items-start justify-between gap-3"><div><div className="text-sm font-bold">{credential.label}</div><div className="mt-1 text-xs text-desk-muted">{credential.token_prefix} · {credential.scopes.length} permission{credential.scopes.length === 1 ? "" : "s"}</div></div><span className={credential.revoked_at ? "text-xs font-bold text-desk-subtle" : "text-xs font-bold text-desk-accent"}>{credential.revoked_at ? "Revoked" : "Active"}</span></div>
+            <div className="mt-2 text-xs text-desk-subtle">Expires {shortDate(credential.expires_at)}{credential.last_used_at ? ` · Used ${shortDate(credential.last_used_at)}` : ""}</div>
+            {!credential.revoked_at ? <button className="mt-3 min-h-10 rounded-paper border border-desk-danger/40 bg-transparent px-3 text-sm font-bold text-desk-danger hover:bg-desk-danger-soft" type="button" onClick={() => setRevokeTarget(credential)}>Revoke</button> : null}
+          </div>
+        ))}</div> : null}
+      </section>
+
+      {error ? <div className="rounded-paper border border-desk-danger/30 bg-desk-danger-soft px-3 py-2 text-sm font-medium text-desk-danger" role="alert">{error}</div> : null}
+      {revokeTarget ? <div className="rounded-paper border border-desk-danger/30 bg-desk-danger-soft p-3"><div className="text-sm font-bold text-desk-danger">Revoke {revokeTarget.label}?</div><p className="mb-3 mt-1 text-sm leading-5 text-desk-ink">OpenClaw will lose access immediately. This cannot be undone.</p><div className="grid grid-cols-2 gap-2"><button className={secondaryButtonClass} type="button" disabled={revoking} onClick={() => setRevokeTarget(null)}>Cancel</button><button className={dangerButtonClass} type="button" disabled={revoking} onClick={revoke}>{revoking ? "Revoking" : "Revoke access"}</button></div></div> : null}
     </div>
   );
 }
@@ -302,6 +467,7 @@ function accountTitle(view: AccountView): string {
   if (view === "profile") return "Edit profile";
   if (view === "email") return "Change email";
   if (view === "password") return "Change password";
+  if (view === "integrations") return "Integrations";
   if (view === "delete") return "Delete account";
   return "Account";
 }
@@ -309,3 +475,18 @@ function accountTitle(view: AccountView): string {
 const iconButtonClass = "grid size-11 place-items-center rounded-paper border-0 bg-transparent text-desk-muted hover:bg-desk-sunk hover:text-desk-ink";
 const fieldClass = "min-h-12 w-full rounded-paper border border-desk-line bg-desk-raised px-3 text-base text-desk-ink outline-none focus:border-desk-accent focus:ring-2 focus:ring-desk-accent-soft";
 const primaryButtonClass = "min-h-12 w-full rounded-paper border border-desk-accent bg-desk-accent px-4 text-sm font-bold text-white shadow-paper disabled:cursor-not-allowed disabled:border-desk-line disabled:bg-desk-sunk disabled:text-desk-subtle";
+const secondaryButtonClass = "min-h-12 w-full rounded-paper border border-desk-line bg-desk-raised px-4 text-sm font-bold text-desk-ink hover:bg-desk-sunk disabled:cursor-not-allowed disabled:text-desk-subtle";
+const dangerButtonClass = "min-h-12 w-full rounded-paper border border-desk-danger bg-desk-danger px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:border-desk-line disabled:bg-desk-sunk disabled:text-desk-subtle";
+
+const scopeOptions: Array<{ scope: IntegrationScope; label: string }> = [
+  { scope: "context:read", label: "Read weekly context" },
+  { scope: "proposal:create", label: "Create proposals" },
+  { scope: "proposal:decide", label: "Record proposal decisions" },
+  { scope: "action:execute", label: "Execute approved plan changes" },
+  { scope: "action:undo", label: "Undo executed plan changes" }
+];
+
+function shortDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+}

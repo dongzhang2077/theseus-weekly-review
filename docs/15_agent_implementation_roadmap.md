@@ -619,6 +619,14 @@ service. Gate five adds independent `action:undo`, which can only undo that
 successful reversible Action through the same service. Product-owner acceptance
 is still required for this gate.
 
+App-management checkpoint (2026-07-28 PDT): authenticated users can open
+Account > Integrations in the Theseus app to create an OpenClaw pairing,
+choose explicit scopes and expiry, copy the one-time token, inspect credential
+lifecycle metadata, and revoke a pairing after confirmation. The browser uses
+only its existing authenticated API client; it does not retain the one-time
+integration token or raw external identity after pairing. This is management
+UI only: it does not embed an OpenClaw runtime or bypass the typed channel API.
+
 Acceptance verification: 27 focused tests pass. The complete inventory reached
 196 of 197 with one previously tracked intermittent authenticated Activity
 request failure, which passed in isolation. Compilation and deterministic

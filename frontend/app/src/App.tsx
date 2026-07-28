@@ -394,6 +394,8 @@ export function App() {
             onClose={() => setAccountOpen(false)}
             onAccountChange={setAccount}
             onSignedOut={signedOut}
+            apiBaseUrl={apiBaseUrl}
+            fetchImpl={authClient.fetch}
             onOpenAssistant={() => {
               setAccountOpen(false);
               setAssistantOpen(true);

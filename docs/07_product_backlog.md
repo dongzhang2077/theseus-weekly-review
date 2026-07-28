@@ -856,10 +856,18 @@ Bearer credential can call only the read-only channel context endpoint when it
 has `context:read`; browser JWTs are not reused. Replay receipts contain no
 personal context copies. Pairing, OpenAPI, expiry, scope, replay conflict,
 revocation, redaction, v8 migration, and account-isolation tests pass in the
-focused candidate suite. The backend's pending-only channel proposal endpoint
-is now available behind `proposal:create`; OpenClaw runtime transport, channel
-approval, and execution remain deferred. Product-owner acceptance passed on
+focused candidate suite. Subsequent STORY-027 work added the pending-only
+channel proposal endpoint, narrow approve/reject decision, approved-plan
+execution, and reversible undo behind distinct scopes; the native OpenClaw
+adapter remains a replaceable transport. Product-owner acceptance passed on
 2026-07-26 PDT.
+
+App-management checkpoint (2026-07-28 PDT): Account > Integrations provides
+an authenticated OpenClaw-only pairing surface for label, identity, explicit
+scopes, and expiry; it displays the raw token only in the one-time pairing
+result, lists lifecycle metadata, and requires confirmation before revocation.
+It uses the existing browser-authenticated management API and deliberately
+does not store integration tokens or identities in browser persistence.
 
 Acceptance verification: 27 focused Integration/schema/migration tests pass.
 The full suite completed 196 of 197 tests; the sole failure was the previously
