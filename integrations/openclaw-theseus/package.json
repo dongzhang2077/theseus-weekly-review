@@ -16,6 +16,7 @@
     "build": "tsc --project tsconfig.json",
     "plugin:build": "npm run build",
     "plugin:validate": "npm run test",
+    "smoke:workflow": "node scripts/smoke-workflow.mjs",
     "test": "npm run build && node --test test/*.test.mjs"
   },
   "dependencies": {

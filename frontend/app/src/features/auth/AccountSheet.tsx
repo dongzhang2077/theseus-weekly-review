@@ -515,7 +515,7 @@ function AccountForm({ onSubmit, error, children }: { onSubmit: (event: FormEven
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return <label className="flex flex-col gap-1.5 text-sm font-bold"><span className="flex justify-between">{label}{hint ? <small className="font-medium text-desk-subtle">{hint}</small> : null}</span>{children}</label>;
+  return <label className="flex flex-col gap-1.5 text-sm font-bold"><span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"><span>{label}</span>{hint ? <small className="font-medium text-desk-subtle">{hint}</small> : null}</span>{children}</label>;
 }
 
 function SubmitButton({ disabled, children }: { disabled: boolean; children: ReactNode }) {

@@ -630,6 +630,13 @@ The same surface offers a one-click API connection check: it creates a
 five-minute, read-only temporary pairing, reads channel context, and revokes
 the credential before reporting success.
 
+Adapter E2E checkpoint (2026-07-28 PDT):
+`scripts/run_openclaw_adapter_e2e.py` prepares a disposable sanitized database
+and pairing, starts a temporary local API, then drives the OpenClaw client
+through context read, proposal draft, approval, execution, and undo. It revokes
+the credential and removes temporary data afterward, so developer verification
+does not require copying a token or identity into a shell.
+
 Acceptance verification: 27 focused tests pass. The complete inventory reached
 196 of 197 with one previously tracked intermittent authenticated Activity
 request failure, which passed in isolation. Compilation and deterministic

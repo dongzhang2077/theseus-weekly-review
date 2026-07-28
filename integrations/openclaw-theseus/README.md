@@ -43,6 +43,24 @@ Run these commands with a supported Node runtime; the package enforces Node
 the native SDK registration and the trusted message/run bridge without a
 configured Gateway or a real Theseus credential.
 
+## Automated adapter workflow check
+
+From the repository root, this one command prepares a temporary sanitized
+Theseus database, starts a temporary API, creates a temporary five-scope
+pairing, and verifies context read, proposal draft, approval, execution, and
+undo through this plugin's HTTP client. It revokes the pairing and removes all
+temporary data afterward. No token or identity needs to be copied into the
+terminal.
+
+```bash
+python3 scripts/run_openclaw_adapter_e2e.py
+```
+
+Use a supported Node runtime. When `node` does not point to one, pass it with
+`THESEUS_NODE=/path/to/node python3 scripts/run_openclaw_adapter_e2e.py`.
+This checks the real Theseus HTTP boundary and plugin client. The native
+OpenClaw host hook registration remains covered by the plugin runtime tests.
+
 Install the local package with `openclaw plugins install` only after the
 Theseus API is running and a scoped integration token has been created.
 Configure `baseUrl`, `accessToken`, `channelType`, and `externalIdentity` in
