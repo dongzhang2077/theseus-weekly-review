@@ -635,7 +635,8 @@ Acceptance criteria:
 - Rollout gate one is read-only. Gate two may create a pending proposal only
   from a trusted inbound message ID. Gate three may record only an `approve`
   or `reject` decision with a distinct scope, replay protection, and audit
-  record; it cannot edit or execute a plan change.
+  record; it cannot edit a plan change. Gate four may execute only an approved
+  proposal through the existing reversible Action service with `action:execute`.
 - Any approved write operation requires bounded permissions, approval,
   idempotency, audit, verification, and Undo where practical.
 - High-risk tools are denied by default.

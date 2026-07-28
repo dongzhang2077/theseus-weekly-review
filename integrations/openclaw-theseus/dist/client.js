@@ -40,6 +40,9 @@ export async function decideTheseusWeeklyPlanProposal(config, request, options =
         ...(request.reason === undefined ? {} : { reason: request.reason }),
     }, "decision");
 }
+export async function executeTheseusWeeklyPlanProposal(config, request, options = {}) {
+    return requestTheseus(config, new URL(`/integrations/channel/proposals/${request.proposalId}/execute-weekly-plan`, normalizedBase(config.baseUrl)), "POST", requiredMessageId(options.messageId), options.fetch, { expected_version: request.expectedVersion }, "execution");
+}
 async function requestTheseus(config, url, method, messageId, fetchOverride, body, operation) {
     const fetcher = fetchOverride ?? fetch;
     const controller = new AbortController();
@@ -101,7 +104,9 @@ function mappedError(status, payload, operation) {
             ? "Theseus read access is not allowed"
             : operation === "proposal"
                 ? "Theseus proposal creation is not allowed"
-                : "Theseus proposal decision is not allowed", status);
+                : operation === "decision"
+                    ? "Theseus proposal decision is not allowed"
+                    : "Theseus proposal execution is not allowed", status);
     }
     if (status === 409) {
         return new TheseusAdapterError(code ?? "theseus_conflict", "Theseus rejected the repeated request", status);

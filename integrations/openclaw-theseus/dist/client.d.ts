@@ -22,6 +22,10 @@ export interface TheseusWeeklyProposalDecisionRequest {
     decision: "approve" | "reject";
     reason?: string;
 }
+export interface TheseusWeeklyProposalExecutionRequest {
+    proposalId: number;
+    expectedVersion: number;
+}
 interface TheseusRequestOptions {
     fetch?: typeof fetch;
     messageId?: string;
@@ -42,4 +46,5 @@ export declare function draftTheseusWeeklyPlanProposal(config: TheseusClientConf
  * approved plan change.
  */
 export declare function decideTheseusWeeklyPlanProposal(config: TheseusClientConfig, request: TheseusWeeklyProposalDecisionRequest, options?: TheseusRequestOptions): Promise<unknown>;
+export declare function executeTheseusWeeklyPlanProposal(config: TheseusClientConfig, request: TheseusWeeklyProposalExecutionRequest, options?: TheseusRequestOptions): Promise<unknown>;
 export {};

@@ -29,6 +29,11 @@ export interface TheseusWeeklyProposalDecisionRequest {
   reason?: string;
 }
 
+export interface TheseusWeeklyProposalExecutionRequest {
+  proposalId: number;
+  expectedVersion: number;
+}
+
 interface TheseusRequestOptions {
   fetch?: typeof fetch;
   messageId?: string;
@@ -120,6 +125,21 @@ export async function decideTheseusWeeklyPlanProposal(
     "decision",
   );
 }
+export async function executeTheseusWeeklyPlanProposal(
+  config: TheseusClientConfig,
+  request: TheseusWeeklyProposalExecutionRequest,
+  options: TheseusRequestOptions = {},
+): Promise<unknown> {
+  return requestTheseus(
+    config,
+    new URL(`/integrations/channel/proposals/${request.proposalId}/execute-weekly-plan`, normalizedBase(config.baseUrl)),
+    "POST",
+    requiredMessageId(options.messageId),
+    options.fetch,
+    {expected_version: request.expectedVersion},
+    "execution",
+  );
+}
 
 async function requestTheseus(
   config: TheseusClientConfig,
@@ -128,7 +148,7 @@ async function requestTheseus(
   messageId: string,
   fetchOverride: typeof fetch | undefined,
   body: object | undefined,
-  operation: "context" | "proposal" | "decision",
+  operation: "context" | "proposal" | "decision" | "execution",
 ): Promise<unknown> {
   const fetcher = fetchOverride ?? fetch;
   const controller = new AbortController();
@@ -189,7 +209,7 @@ async function safeJson(response: Response): Promise<unknown> {
 function mappedError(
   status: number,
   payload: unknown,
-  operation: "context" | "proposal" | "decision",
+  operation: "context" | "proposal" | "decision" | "execution",
 ): TheseusAdapterError {
   const code = errorCode(payload);
   if (status === 401) {
@@ -202,7 +222,9 @@ function mappedError(
         ? "Theseus read access is not allowed"
         : operation === "proposal"
           ? "Theseus proposal creation is not allowed"
-          : "Theseus proposal decision is not allowed",
+          : operation === "decision"
+            ? "Theseus proposal decision is not allowed"
+            : "Theseus proposal execution is not allowed",
       status,
     );
   }

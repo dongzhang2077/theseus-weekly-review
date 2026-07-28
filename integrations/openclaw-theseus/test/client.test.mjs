@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   TheseusAdapterError,
   decideTheseusWeeklyPlanProposal,
+  executeTheseusWeeklyPlanProposal,
   draftTheseusWeeklyPlanProposal,
   readTheseusContext,
 } from "../dist/client.js";
@@ -138,6 +139,23 @@ test("proposal decision accepts only the decision contract and trusted message I
     decision: "reject",
     reason: "Not this week",
   });
+});
+
+test("proposal execution sends only its approved-proposal contract", async () => {
+  let captured;
+  const result = await executeTheseusWeeklyPlanProposal(
+    config, {proposalId: 8, expectedVersion: 2}, {
+      messageId: "trusted-execution-001",
+      fetch: async (url, init) => {
+        captured = {url: String(url), init};
+        return new Response(JSON.stringify({proposal: {status: "executed"}}), {status: 200, headers: {"content-type": "application/json"}});
+      },
+    },
+  );
+  assert.deepEqual(result, {proposal: {status: "executed"}});
+  assert.equal(captured.url, "http://127.0.0.1:8000/integrations/channel/proposals/8/execute-weekly-plan");
+  assert.deepEqual(JSON.parse(captured.init.body), {expected_version: 2});
+  assert.equal(captured.init.headers["X-External-Message-ID"], "trusted-execution-001");
 });
 
 test("authentication failures are redacted", async () => {

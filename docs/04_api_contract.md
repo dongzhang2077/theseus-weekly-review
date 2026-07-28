@@ -1433,3 +1433,21 @@ already decided, or expired proposals return controlled `409` responses;
 missing proposals return `404 proposal_not_found`. Invalid, expired, revoked,
 or mismatched credentials return redacted `401 integration_access_denied`, and
 missing scope returns `403 integration_scope_denied`.
+
+### 14.3 Execute An Approved Channel Weekly Plan Proposal
+
+```text
+POST /integrations/channel/proposals/{proposal_id}/execute-weekly-plan
+Authorization: Bearer <integration token>
+X-Channel-Type: local_test | openclaw | whatsapp
+X-External-Identity: <paired external identity>
+X-External-Message-ID: <channel message ID>
+```
+
+The body accepts only `expected_version`. The endpoint requires `action:execute`
+and delegates to `AssistantWeeklyPlanExecutionService`; it only accepts an
+approved `weekly_plan_adjustment` Proposal, derives its opaque Action idempotency
+key from the pairing and external message ID, and preserves its existing Action,
+verification, and Undo data. Exact retries return the original execution;
+different reuse returns `409 external_message_replay_conflict`. It exposes no
+generic execution or arbitrary plan-write shape.

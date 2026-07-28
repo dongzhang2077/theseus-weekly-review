@@ -8,6 +8,7 @@ import { jsonResult } from "openclaw/plugin-sdk/tool-results";
 
 import {
   decideTheseusWeeklyPlanProposal,
+  executeTheseusWeeklyPlanProposal,
   draftTheseusWeeklyPlanProposal,
   readTheseusContext,
   type TheseusClientConfig,
@@ -37,7 +38,12 @@ interface ProposalDecisionToolParams {
 
 const proposalToolName = "theseus_weekly_plan_proposal";
 const proposalDecisionToolName = "theseus_weekly_plan_decision";
-const trustedProposalToolNames = new Set([proposalToolName, proposalDecisionToolName]);
+const proposalExecutionToolName = "theseus_weekly_plan_execute";
+const trustedProposalToolNames = new Set([
+  proposalToolName,
+  proposalDecisionToolName,
+  proposalExecutionToolName,
+]);
 const pluginConfigSchema = buildJsonPluginConfigSchema({
   type: "object",
   required: ["baseUrl", "accessToken", "channelType", "externalIdentity"],
@@ -56,7 +62,7 @@ const pluginConfigSchema = buildJsonPluginConfigSchema({
 const plugin: OpenClawPluginDefinition = definePluginEntry({
   id: "theseus",
   name: "Theseus",
-  description: "Read Theseus context, draft weekly-plan proposals, and record narrow user decisions through scoped integration access.",
+  description: "Read Theseus context, draft and decide weekly-plan proposals, and execute approved changes through scoped integration access.",
   configSchema: pluginConfigSchema,
   register(api) {
     const config = requirePluginConfig(api.pluginConfig);
@@ -212,6 +218,28 @@ const plugin: OpenClawPluginDefinition = definePluginEntry({
               {messageId},
             ),
           );
+        },
+      },
+      {optional: true},
+    );
+    api.registerTool(
+      {
+        name: proposalExecutionToolName,
+        label: "Theseus Weekly Plan Execute",
+        description: "Execute an approved weekly-plan proposal with a reversible Action. It never accepts plan content.",
+        parameters: Type.Object({
+          proposalId: Type.Integer({minimum: 1}),
+          expectedVersion: Type.Integer({minimum: 1}),
+          trustedMessageReference: Type.Optional(Type.String()),
+        }, {additionalProperties: false}),
+        async execute(_toolCallId, params: {proposalId: number; expectedVersion: number; trustedMessageReference?: string}, signal) {
+          signal?.throwIfAborted();
+          const messageId = bridge.resolveProposalReference(params.trustedMessageReference);
+          if (!messageId) throw new Error("Theseus proposal execution requires a trusted runtime message reference");
+          return jsonResult(await executeTheseusWeeklyPlanProposal(config, {
+            proposalId: params.proposalId,
+            expectedVersion: params.expectedVersion,
+          }, {messageId}));
         },
       },
       {optional: true},

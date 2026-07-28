@@ -797,6 +797,10 @@ class ChannelProposalDecisionRequest(APIModel):
     reason: str = Field(default="", max_length=1000)
 
 
+class ChannelProposalExecutionRequest(APIModel):
+    expected_version: int = Field(ge=1)
+
+
 class AgentActionCreate(APIModel):
     proposal_id: int = Field(gt=0)
     decision_id: int | None = Field(default=None, gt=0)

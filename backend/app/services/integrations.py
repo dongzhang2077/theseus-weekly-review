@@ -16,7 +16,10 @@ from ..db.repositories.integrations import IntegrationRepository, StoredIntegrat
 from ..schemas import (
     AssistantContextRead,
     AssistantWeeklyPlanProposalRequest,
+    AssistantProposalExecutionRequest,
     ChannelProposalDecisionRequest,
+    ChannelProposalExecutionRequest,
+    AssistantWeeklyPlanExecutionRead,
     IntegrationCredentialRead,
     ProposalDecisionCreate,
     ProposalDecisionRead,
@@ -26,7 +29,7 @@ from ..schemas import (
     IntegrationScope,
 )
 from .agent_memory import ProposalLedgerService
-from .assistant import AssistantContextService, AssistantWeeklyPlanProposalService
+from .assistant import AssistantContextService, AssistantWeeklyPlanExecutionService, AssistantWeeklyPlanProposalService
 
 
 class IntegrationAccessDenied(Exception):
@@ -268,6 +271,27 @@ class IntegrationService:
             )
             self.repository.touch(access.credential_id, self._now())
             return decision
+
+    def execute_weekly_plan_proposal(
+        self, *, token: str, channel_type: str, external_identity: str,
+        external_message_id: str, proposal_id: int,
+        request: ChannelProposalExecutionRequest,
+    ) -> AssistantWeeklyPlanExecutionRead:
+        access = self.authenticate(token=token, channel_type=channel_type,
+            external_identity=external_identity, required_scope="action:execute")
+        operation = "proposal.execute.weekly_plan_adjustment"
+        message_hash = self._message_hash(access.credential_id, external_message_id)
+        request_hash = self._request_hash(operation, {"proposal_id": proposal_id, **request.model_dump(mode="json")})
+        with _savepoint(self.connection, "integration_channel_proposal_execution"):
+            self._existing_receipt(access.credential_id, message_hash, request_hash)
+            result = AssistantWeeklyPlanExecutionService(self.connection, access.user_id).execute(
+                proposal_id, AssistantProposalExecutionRequest(expected_version=request.expected_version),
+                idempotency_key=self._protected_hash("execution-idempotency", str(access.credential_id), external_message_id),
+            )
+            self._save_receipt(access=access, message_hash=message_hash, operation=operation,
+                request_hash=request_hash, created_at=self._now())
+            self.repository.touch(access.credential_id, self._now())
+            return result
 
     def _message_hash(self, credential_id: int, external_message_id: str) -> str:
         return self._protected_hash("message", str(credential_id), external_message_id)

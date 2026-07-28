@@ -343,9 +343,9 @@ configured sender. The runtime passes only an opaque, short-lived reference
 into the tool; model input never becomes the external message ID. A decision is
 limited to `approve` or `reject`, requires a distinct integration scope, and
 only appends to the Proposal ledger; it cannot edit or execute a plan change.
-The package passes an isolated OpenClaw runtime install/load check with all
-three optional tools and both typed hooks registered without diagnostics.
-Channel execution remains deliberately absent.
+Gate four adds a fourth optional execution tool. It requires `action:execute`,
+accepts no plan content, and delegates to the existing approved-proposal Action
+service, preserving verification and Undo data.
 
 ## 10. Anti-Patterns to Avoid
 

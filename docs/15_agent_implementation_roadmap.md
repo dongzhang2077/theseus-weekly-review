@@ -611,13 +611,10 @@ implemented. The native OpenClaw package binds the host-provided inbound
 message ID to the single runtime `runId`, rejects an unconfigured channel or
 sender, and passes an opaque short-lived reference to proposal-changing tools.
 The decision endpoint accepts only `approve` or `reject`, requires the distinct
-`proposal:decide` scope, appends a decision record, and never executes a plan
-change. The package-style isolated-runtime install/load check registers all
-three optional tools and both typed hooks without diagnostics. Verification:
-200 Python tests, 10 plugin tests, Python compilation, and deterministic sample
-review pass. Channel execution remains out of scope; a later gate must reuse
-the accepted execution service rather than add a direct-write tool.
-Product-owner acceptance is still required for this gate.
+`proposal:decide` scope, appends a decision record, and never edits a plan
+change. Gate four adds the separately scoped `action:execute` operation, which
+accepts no plan content and delegates to the accepted reversible execution
+service. Product-owner acceptance is still required for this gate.
 
 Acceptance verification: 27 focused tests pass. The complete inventory reached
 196 of 197 with one previously tracked intermittent authenticated Activity

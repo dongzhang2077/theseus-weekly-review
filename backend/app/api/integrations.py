@@ -11,7 +11,9 @@ from ..schemas import (
     AccountRead,
     AssistantContextRead,
     AssistantWeeklyPlanProposalRequest,
+    AssistantWeeklyPlanExecutionRead,
     ChannelProposalDecisionRequest,
+    ChannelProposalExecutionRequest,
     IntegrationChannelType,
     IntegrationCredentialRead,
     IntegrationPairCreate,
@@ -24,6 +26,12 @@ from ..services import (
     AssistantProposalSourceNotFound,
     AssistantProposalSourceStale,
     AssistantProposalUnavailable,
+    AssistantActionInProgress,
+    AssistantPlanPersistenceConflict,
+    AssistantPlanStateConflict,
+    AssistantProposalNotApproved,
+    AssistantProposalPayloadInvalid,
+    AssistantProposalTypeUnsupported,
     IdempotencyConflict,
     IdempotencyInProgress,
     IntegrationAccessDenied,
@@ -36,6 +44,7 @@ from ..services import (
     ProposalExpired,
     ProposalNotFound,
     ProposalVersionConflict,
+    ActionIdempotencyConflict,
 )
 from .dependencies import (
     bearer_scheme,
@@ -337,37 +346,43 @@ async def channel_decide_weekly_plan_proposal(
             },
         ) from exc
     except IntegrationReplayConflict as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "code": "external_message_replay_conflict",
-                "message": "This external message ID was used for another request",
-            },
-        ) from exc
+        raise HTTPException(status_code=409, detail={"code": "external_message_replay_conflict", "message": "This external message ID was used for another request"}) from exc
     except ProposalNotFound as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "code": "proposal_not_found",
-                "message": "The proposal was not found",
-            },
-        ) from exc
+        raise HTTPException(status_code=404, detail={"code": "proposal_not_found", "message": "The proposal was not found"}) from exc
     except ProposalExpired as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "code": "proposal_expired",
-                "message": "The proposal expired before the decision was recorded",
-            },
-        ) from exc
+        raise HTTPException(status_code=409, detail={"code": "proposal_expired", "message": "The proposal expired before the decision was recorded"}) from exc
     except ProposalVersionConflict as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "code": "proposal_version_conflict",
-                "message": "The proposal changed after it was loaded",
-            },
-        ) from exc
+        raise HTTPException(status_code=409, detail={"code": "proposal_version_conflict", "message": "The proposal changed after it was loaded"}) from exc
+
+
+@router.post("/channel/proposals/{proposal_id}/execute-weekly-plan", response_model=AssistantWeeklyPlanExecutionRead)
+async def channel_execute_weekly_plan_proposal(
+    proposal_id: int, request: ChannelProposalExecutionRequest,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    channel_type: Annotated[IntegrationChannelType, Header(alias="X-Channel-Type")],
+    external_identity: Annotated[str, Header(alias="X-External-Identity", min_length=1, max_length=256, pattern=r".*\S.*")],
+    external_message_id: Annotated[str, Header(alias="X-External-Message-ID", min_length=1, max_length=256, pattern=r".*\S.*")],
+    connection: sqlite3.Connection = Depends(get_connection), auth: AuthService = Depends(get_auth_service),
+) -> AssistantWeeklyPlanExecutionRead:
+    if credentials is None or credentials.scheme.casefold() != "bearer": raise _integration_unauthorized()
+    try:
+        return IntegrationService(connection, auth.settings.secret_key).execute_weekly_plan_proposal(token=credentials.credentials, channel_type=channel_type, external_identity=external_identity, external_message_id=external_message_id, proposal_id=proposal_id, request=request)
+    except IntegrationAccessDenied as exc: raise _integration_unauthorized() from exc
+    except IntegrationScopeDenied as exc: raise HTTPException(status_code=403, detail={"code":"integration_scope_denied","message":"This integration is not allowed to execute proposals"}) from exc
+    except IntegrationReplayConflict as exc: raise HTTPException(status_code=409, detail={"code":"external_message_replay_conflict","message":"This external message ID was used for another request"}) from exc
+    except ProposalNotFound as exc: raise HTTPException(status_code=404, detail={"code":"proposal_not_found","message":"The proposal was not found"}) from exc
+    except AssistantProposalTypeUnsupported as exc: raise _channel_execution_conflict("proposal_type_unsupported", "Only Weekly Plan adjustment proposals can be executed here") from exc
+    except AssistantProposalNotApproved as exc: raise _channel_execution_conflict("proposal_not_approved", "Approve the proposal before executing it") from exc
+    except ProposalVersionConflict as exc: raise _channel_execution_conflict("proposal_version_conflict", "The proposal changed after it was loaded") from exc
+    except AssistantProposalPayloadInvalid as exc: raise _channel_execution_conflict("proposal_payload_invalid", "The approved proposal does not contain a valid Weekly Plan change") from exc
+    except AssistantPlanStateConflict as exc: raise _channel_execution_conflict("weekly_plan_state_conflict", "The target Weekly Plan changed after the proposal was drafted") from exc
+    except AssistantPlanPersistenceConflict as exc: raise _channel_execution_conflict("weekly_plan_persistence_conflict", "The approved Weekly Plan change could not be persisted") from exc
+    except ActionIdempotencyConflict as exc: raise _channel_execution_conflict("idempotency_conflict", "This external message ID was already used for another action") from exc
+    except AssistantActionInProgress as exc: raise _channel_execution_conflict("idempotency_in_progress", "This request is still in progress") from exc
+
+
+def _channel_execution_conflict(code: str, message: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"code": code, "message": message})
 
 
 def _integration_unauthorized() -> HTTPException:
