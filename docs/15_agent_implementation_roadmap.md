@@ -397,7 +397,8 @@ Rollout gates:
 1. read-only review and context;
 2. proposal creation;
 3. approval response;
-4. bounded, approved writes.
+4. bounded execution of an approved proposal;
+5. bounded undo of the resulting reversible Action.
 
 Acceptance:
 
