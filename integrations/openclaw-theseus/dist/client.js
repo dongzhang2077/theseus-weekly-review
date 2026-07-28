@@ -43,6 +43,13 @@ export async function decideTheseusWeeklyPlanProposal(config, request, options =
 export async function executeTheseusWeeklyPlanProposal(config, request, options = {}) {
     return requestTheseus(config, new URL(`/integrations/channel/proposals/${request.proposalId}/execute-weekly-plan`, normalizedBase(config.baseUrl)), "POST", requiredMessageId(options.messageId), options.fetch, { expected_version: request.expectedVersion }, "execution");
 }
+/**
+ * Undo one successful, reversible action created from an approved weekly-plan
+ * proposal. The backend retains the Action's verification and replay record.
+ */
+export async function undoTheseusWeeklyPlanAction(config, request, options = {}) {
+    return requestTheseus(config, new URL(`/integrations/channel/proposals/${request.proposalId}/actions/${request.actionId}/undo-weekly-plan`, normalizedBase(config.baseUrl)), "POST", requiredMessageId(options.messageId), options.fetch, { expected_version: request.expectedVersion }, "undo");
+}
 async function requestTheseus(config, url, method, messageId, fetchOverride, body, operation) {
     const fetcher = fetchOverride ?? fetch;
     const controller = new AbortController();
@@ -106,7 +113,9 @@ function mappedError(status, payload, operation) {
                 ? "Theseus proposal creation is not allowed"
                 : operation === "decision"
                     ? "Theseus proposal decision is not allowed"
-                    : "Theseus proposal execution is not allowed", status);
+                    : operation === "execution"
+                        ? "Theseus proposal execution is not allowed"
+                        : "Theseus proposal undo is not allowed", status);
     }
     if (status === 409) {
         return new TheseusAdapterError(code ?? "theseus_conflict", "Theseus rejected the repeated request", status);

@@ -12,7 +12,8 @@ V7_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v7.sql"
 V8_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v8.sql"
 V9_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v9.sql"
 V10_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v10.sql"
-SCHEMA_VERSION = 10
+V11_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v11.sql"
+SCHEMA_VERSION = 11
 
 LEGACY_TABLES = (
     "weekly_reviews",
@@ -83,16 +84,21 @@ class Database:
                 self._migrate_v8_schema(connection)
             elif version == 9:
                 self._migrate_v9_schema(connection)
+            elif version == 10:
+                self._migrate_v10_schema(connection)
             elif version == SCHEMA_VERSION:
                 self._apply_schema(connection)
             else:
                 raise RuntimeError(
                     "Unsupported Theseus schema version "
-                    f"{version}; expected 1, 2, 3, 4, 5, 6, 7, 8, 9, or {SCHEMA_VERSION}"
+                    f"{version}; expected 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, or {SCHEMA_VERSION}"
                 )
             version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version == 9:
                 self._migrate_v9_schema(connection)
+                version = connection.execute("PRAGMA user_version").fetchone()[0]
+            if version == 10:
+                self._migrate_v10_schema(connection)
                 version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version != SCHEMA_VERSION:
                 raise RuntimeError(
@@ -188,6 +194,13 @@ class Database:
             "The Theseus v9 database could not be migrated safely",
         )
 
+    def _migrate_v10_schema(self, connection: sqlite3.Connection) -> None:
+        self._run_atomic_migration(
+            connection,
+            V11_MIGRATION_PATH.read_text(encoding="utf-8") + "\n",
+            "The Theseus v10 database could not be migrated safely",
+        )
+
     @staticmethod
     def _v5_extension_sql(connection: sqlite3.Connection) -> str:
         additions = {
@@ -224,12 +237,24 @@ class Database:
         return "\n".join(statements) + ("\n" if statements else "")
 
     def _apply_schema(self, connection: sqlite3.Connection) -> None:
-        self._run_atomic_migration(
-            connection,
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+        migration_sql = (
             SCHEMA_PATH.read_text(encoding="utf-8")
             + self._v8_extension_sql(connection)
             + self._v9_extension_sql(connection)
-            + "\nPRAGMA user_version = 9;\n",
+        )
+        if version == 0:
+            migration_sql += (
+                V10_MIGRATION_PATH.read_text(encoding="utf-8")
+                + "\n"
+                + V11_MIGRATION_PATH.read_text(encoding="utf-8")
+                + "\n"
+            )
+        else:
+            migration_sql += f"\nPRAGMA user_version = {SCHEMA_VERSION};\n"
+        self._run_atomic_migration(
+            connection,
+            migration_sql,
             "The Theseus database schema could not be applied safely",
         )
 

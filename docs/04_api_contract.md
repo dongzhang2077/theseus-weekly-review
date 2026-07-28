@@ -1351,7 +1351,8 @@ DELETE /integrations/{credential_id}
 ```
 
 Pairing accepts `label`, `channel_type`, raw `external_identity`, one or more
-of `context:read`, `proposal:create`, `proposal:decide`, and `action:execute`,
+of `context:read`, `proposal:create`, `proposal:decide`, `action:execute`, and
+`action:undo`,
 and an expiry from
 300 to 2,592,000 seconds. The response returns the integration `access_token`
 exactly once. Lists return only its prefix and lifecycle metadata; neither raw
@@ -1451,3 +1452,22 @@ key from the pairing and external message ID, and preserves its existing Action,
 verification, and Undo data. Exact retries return the original execution;
 different reuse returns `409 external_message_replay_conflict`. It exposes no
 generic execution or arbitrary plan-write shape.
+
+### 14.4 Undo A Channel Weekly Plan Action
+
+```text
+POST /integrations/channel/proposals/{proposal_id}/actions/{action_id}/undo-weekly-plan
+Authorization: Bearer <integration token>
+X-Channel-Type: local_test | openclaw | whatsapp
+X-External-Identity: <paired external identity>
+X-External-Message-ID: <channel message ID>
+```
+
+The body accepts only `expected_version`. This is a separately bounded
+`action:undo` permission, not an extension of `action:execute`. It delegates to
+`AssistantWeeklyPlanUndoService` and can undo only the successful, reversible
+Action belonging to the specified `weekly_plan_adjustment` Proposal. The
+existing action verification and undo record remain canonical. Exact retries
+return the original undo response; a changed request with the same message ID
+returns `409 external_message_replay_conflict`. It exposes no arbitrary plan
+delete, replace, or generic Action undo shape.

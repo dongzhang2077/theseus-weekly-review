@@ -1,7 +1,7 @@
 {
   "id": "theseus",
   "name": "Theseus",
-  "description": "Read Theseus context, draft and decide weekly-plan proposals, and execute approved changes through scoped integration access.",
+  "description": "Read Theseus context, draft and decide weekly-plan proposals, and execute or undo approved changes through scoped integration access.",
   "version": "0.1.0",
   "configSchema": {
     "type": "object",
@@ -93,7 +93,8 @@
       "theseus_context_read",
       "theseus_weekly_plan_proposal",
       "theseus_weekly_plan_decision",
-      "theseus_weekly_plan_execute"
+      "theseus_weekly_plan_execute",
+      "theseus_weekly_plan_undo"
     ]
   },
   "toolMetadata": {
@@ -108,6 +109,9 @@
       "optional": true
     },
     "theseus_weekly_plan_execute": {
+      "optional": true
+    },
+    "theseus_weekly_plan_undo": {
       "optional": true
     }
   }

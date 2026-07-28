@@ -5,6 +5,7 @@ import {
   TheseusAdapterError,
   decideTheseusWeeklyPlanProposal,
   executeTheseusWeeklyPlanProposal,
+  undoTheseusWeeklyPlanAction,
   draftTheseusWeeklyPlanProposal,
   readTheseusContext,
 } from "../dist/client.js";
@@ -156,6 +157,23 @@ test("proposal execution sends only its approved-proposal contract", async () =>
   assert.equal(captured.url, "http://127.0.0.1:8000/integrations/channel/proposals/8/execute-weekly-plan");
   assert.deepEqual(JSON.parse(captured.init.body), {expected_version: 2});
   assert.equal(captured.init.headers["X-External-Message-ID"], "trusted-execution-001");
+});
+
+test("proposal undo sends only its action contract", async () => {
+  let captured;
+  const result = await undoTheseusWeeklyPlanAction(
+    config, {proposalId: 8, actionId: 13, expectedVersion: 3}, {
+      messageId: "trusted-undo-001",
+      fetch: async (url, init) => {
+        captured = {url: String(url), init};
+        return new Response(JSON.stringify({proposal: {status: "undone"}}), {status: 200, headers: {"content-type": "application/json"}});
+      },
+    },
+  );
+  assert.deepEqual(result, {proposal: {status: "undone"}});
+  assert.equal(captured.url, "http://127.0.0.1:8000/integrations/channel/proposals/8/actions/13/undo-weekly-plan");
+  assert.deepEqual(JSON.parse(captured.init.body), {expected_version: 3});
+  assert.equal(captured.init.headers["X-External-Message-ID"], "trusted-undo-001");
 });
 
 test("authentication failures are redacted", async () => {

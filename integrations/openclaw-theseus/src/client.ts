@@ -34,6 +34,12 @@ export interface TheseusWeeklyProposalExecutionRequest {
   expectedVersion: number;
 }
 
+export interface TheseusWeeklyPlanUndoRequest {
+  proposalId: number;
+  actionId: number;
+  expectedVersion: number;
+}
+
 interface TheseusRequestOptions {
   fetch?: typeof fetch;
   messageId?: string;
@@ -141,6 +147,29 @@ export async function executeTheseusWeeklyPlanProposal(
   );
 }
 
+/**
+ * Undo one successful, reversible action created from an approved weekly-plan
+ * proposal. The backend retains the Action's verification and replay record.
+ */
+export async function undoTheseusWeeklyPlanAction(
+  config: TheseusClientConfig,
+  request: TheseusWeeklyPlanUndoRequest,
+  options: TheseusRequestOptions = {},
+): Promise<unknown> {
+  return requestTheseus(
+    config,
+    new URL(
+      `/integrations/channel/proposals/${request.proposalId}/actions/${request.actionId}/undo-weekly-plan`,
+      normalizedBase(config.baseUrl),
+    ),
+    "POST",
+    requiredMessageId(options.messageId),
+    options.fetch,
+    {expected_version: request.expectedVersion},
+    "undo",
+  );
+}
+
 async function requestTheseus(
   config: TheseusClientConfig,
   url: URL,
@@ -148,7 +177,7 @@ async function requestTheseus(
   messageId: string,
   fetchOverride: typeof fetch | undefined,
   body: object | undefined,
-  operation: "context" | "proposal" | "decision" | "execution",
+  operation: "context" | "proposal" | "decision" | "execution" | "undo",
 ): Promise<unknown> {
   const fetcher = fetchOverride ?? fetch;
   const controller = new AbortController();
@@ -209,7 +238,7 @@ async function safeJson(response: Response): Promise<unknown> {
 function mappedError(
   status: number,
   payload: unknown,
-  operation: "context" | "proposal" | "decision" | "execution",
+  operation: "context" | "proposal" | "decision" | "execution" | "undo",
 ): TheseusAdapterError {
   const code = errorCode(payload);
   if (status === 401) {
@@ -224,7 +253,9 @@ function mappedError(
           ? "Theseus proposal creation is not allowed"
           : operation === "decision"
             ? "Theseus proposal decision is not allowed"
-            : "Theseus proposal execution is not allowed",
+            : operation === "execution"
+              ? "Theseus proposal execution is not allowed"
+              : "Theseus proposal undo is not allowed",
       status,
     );
   }

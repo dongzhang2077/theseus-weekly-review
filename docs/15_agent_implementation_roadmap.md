@@ -604,7 +604,7 @@ Python compilation, `pip check`, deterministic sample review, and a real
 four-process start/status/resume/replay CLI demonstration pass.
 
 Current sequential gate: STORY-027 OpenClaw Conversation Adapter, rollout gate
-three. The schema-v9 pairing/list/revoke path, HMAC-protected channel/message
+five. The schema-v11 pairing/list/revoke path, HMAC-protected channel/message
 identities, explicit scopes, read-only context operation, pending-only channel
 proposal endpoint, and narrow channel proposal-decision endpoint are
 implemented. The native OpenClaw package binds the host-provided inbound
@@ -614,7 +614,9 @@ The decision endpoint accepts only `approve` or `reject`, requires the distinct
 `proposal:decide` scope, appends a decision record, and never edits a plan
 change. Gate four adds the separately scoped `action:execute` operation, which
 accepts no plan content and delegates to the accepted reversible execution
-service. Product-owner acceptance is still required for this gate.
+service. Gate five adds independent `action:undo`, which can only undo that
+successful reversible Action through the same service. Product-owner acceptance
+is still required for this gate.
 
 Acceptance verification: 27 focused tests pass. The complete inventory reached
 196 of 197 with one previously tracked intermittent authenticated Activity

@@ -12,8 +12,10 @@ from ..schemas import (
     AssistantContextRead,
     AssistantWeeklyPlanProposalRequest,
     AssistantWeeklyPlanExecutionRead,
+    AssistantWeeklyPlanUndoRead,
     ChannelProposalDecisionRequest,
     ChannelProposalExecutionRequest,
+    ChannelProposalUndoRequest,
     IntegrationChannelType,
     IntegrationCredentialRead,
     IntegrationPairCreate,
@@ -32,6 +34,7 @@ from ..services import (
     AssistantProposalNotApproved,
     AssistantProposalPayloadInvalid,
     AssistantProposalTypeUnsupported,
+    AssistantUndoUnavailable,
     IdempotencyConflict,
     IdempotencyInProgress,
     IntegrationAccessDenied,
@@ -45,6 +48,8 @@ from ..services import (
     ProposalNotFound,
     ProposalVersionConflict,
     ActionIdempotencyConflict,
+    ActionNotFound,
+    ActionUndoConflict,
 )
 from .dependencies import (
     bearer_scheme,
@@ -383,6 +388,122 @@ async def channel_execute_weekly_plan_proposal(
 
 def _channel_execution_conflict(code: str, message: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"code": code, "message": message})
+
+
+@router.post(
+    "/channel/proposals/{proposal_id}/actions/{action_id}/undo-weekly-plan",
+    response_model=AssistantWeeklyPlanUndoRead,
+)
+async def channel_undo_weekly_plan_action(
+    proposal_id: int,
+    action_id: int,
+    request: ChannelProposalUndoRequest,
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(bearer_scheme)
+    ],
+    channel_type: Annotated[
+        IntegrationChannelType, Header(alias="X-Channel-Type")
+    ],
+    external_identity: Annotated[
+        str,
+        Header(
+            alias="X-External-Identity",
+            min_length=1,
+            max_length=256,
+            pattern=r".*\S.*",
+        ),
+    ],
+    external_message_id: Annotated[
+        str,
+        Header(
+            alias="X-External-Message-ID",
+            min_length=1,
+            max_length=256,
+            pattern=r".*\S.*",
+        ),
+    ],
+    connection: sqlite3.Connection = Depends(get_connection),
+    auth: AuthService = Depends(get_auth_service),
+) -> AssistantWeeklyPlanUndoRead:
+    if credentials is None or credentials.scheme.casefold() != "bearer":
+        raise _integration_unauthorized()
+    try:
+        return IntegrationService(
+            connection, auth.settings.secret_key
+        ).undo_weekly_plan_action(
+            token=credentials.credentials,
+            channel_type=channel_type,
+            external_identity=external_identity,
+            external_message_id=external_message_id,
+            proposal_id=proposal_id,
+            action_id=action_id,
+            request=request,
+        )
+    except IntegrationAccessDenied as exc:
+        raise _integration_unauthorized() from exc
+    except IntegrationScopeDenied as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "integration_scope_denied",
+                "message": "This integration is not allowed to undo proposals",
+            },
+        ) from exc
+    except IntegrationReplayConflict as exc:
+        raise _channel_execution_conflict(
+            "external_message_replay_conflict",
+            "This external message ID was used for another request",
+        ) from exc
+    except ProposalNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "proposal_not_found", "message": "The proposal was not found"},
+        ) from exc
+    except ActionNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "action_not_found", "message": "The action was not found"},
+        ) from exc
+    except AssistantProposalTypeUnsupported as exc:
+        raise _channel_execution_conflict(
+            "proposal_type_unsupported",
+            "Only Weekly Plan adjustment proposals can be undone here",
+        ) from exc
+    except (AssistantUndoUnavailable, ActionUndoConflict) as exc:
+        raise _channel_execution_conflict(
+            "weekly_plan_undo_unavailable",
+            "Only one succeeded, reversible Weekly Plan action can be undone",
+        ) from exc
+    except ProposalVersionConflict as exc:
+        raise _channel_execution_conflict(
+            "proposal_version_conflict",
+            "The proposal changed after it was loaded",
+        ) from exc
+    except AssistantProposalPayloadInvalid as exc:
+        raise _channel_execution_conflict(
+            "action_payload_invalid",
+            "The action does not contain a valid Weekly Plan change",
+        ) from exc
+    except AssistantPlanStateConflict as exc:
+        raise _channel_execution_conflict(
+            "weekly_plan_state_conflict",
+            "The target Weekly Plan changed after this action succeeded",
+        ) from exc
+    except AssistantPlanPersistenceConflict as exc:
+        raise _channel_execution_conflict(
+            "weekly_plan_persistence_conflict",
+            "The previous Weekly Plan state could not be restored",
+        ) from exc
+    except ActionIdempotencyConflict as exc:
+        raise _channel_execution_conflict(
+            "idempotency_conflict",
+            "This external message ID was already used for another action",
+        ) from exc
+    except AssistantActionInProgress as exc:
+        raise _channel_execution_conflict(
+            "idempotency_in_progress",
+            "This request is still in progress",
+        ) from exc
 
 
 def _integration_unauthorized() -> HTTPException:

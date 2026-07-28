@@ -26,6 +26,11 @@ export interface TheseusWeeklyProposalExecutionRequest {
     proposalId: number;
     expectedVersion: number;
 }
+export interface TheseusWeeklyPlanUndoRequest {
+    proposalId: number;
+    actionId: number;
+    expectedVersion: number;
+}
 interface TheseusRequestOptions {
     fetch?: typeof fetch;
     messageId?: string;
@@ -47,4 +52,9 @@ export declare function draftTheseusWeeklyPlanProposal(config: TheseusClientConf
  */
 export declare function decideTheseusWeeklyPlanProposal(config: TheseusClientConfig, request: TheseusWeeklyProposalDecisionRequest, options?: TheseusRequestOptions): Promise<unknown>;
 export declare function executeTheseusWeeklyPlanProposal(config: TheseusClientConfig, request: TheseusWeeklyProposalExecutionRequest, options?: TheseusRequestOptions): Promise<unknown>;
+/**
+ * Undo one successful, reversible action created from an approved weekly-plan
+ * proposal. The backend retains the Action's verification and replay record.
+ */
+export declare function undoTheseusWeeklyPlanAction(config: TheseusClientConfig, request: TheseusWeeklyPlanUndoRequest, options?: TheseusRequestOptions): Promise<unknown>;
 export {};

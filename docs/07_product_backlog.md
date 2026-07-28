@@ -637,6 +637,8 @@ Acceptance criteria:
   or `reject` decision with a distinct scope, replay protection, and audit
   record; it cannot edit a plan change. Gate four may execute only an approved
   proposal through the existing reversible Action service with `action:execute`.
+  Gate five may undo only the resulting successful reversible Action with the
+  independent `action:undo` scope.
 - Any approved write operation requires bounded permissions, approval,
   idempotency, audit, verification, and Undo where practical.
 - High-risk tools are denied by default.

@@ -29,6 +29,7 @@ IntegrationScope = Literal[
     "proposal:create",
     "proposal:decide",
     "action:execute",
+    "action:undo",
 ]
 ReviewMode = Literal["deterministic_first", "supportive_text"]
 RiskType = Literal[
@@ -111,7 +112,7 @@ class IntegrationPairCreate(APIModel):
     label: str = Field(min_length=1, max_length=80)
     channel_type: IntegrationChannelType
     external_identity: str = Field(min_length=1, max_length=256, repr=False)
-    scopes: list[IntegrationScope] = Field(min_length=1, max_length=4)
+    scopes: list[IntegrationScope] = Field(min_length=1, max_length=5)
     expires_in_seconds: int = Field(default=86400, ge=300, le=2592000)
 
     @field_validator("label", "external_identity")
@@ -798,6 +799,10 @@ class ChannelProposalDecisionRequest(APIModel):
 
 
 class ChannelProposalExecutionRequest(APIModel):
+    expected_version: int = Field(ge=1)
+
+
+class ChannelProposalUndoRequest(APIModel):
     expected_version: int = Field(ge=1)
 
 

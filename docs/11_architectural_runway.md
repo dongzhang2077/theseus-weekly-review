@@ -345,7 +345,9 @@ limited to `approve` or `reject`, requires a distinct integration scope, and
 only appends to the Proposal ledger; it cannot edit or execute a plan change.
 Gate four adds a fourth optional execution tool. It requires `action:execute`,
 accepts no plan content, and delegates to the existing approved-proposal Action
-service, preserving verification and Undo data.
+service, preserving verification and Undo data. Gate five adds a fifth optional
+undo tool with the independent `action:undo` scope; it accepts only a proposal,
+Action, and expected version, then delegates to the same undo service.
 
 ## 10. Anti-Patterns to Avoid
 

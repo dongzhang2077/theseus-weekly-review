@@ -358,13 +358,16 @@ async def test_channel_execution_requires_approval_scope_and_replays_once(databa
             import_sample_week(connection, user["id"], load_sample_payload())
         assert (await client.post("/reviews/weekly/generate", json=WEEK_QUERY)).status_code == 200
         identity = f"execution-user-{id(client)}"
-        pairing = await _pair(client, identity=identity, scopes=["proposal:create", "proposal:decide", "action:execute"])
+        pairing = await _pair(client, identity=identity, scopes=["proposal:create", "proposal:decide", "action:execute", "action:undo"])
         proposal = await client.post("/integrations/channel/proposals/weekly-adjustment", json=WEEKLY_PROPOSAL_REQUEST, headers=_channel_headers(pairing, message_id="execution-source", identity=identity))
         pending = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/execute-weekly-plan", json={"expected_version": proposal.json()["version"]}, headers=_channel_headers(pairing, message_id="execution-pending", identity=identity))
         approved = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/decision", json={"expected_version": proposal.json()["version"], "decision":"approve"}, headers=_channel_headers(pairing, message_id="execution-approve", identity=identity))
         first = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/execute-weekly-plan", json={"expected_version": 2}, headers=_channel_headers(pairing, message_id="execution-001", identity=identity))
         replay = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/execute-weekly-plan", json={"expected_version": 2}, headers=_channel_headers(pairing, message_id="execution-001", identity=identity))
         conflict = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/execute-weekly-plan", json={"expected_version": 3}, headers=_channel_headers(pairing, message_id="execution-001", identity=identity))
+        undo = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/actions/{first.json()['action']['id']}/undo-weekly-plan", json={"expected_version": 3}, headers=_channel_headers(pairing, message_id="undo-001", identity=identity))
+        undo_replay = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/actions/{first.json()['action']['id']}/undo-weekly-plan", json={"expected_version": 3}, headers=_channel_headers(pairing, message_id="undo-001", identity=identity))
+        undo_conflict = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/actions/{first.json()['action']['id']}/undo-weekly-plan", json={"expected_version": 4}, headers=_channel_headers(pairing, message_id="undo-001", identity=identity))
         detail = await client.get(f"/proposals/{proposal.json()['id']}")
         schema = (await client.get("/openapi.json")).json()
 
@@ -376,10 +379,38 @@ async def test_channel_execution_requires_approval_scope_and_replays_once(databa
     assert first.json()["proposal"]["status"] == "executed"
     assert first.json()["action"]["status"] == "succeeded"
     assert conflict.status_code == 409 and conflict.json()["detail"]["code"] == "external_message_replay_conflict"
-    assert len(detail.json()["actions"]) == 1
+    assert undo.status_code == undo_replay.status_code == 200
+    assert undo.json() == undo_replay.json()
+    assert undo.json()["proposal"]["status"] == "undone"
+    assert undo.json()["action"]["status"] == "succeeded"
+    assert undo.json()["undone_action"]["id"] == first.json()["action"]["id"]
+    assert undo.json()["undone_action"]["status"] == "undone"
+    assert undo_conflict.status_code == 409 and undo_conflict.json()["detail"]["code"] == "external_message_replay_conflict"
+    assert len(detail.json()["actions"]) == 2
     operation = schema["paths"]["/integrations/channel/proposals/{proposal_id}/execute-weekly-plan"]["post"]
     assert operation["requestBody"]["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/ChannelProposalExecutionRequest"}
     assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/AssistantWeeklyPlanExecutionRead"}
+    undo_operation = schema["paths"]["/integrations/channel/proposals/{proposal_id}/actions/{action_id}/undo-weekly-plan"]["post"]
+    assert undo_operation["requestBody"]["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/ChannelProposalUndoRequest"}
+    assert undo_operation["responses"]["200"]["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/AssistantWeeklyPlanUndoRead"}
+
+
+async def test_channel_undo_requires_its_own_scope(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client, "Undo scope owner")
+        identity = f"undo-scope-{id(client)}"
+        pairing = await _pair(client, identity=identity, scopes=["action:execute"])
+        denied = await client.post(
+            "/integrations/channel/proposals/1/actions/1/undo-weekly-plan",
+            json={"expected_version": 1},
+            headers=_channel_headers(pairing, message_id="undo-denied", identity=identity),
+        )
+
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "integration_scope_denied"
+    assert "action:undo" not in denied.text
 
 
 async def test_scope_expiry_identity_and_replay_conflicts_are_controlled(

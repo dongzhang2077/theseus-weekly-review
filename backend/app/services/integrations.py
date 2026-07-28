@@ -19,7 +19,10 @@ from ..schemas import (
     AssistantProposalExecutionRequest,
     ChannelProposalDecisionRequest,
     ChannelProposalExecutionRequest,
+    ChannelProposalUndoRequest,
     AssistantWeeklyPlanExecutionRead,
+    AssistantWeeklyPlanUndoRead,
+    AssistantWeeklyPlanUndoRequest,
     IntegrationCredentialRead,
     ProposalDecisionCreate,
     ProposalDecisionRead,
@@ -29,7 +32,7 @@ from ..schemas import (
     IntegrationScope,
 )
 from .agent_memory import ProposalLedgerService
-from .assistant import AssistantContextService, AssistantWeeklyPlanExecutionService, AssistantWeeklyPlanProposalService
+from .assistant import AssistantContextService, AssistantWeeklyPlanExecutionService, AssistantWeeklyPlanProposalService, AssistantWeeklyPlanUndoService
 
 
 class IntegrationAccessDenied(Exception):
@@ -290,6 +293,62 @@ class IntegrationService:
             )
             self._save_receipt(access=access, message_hash=message_hash, operation=operation,
                 request_hash=request_hash, created_at=self._now())
+            self.repository.touch(access.credential_id, self._now())
+            return result
+
+    def undo_weekly_plan_action(
+        self,
+        *,
+        token: str,
+        channel_type: str,
+        external_identity: str,
+        external_message_id: str,
+        proposal_id: int,
+        action_id: int,
+        request: ChannelProposalUndoRequest,
+    ) -> AssistantWeeklyPlanUndoRead:
+        access = self.authenticate(
+            token=token,
+            channel_type=channel_type,
+            external_identity=external_identity,
+            required_scope="action:undo",
+        )
+        operation = "proposal.undo.weekly_plan_adjustment"
+        message_hash = self._message_hash(
+            access.credential_id, external_message_id
+        )
+        request_hash = self._request_hash(
+            operation,
+            {
+                "proposal_id": proposal_id,
+                "action_id": action_id,
+                **request.model_dump(mode="json"),
+            },
+        )
+        with _savepoint(self.connection, "integration_channel_proposal_undo"):
+            self._existing_receipt(
+                access.credential_id, message_hash, request_hash
+            )
+            result = AssistantWeeklyPlanUndoService(
+                self.connection, access.user_id
+            ).undo(
+                proposal_id, action_id,
+                AssistantWeeklyPlanUndoRequest(
+                    expected_version=request.expected_version
+                ),
+                idempotency_key=self._protected_hash(
+                    "undo-idempotency",
+                    str(access.credential_id),
+                    external_message_id,
+                ),
+            )
+            self._save_receipt(
+                access=access,
+                message_hash=message_hash,
+                operation=operation,
+                request_hash=request_hash,
+                created_at=self._now(),
+            )
             self.repository.touch(access.credential_id, self._now())
             return result
 

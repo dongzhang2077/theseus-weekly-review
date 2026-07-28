@@ -3,7 +3,7 @@ import test from "node:test";
 
 import plugin from "../dist/index.js";
 
-test("registers optional context, proposal, decision, and execution tools through the native OpenClaw SDK", () => {
+test("registers optional context, proposal, decision, execution, and undo tools through the native OpenClaw SDK", () => {
   const registrations = [];
   const hooks = new Map();
   plugin.register({
@@ -25,7 +25,7 @@ test("registers optional context, proposal, decision, and execution tools throug
 
   assert.deepEqual(
     registrations.map(({tool}) => tool.name),
-    ["theseus_context_read", "theseus_weekly_plan_proposal", "theseus_weekly_plan_decision", "theseus_weekly_plan_execute"],
+    ["theseus_context_read", "theseus_weekly_plan_proposal", "theseus_weekly_plan_decision", "theseus_weekly_plan_execute", "theseus_weekly_plan_undo"],
   );
   assert.equal(registrations[0].options.optional, true);
   assert.equal(typeof registrations[0].tool.execute, "function");
@@ -33,6 +33,7 @@ test("registers optional context, proposal, decision, and execution tools throug
   assert.equal(registrations[1].options.optional, true);
   assert.equal(registrations[2].options.optional, true);
   assert.equal(registrations[3].options.optional, true);
+  assert.equal(registrations[4].options.optional, true);
   assert.equal(typeof hooks.get("message_received"), "function");
   assert.equal(typeof hooks.get("before_tool_call"), "function");
 });
@@ -109,4 +110,7 @@ test("proposal uses only a matching trusted inbound message", async () => {
   const executionAccepted = await beforeToolCall({toolName: "theseus_weekly_plan_execute", runId: "run-1", params: {proposalId: 7, expectedVersion: 2}});
   assert.equal(executionAccepted.block, undefined);
   assert.equal(typeof executionAccepted.params.trustedMessageReference, "string");
+  const undoAccepted = await beforeToolCall({toolName: "theseus_weekly_plan_undo", runId: "run-1", params: {proposalId: 7, actionId: 12, expectedVersion: 3}});
+  assert.equal(undoAccepted.block, undefined);
+  assert.equal(typeof undoAccepted.params.trustedMessageReference, "string");
 });

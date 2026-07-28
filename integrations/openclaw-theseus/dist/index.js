@@ -1,15 +1,17 @@
 import { Type } from "typebox";
 import { buildJsonPluginConfigSchema, definePluginEntry, } from "openclaw/plugin-sdk/plugin-entry";
 import { jsonResult } from "openclaw/plugin-sdk/tool-results";
-import { decideTheseusWeeklyPlanProposal, executeTheseusWeeklyPlanProposal, draftTheseusWeeklyPlanProposal, readTheseusContext, } from "./client.js";
+import { decideTheseusWeeklyPlanProposal, executeTheseusWeeklyPlanProposal, undoTheseusWeeklyPlanAction, draftTheseusWeeklyPlanProposal, readTheseusContext, } from "./client.js";
 import { TrustedMessageBridge } from "./trusted-message-bridge.js";
 const proposalToolName = "theseus_weekly_plan_proposal";
 const proposalDecisionToolName = "theseus_weekly_plan_decision";
 const proposalExecutionToolName = "theseus_weekly_plan_execute";
+const proposalUndoToolName = "theseus_weekly_plan_undo";
 const trustedProposalToolNames = new Set([
     proposalToolName,
     proposalDecisionToolName,
     proposalExecutionToolName,
+    proposalUndoToolName,
 ]);
 const pluginConfigSchema = buildJsonPluginConfigSchema({
     type: "object",
@@ -28,7 +30,7 @@ const pluginConfigSchema = buildJsonPluginConfigSchema({
 const plugin = definePluginEntry({
     id: "theseus",
     name: "Theseus",
-    description: "Read Theseus context, draft and decide weekly-plan proposals, and execute approved changes through scoped integration access.",
+    description: "Read Theseus context, draft and decide weekly-plan proposals, and execute or undo approved changes through scoped integration access.",
     configSchema: pluginConfigSchema,
     register(api) {
         const config = requirePluginConfig(api.pluginConfig);
@@ -155,6 +157,28 @@ const plugin = definePluginEntry({
                     throw new Error("Theseus proposal execution requires a trusted runtime message reference");
                 return jsonResult(await executeTheseusWeeklyPlanProposal(config, {
                     proposalId: params.proposalId,
+                    expectedVersion: params.expectedVersion,
+                }, { messageId }));
+            },
+        }, { optional: true });
+        api.registerTool({
+            name: proposalUndoToolName,
+            label: "Theseus Weekly Plan Undo",
+            description: "Undo one successful, reversible Weekly Plan action without accepting plan content.",
+            parameters: Type.Object({
+                proposalId: Type.Integer({ minimum: 1 }),
+                actionId: Type.Integer({ minimum: 1 }),
+                expectedVersion: Type.Integer({ minimum: 1 }),
+                trustedMessageReference: Type.Optional(Type.String()),
+            }, { additionalProperties: false }),
+            async execute(_toolCallId, params, signal) {
+                signal?.throwIfAborted();
+                const messageId = bridge.resolveProposalReference(params.trustedMessageReference);
+                if (!messageId)
+                    throw new Error("Theseus proposal undo requires a trusted runtime message reference");
+                return jsonResult(await undoTheseusWeeklyPlanAction(config, {
+                    proposalId: params.proposalId,
+                    actionId: params.actionId,
                     expectedVersion: params.expectedVersion,
                 }, { messageId }));
             },

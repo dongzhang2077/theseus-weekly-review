@@ -1,6 +1,6 @@
 # Theseus OpenClaw Plugin
 
-This native OpenClaw plugin exposes four optional tools:
+This native OpenClaw plugin exposes five optional tools:
 
 - `theseus_context_read` reads evidence-backed context through the scoped
   STORY-039 Integration API.
@@ -10,6 +10,8 @@ This native OpenClaw plugin exposes four optional tools:
   a pending proposal; it cannot edit or execute a plan change.
 - `theseus_weekly_plan_execute` executes an approved proposal through the
   existing reversible Action service; it never accepts plan content.
+- `theseus_weekly_plan_undo` undoes one successful reversible Action from an
+  approved proposal; it never accepts plan content.
 
 The proposal-changing tools are fail-closed. The plugin observes OpenClaw's trusted
 `message_received` hook, binds the runtime-provided inbound message ID to its
@@ -24,7 +26,8 @@ so concurrent turns in one chat cannot reuse each other's message ID.
 - OpenClaw 2026.5.17+
 - A Theseus integration pairing with `context:read`; proposal drafts also
   require `proposal:create`, and proposal decisions require `proposal:decide`
-  and execution requires `action:execute`.
+  execution requires `action:execute`, and undo requires the independent
+  `action:undo` scope.
 
 ## Build and verify
 
