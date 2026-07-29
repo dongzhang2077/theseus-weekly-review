@@ -878,6 +878,16 @@ with an exact numeric trusted sender and only `context:read` plus
 `proposal:create`; decision, execution, and undo remain disabled until a later
 explicit approval gate.
 
+Persistence correction checkpoint (2026-07-29 PDT): schema v12 rebuilds the
+channel binding constraint to accept Telegram while preserving existing
+bindings, uniqueness, ownership triggers, and foreign keys. A focused
+migration regression proves a v11 database retains an existing OpenClaw
+binding and then accepts Telegram. The Integration API regression proves the
+first Telegram pairing returns `201` and only a duplicate active identity
+returns `409`. The focused backend and frontend suites, full Python suite,
+Python compilation, TypeScript, production build, and sanitized
+sample-to-stored-review path pass.
+
 Acceptance verification: 27 focused Integration/schema/migration tests pass.
 The full suite completed 196 of 197 tests; the sole failure was the previously
 tracked intermittent authenticated Activity request and passed immediately in

@@ -94,7 +94,12 @@ class IntegrationService:
                 created_at=now,
             )
         except sqlite3.IntegrityError as exc:
-            raise IntegrationBindingConflict from exc
+            if (
+                "UNIQUE constraint failed: channel_bindings.channel_type, "
+                "channel_bindings.external_identity_hash"
+            ) in str(exc):
+                raise IntegrationBindingConflict from exc
+            raise
         return IntegrationPairRead(credential=credential, access_token=token)
 
     def list(self) -> list[IntegrationCredentialRead]:

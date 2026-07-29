@@ -1361,6 +1361,12 @@ identity returns `409 channel_identity_already_paired`; foreign management is
 non-disclosing `404`. Delete returns `204` and revokes the credential/binding
 without deleting domain data.
 
+Schema v12 makes the durable channel constraint match the documented
+`local_test | openclaw | telegram | whatsapp` API enum. Only the active
+channel-identity unique constraint is mapped to
+`409 channel_identity_already_paired`; unrelated persistence integrity errors
+are not misreported as an existing pairing.
+
 The read-only channel operation is:
 
 ```text

@@ -91,7 +91,7 @@ def test_v1_database_migrates_to_local_user_ownership(tmp_path) -> None:
         "weekly_reviews": (10, 1),
     }
     assert tuple(item) == (7, 6, 4)
-    assert version == 11
+    assert version == 12
     assert violations == []
 
 
@@ -155,7 +155,7 @@ def test_v2_database_adds_auth_tables_without_rewriting_personal_data(tmp_path) 
     assert tuple(goal) == (7, 4, "Existing goal")
     assert auth_tables == {"auth_credentials", "auth_sessions"}
     assert credential_count == 0
-    assert version == 11
+    assert version == 12
     assert violations == []
 
 
@@ -220,7 +220,7 @@ def test_v3_database_removes_recovery_code_without_rewriting_account(tmp_path) -
         "existing@example.com",
         "$argon2id$preserved-password-hash",
     )
-    assert version == 11
+    assert version == 12
     assert violations == []
 
 
@@ -411,7 +411,7 @@ def test_v4_database_adds_task_foundation_without_rewriting_personal_data(
         }
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 11
+    assert version == 12
     assert tuple(activity) == (6, 1)
     assert tuple(item) == (8, None, "Existing block")
     assert tuple(time_log) == (9, None, None)
@@ -595,7 +595,7 @@ def test_v5_database_adds_focus_foundation_and_preserves_time_logs(
         ).fetchone()
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 11
+    assert version == 12
     assert tables == {
         "focus_sessions",
         "focus_session_segments",
@@ -695,7 +695,7 @@ def test_v6_database_adds_correction_history_and_preserves_evidence(tmp_path) ->
         ).fetchone()
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 11
+    assert version == 12
     assert tuple(time_log) == (9, 1800, 1, None)
     assert tuple(review) == (10, None)
     assert revision_table is not None
@@ -780,7 +780,7 @@ def test_v7_database_adds_trust_ledger_without_rewriting_account(tmp_path) -> No
         }
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 11
+    assert version == 12
     assert tuple(user) == (4, "Existing account")
     assert ledger_tables == {
         "preferences",
@@ -884,7 +884,7 @@ def test_v8_database_adds_channel_identity_tables_without_rewriting_users(
         }
         violations = connection.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 11
+    assert version == 12
     assert user["display_name"] == "Version Eight User"
     assert {
         "integration_credentials",
@@ -937,7 +937,7 @@ def test_v9_database_adds_proposal_decide_scope_without_losing_pairing_scopes(
         )
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 11
+    assert version == 12
     assert [row["scope"] for row in scopes] == ["proposal:create"]
     assert violations == []
 
@@ -983,8 +983,86 @@ def test_v10_database_adds_undo_scope_without_losing_execution_scope(tmp_path) -
         )
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 11
+    assert version == 12
     assert [row["scope"] for row in scopes] == ["action:execute"]
+    assert violations == []
+
+
+def test_v11_database_allows_telegram_without_losing_existing_bindings(
+    tmp_path,
+) -> None:
+    database_path = tmp_path / "owned-v11.db"
+    connection = sqlite3.connect(database_path)
+    connection.executescript(
+        connection_module.SCHEMA_PATH.read_text(encoding="utf-8")
+        + connection_module.V8_MIGRATION_PATH.read_text(encoding="utf-8")
+        + connection_module.V9_MIGRATION_PATH.read_text(encoding="utf-8")
+        + connection_module.V10_MIGRATION_PATH.read_text(encoding="utf-8")
+        + connection_module.V11_MIGRATION_PATH.read_text(encoding="utf-8")
+    )
+    connection.executescript(
+        """
+        INSERT INTO users (id, display_name) VALUES (41, 'Version Eleven User');
+        INSERT INTO integration_credentials (
+            id, user_id, label, token_prefix, token_hash, expires_at, created_at
+        ) VALUES (
+            1, 41, 'Existing pairing', 'ths_int_existing',
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            '2030-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'
+        );
+        INSERT INTO integration_credential_scopes (credential_id, scope)
+        VALUES (1, 'context:read');
+        INSERT INTO channel_bindings (
+            id, user_id, credential_id, channel_type,
+            external_identity_hash, created_at
+        ) VALUES (
+            1, 41, 1, 'openclaw', 'existing-identity',
+            '2026-01-01T00:00:00+00:00'
+        );
+        """
+    )
+    connection.commit()
+    connection.close()
+
+    database = Database(database_path)
+    database.initialize()
+    database.initialize()
+
+    with database.session() as migrated:
+        version = migrated.execute("PRAGMA user_version").fetchone()[0]
+        existing = migrated.execute(
+            """
+            SELECT channel_type, external_identity_hash
+            FROM channel_bindings WHERE id = 1
+            """
+        ).fetchone()
+        migrated.execute(
+            """
+            INSERT INTO integration_credentials (
+                id, user_id, label, token_prefix, token_hash,
+                expires_at, created_at
+            ) VALUES (
+                2, 41, 'Telegram pairing', 'ths_int_telegram',
+                'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+                '2030-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'
+            )
+            """
+        )
+        migrated.execute(
+            """
+            INSERT INTO channel_bindings (
+                id, user_id, credential_id, channel_type,
+                external_identity_hash, created_at
+            ) VALUES (
+                2, 41, 2, 'telegram', 'telegram-identity',
+                '2026-01-01T00:00:00+00:00'
+            )
+            """
+        )
+        violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
+
+    assert version == 12
+    assert tuple(existing) == ("openclaw", "existing-identity")
     assert violations == []
 
 

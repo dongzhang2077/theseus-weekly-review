@@ -16,6 +16,9 @@ automatically verified, and product-owner accepted through STORY-025A for
 inspectable preferences and the proposal-to-outcome ledger.
 Schema version 9 is implemented, automatically verified, and product-owner
 accepted through STORY-039 for scoped conversation channel identity.
+Schema versions 10 and 11 extend the explicit integration scopes. Schema
+version 12 preserves existing bindings while adding `telegram` to the durable
+channel-type constraint so the persistence contract matches the public API.
 
 ```text
 Account (users + auth_credentials)
@@ -476,7 +479,7 @@ Theseus database and are hydrated through user-scoped services when read.
 
 ### integration_credentials, channel_bindings, integration_message_receipts
 
-Schema v11 stores high-entropy integration credential hashes, explicit scopes
+Schema v12 stores high-entropy integration credential hashes, explicit scopes
 (`context:read`, `proposal:create`, `proposal:decide`, `action:execute`, and
 `action:undo`),
 expiry/revocation timestamps, and one HMAC-protected channel identity binding.

@@ -13,7 +13,8 @@ V8_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v8.sql"
 V9_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v9.sql"
 V10_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v10.sql"
 V11_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v11.sql"
-SCHEMA_VERSION = 11
+V12_MIGRATION_PATH = Path(__file__).with_name("migrations") / "v12.sql"
+SCHEMA_VERSION = 12
 
 LEGACY_TABLES = (
     "weekly_reviews",
@@ -86,12 +87,14 @@ class Database:
                 self._migrate_v9_schema(connection)
             elif version == 10:
                 self._migrate_v10_schema(connection)
+            elif version == 11:
+                self._migrate_v11_schema(connection)
             elif version == SCHEMA_VERSION:
                 self._apply_schema(connection)
             else:
                 raise RuntimeError(
                     "Unsupported Theseus schema version "
-                    f"{version}; expected 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, or {SCHEMA_VERSION}"
+                    f"{version}; expected 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, or {SCHEMA_VERSION}"
                 )
             version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version == 9:
@@ -99,6 +102,9 @@ class Database:
                 version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version == 10:
                 self._migrate_v10_schema(connection)
+                version = connection.execute("PRAGMA user_version").fetchone()[0]
+            if version == 11:
+                self._migrate_v11_schema(connection)
                 version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version != SCHEMA_VERSION:
                 raise RuntimeError(
@@ -201,6 +207,13 @@ class Database:
             "The Theseus v10 database could not be migrated safely",
         )
 
+    def _migrate_v11_schema(self, connection: sqlite3.Connection) -> None:
+        self._run_atomic_migration(
+            connection,
+            V12_MIGRATION_PATH.read_text(encoding="utf-8") + "\n",
+            "The Theseus v11 database could not be migrated safely",
+        )
+
     @staticmethod
     def _v5_extension_sql(connection: sqlite3.Connection) -> str:
         additions = {
@@ -248,6 +261,8 @@ class Database:
                 V10_MIGRATION_PATH.read_text(encoding="utf-8")
                 + "\n"
                 + V11_MIGRATION_PATH.read_text(encoding="utf-8")
+                + "\n"
+                + V12_MIGRATION_PATH.read_text(encoding="utf-8")
                 + "\n"
             )
         else:

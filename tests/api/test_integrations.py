@@ -99,6 +99,35 @@ async def test_pairing_shows_secret_once_and_hashes_sensitive_values(database) -
     assert "response_json" not in receipt_columns
 
 
+async def test_telegram_pairing_succeeds_and_only_duplicate_identity_conflicts(
+    database,
+) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    payload = {
+        "label": "Telegram private pilot",
+        "channel_type": "telegram",
+        "external_identity": "8891353746",
+        "scopes": ["context:read", "proposal:create"],
+        "expires_in_seconds": 2592000,
+    }
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client, "Telegram owner")
+        first = await client.post("/integrations/pair", json=payload)
+        duplicate = await client.post("/integrations/pair", json=payload)
+        listed = await client.get("/integrations")
+
+    assert first.status_code == 201, first.text
+    assert first.json()["credential"]["channel_type"] == "telegram"
+    assert first.json()["credential"]["scopes"] == [
+        "context:read",
+        "proposal:create",
+    ]
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"]["code"] == "channel_identity_already_paired"
+    assert listed.json() == [first.json()["credential"]]
+
+
 async def test_channel_context_is_scoped_and_replay_is_idempotent(database) -> None:
     app = create_app(database.path)
     transport = httpx.ASGITransport(app=app)

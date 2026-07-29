@@ -334,6 +334,9 @@ high-entropy credentials, HMAC-protects channel/message identifiers, stores
 explicit read/propose/execute scopes, and supports immediate revocation. The
 first channel operation is read-only Assistant context through the same typed
 domain service. Channel code has no direct repository or SQLite access.
+Schema v12 preserves that boundary and its active-identity uniqueness while
+bringing the durable channel-type constraint into line with the Telegram
+private-pilot API contract.
 
 STORY-027 gate-three implementation checkpoint (2026-07-27 PDT): the native
 OpenClaw adapter now registers optional context, pending-proposal, and narrow
