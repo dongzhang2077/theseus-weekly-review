@@ -1,7 +1,30 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import plugin from "../dist/index.js";
+
+test("declares the integration token as a manifest-owned SecretRef surface", async () => {
+  const manifest = JSON.parse(
+    await readFile(new URL("../openclaw.plugin.json", import.meta.url), "utf8"),
+  );
+  const packageMetadata = JSON.parse(
+    await readFile(new URL("../package.json", import.meta.url), "utf8"),
+  );
+
+  assert.equal(manifest.version, packageMetadata.version);
+  assert.deepEqual(manifest.configContracts.secretInputs.paths, [
+    {path: "accessToken", expected: "string"},
+  ]);
+  assert.deepEqual(
+    manifest.configSchema.properties.accessToken.anyOf.map((schema) => schema.type),
+    ["string", "object"],
+  );
+  assert.deepEqual(
+    plugin.configSchema.jsonSchema.properties.accessToken.anyOf.map((schema) => schema.type),
+    ["string", "object"],
+  );
+});
 
 test("registers optional context, proposal, decision, execution, and undo tools through the native OpenClaw SDK", () => {
   const registrations = [];

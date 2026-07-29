@@ -23,7 +23,7 @@ so concurrent turns in one chat cannot reuse each other's message ID.
 ## Runtime requirements
 
 - Node 22.22.3+, 24.15+, or a currently supported OpenClaw Node runtime
-- OpenClaw 2026.5.17+
+- OpenClaw 2026.7.1+
 - A Theseus integration pairing with `context:read`; proposal drafts also
   require `proposal:create`, and proposal decisions require `proposal:decide`
   execution requires `action:execute`, and undo requires the independent
@@ -39,7 +39,7 @@ npm run plugin:validate
 ```
 
 Run these commands with a supported Node runtime; the package enforces Node
-22.22.3+, 24.15+, or 25.9+ and OpenClaw 2026.5.17+. The unit suite exercises
+22.22.3+, 24.15+, or 25.9+ and OpenClaw 2026.7.1+. The unit suite exercises
 the native SDK registration and the trusted message/run bridge without a
 configured Gateway or a real Theseus credential.
 
@@ -64,11 +64,19 @@ OpenClaw host hook registration remains covered by the plugin runtime tests.
 Install the local package with `openclaw plugins install` only after the
 Theseus API is running and a scoped integration token has been created.
 Configure `baseUrl`, `accessToken`, `channelType`, and `externalIdentity` in
-the plugin entry. To enable proposal drafting, also configure
+the plugin entry. OpenClaw 2026.7.1+ can store `accessToken` as a SecretRef;
+prefer a private file provider or another supported secret provider instead of
+plaintext in `openclaw.json`. To enable proposal drafting, also configure
 `trustedChannelId` and `trustedSenderId` to the exact OpenClaw channel and
 host-trusted sender allowed to act for this Theseus pairing. Without both
 values, proposal calls are blocked. Treat the token, external identity, and
 sender identifier as secrets; never commit them or place them in this package.
+
+For the local Telegram pilot, run
+`bash scripts/configure_openclaw_local_secrets.sh` from the repository root. It
+prompts without echo and writes the Bot Token and Theseus pairing token outside
+the repository under `~/.openclaw/secrets/` with owner-only permissions. The
+script does not modify OpenClaw configuration or start the Gateway.
 
 For channels that gate inbound hook data, the OpenClaw operator must also opt
 this trusted plugin into `message_received` for the specific account. For

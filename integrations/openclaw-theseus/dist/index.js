@@ -13,12 +13,27 @@ const trustedProposalToolNames = new Set([
     proposalExecutionToolName,
     proposalUndoToolName,
 ]);
+const secretRefSchema = {
+    type: "object",
+    properties: {
+        source: { enum: ["env", "file", "exec"] },
+        provider: { type: "string", minLength: 1 },
+        id: { type: "string", minLength: 1 },
+    },
+    required: ["source", "provider", "id"],
+    additionalProperties: false,
+};
 const pluginConfigSchema = buildJsonPluginConfigSchema({
     type: "object",
     required: ["baseUrl", "accessToken", "channelType", "externalIdentity"],
     properties: {
         baseUrl: { type: "string", minLength: 1 },
-        accessToken: { type: "string", minLength: 16 },
+        accessToken: {
+            anyOf: [
+                { type: "string", minLength: 16 },
+                secretRefSchema,
+            ],
+        },
         channelType: { enum: ["local_test", "openclaw", "telegram", "whatsapp"] },
         externalIdentity: { type: "string", minLength: 1 },
         timeoutMs: { type: "integer", minimum: 1000, maximum: 30000 },
