@@ -16,7 +16,14 @@ import {
 } from "./client.js";
 import { TrustedMessageBridge } from "./trusted-message-bridge.js";
 
-type TheseusPluginConfig = TheseusClientConfig & {
+interface OpenClawSecretReference {
+  source: "env" | "file" | "exec";
+  provider: string;
+  id: string;
+}
+
+type TheseusPluginConfig = Omit<TheseusClientConfig, "accessToken"> & {
+  accessToken: string | OpenClawSecretReference;
   trustedChannelId?: string;
   trustedSenderId?: string;
 };
@@ -156,7 +163,9 @@ const plugin: OpenClawPluginDefinition = definePluginEntry({
         signal,
       ) {
         signal?.throwIfAborted();
-        return jsonResult(await readTheseusContext(config, { weekStart, weekEnd }));
+        return jsonResult(
+          await readTheseusContext(requireResolvedClientConfig(config), {weekStart, weekEnd}),
+        );
       },
       },
       {optional: true},
@@ -190,7 +199,7 @@ const plugin: OpenClawPluginDefinition = definePluginEntry({
           }
           return jsonResult(
             await draftTheseusWeeklyPlanProposal(
-              config,
+              requireResolvedClientConfig(config),
               {
                 reviewWeekStart: params.reviewWeekStart,
                 reviewWeekEnd: params.reviewWeekEnd,
@@ -233,7 +242,7 @@ const plugin: OpenClawPluginDefinition = definePluginEntry({
           }
           return jsonResult(
             await decideTheseusWeeklyPlanProposal(
-              config,
+              requireResolvedClientConfig(config),
               {
                 proposalId: params.proposalId,
                 expectedVersion: params.expectedVersion,
@@ -261,7 +270,7 @@ const plugin: OpenClawPluginDefinition = definePluginEntry({
           signal?.throwIfAborted();
           const messageId = bridge.resolveProposalReference(params.trustedMessageReference);
           if (!messageId) throw new Error("Theseus proposal execution requires a trusted runtime message reference");
-          return jsonResult(await executeTheseusWeeklyPlanProposal(config, {
+          return jsonResult(await executeTheseusWeeklyPlanProposal(requireResolvedClientConfig(config), {
             proposalId: params.proposalId,
             expectedVersion: params.expectedVersion,
           }, {messageId}));
@@ -284,7 +293,7 @@ const plugin: OpenClawPluginDefinition = definePluginEntry({
           signal?.throwIfAborted();
           const messageId = bridge.resolveProposalReference(params.trustedMessageReference);
           if (!messageId) throw new Error("Theseus proposal undo requires a trusted runtime message reference");
-          return jsonResult(await undoTheseusWeeklyPlanAction(config, {
+          return jsonResult(await undoTheseusWeeklyPlanAction(requireResolvedClientConfig(config), {
             proposalId: params.proposalId,
             actionId: params.actionId,
             expectedVersion: params.expectedVersion,
@@ -302,13 +311,36 @@ function requirePluginConfig(value: Record<string, unknown> | undefined): Theseu
   if (
     !value ||
     typeof value.baseUrl !== "string" ||
-    typeof value.accessToken !== "string" ||
+    !(typeof value.accessToken === "string" || isSecretReference(value.accessToken)) ||
     typeof value.channelType !== "string" ||
     typeof value.externalIdentity !== "string"
   ) {
     throw new Error("Theseus plugin configuration is invalid");
   }
   return value as unknown as TheseusPluginConfig;
+}
+
+function requireResolvedClientConfig(config: TheseusPluginConfig): TheseusClientConfig {
+  if (typeof config.accessToken !== "string") {
+    throw new Error(
+      "Theseus integration credential is unavailable in this OpenClaw registration mode",
+    );
+  }
+  return config as TheseusClientConfig;
+}
+
+function isSecretReference(value: unknown): value is OpenClawSecretReference {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    (candidate.source === "env" ||
+      candidate.source === "file" ||
+      candidate.source === "exec") &&
+    typeof candidate.provider === "string" &&
+    candidate.provider.length > 0 &&
+    typeof candidate.id === "string" &&
+    candidate.id.length > 0
+  );
 }
 
 function hasTrustedSource(

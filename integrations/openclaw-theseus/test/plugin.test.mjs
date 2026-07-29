@@ -61,6 +61,36 @@ test("registers optional context, proposal, decision, execution, and undo tools 
   assert.equal(typeof hooks.get("before_tool_call"), "function");
 });
 
+test("registers discovery metadata with an unresolved SecretRef and fails closed before execution", async () => {
+  const registrations = [];
+  plugin.register({
+    registrationMode: "discovery",
+    pluginConfig: {
+      baseUrl: "http://127.0.0.1:1",
+      accessToken: {
+        source: "file",
+        provider: "theseus_pairing",
+        id: "value",
+      },
+      channelType: "telegram",
+      externalIdentity: "8891353746",
+    },
+    registerTool(tool, options) {
+      registrations.push({tool, options});
+    },
+    on() {},
+  });
+
+  assert.equal(registrations.length, 5);
+  await assert.rejects(
+    registrations[0].tool.execute(
+      "discovery-call",
+      {weekStart: "2026-06-08", weekEnd: "2026-06-14"},
+    ),
+    /credential is unavailable in this OpenClaw registration mode/,
+  );
+});
+
 test("proposal uses only a matching trusted inbound message", async () => {
   const registrations = [];
   const hooks = new Map();

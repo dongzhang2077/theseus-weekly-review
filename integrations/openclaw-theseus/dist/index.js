@@ -99,7 +99,7 @@ const plugin = definePluginEntry({
             }, { additionalProperties: false }),
             async execute(_toolCallId, { weekStart, weekEnd }, signal) {
                 signal?.throwIfAborted();
-                return jsonResult(await readTheseusContext(config, { weekStart, weekEnd }));
+                return jsonResult(await readTheseusContext(requireResolvedClientConfig(config), { weekStart, weekEnd }));
             },
         }, { optional: true });
         api.registerTool({
@@ -121,7 +121,7 @@ const plugin = definePluginEntry({
                 if (!messageId) {
                     throw new Error("Theseus proposal creation requires a trusted runtime message reference");
                 }
-                return jsonResult(await draftTheseusWeeklyPlanProposal(config, {
+                return jsonResult(await draftTheseusWeeklyPlanProposal(requireResolvedClientConfig(config), {
                     reviewWeekStart: params.reviewWeekStart,
                     reviewWeekEnd: params.reviewWeekEnd,
                     targetWeekStart: params.targetWeekStart,
@@ -148,7 +148,7 @@ const plugin = definePluginEntry({
                 if (!messageId) {
                     throw new Error("Theseus proposal changes require a trusted runtime message reference");
                 }
-                return jsonResult(await decideTheseusWeeklyPlanProposal(config, {
+                return jsonResult(await decideTheseusWeeklyPlanProposal(requireResolvedClientConfig(config), {
                     proposalId: params.proposalId,
                     expectedVersion: params.expectedVersion,
                     decision: params.decision,
@@ -170,7 +170,7 @@ const plugin = definePluginEntry({
                 const messageId = bridge.resolveProposalReference(params.trustedMessageReference);
                 if (!messageId)
                     throw new Error("Theseus proposal execution requires a trusted runtime message reference");
-                return jsonResult(await executeTheseusWeeklyPlanProposal(config, {
+                return jsonResult(await executeTheseusWeeklyPlanProposal(requireResolvedClientConfig(config), {
                     proposalId: params.proposalId,
                     expectedVersion: params.expectedVersion,
                 }, { messageId }));
@@ -191,7 +191,7 @@ const plugin = definePluginEntry({
                 const messageId = bridge.resolveProposalReference(params.trustedMessageReference);
                 if (!messageId)
                     throw new Error("Theseus proposal undo requires a trusted runtime message reference");
-                return jsonResult(await undoTheseusWeeklyPlanAction(config, {
+                return jsonResult(await undoTheseusWeeklyPlanAction(requireResolvedClientConfig(config), {
                     proposalId: params.proposalId,
                     actionId: params.actionId,
                     expectedVersion: params.expectedVersion,
@@ -204,12 +204,30 @@ export default plugin;
 function requirePluginConfig(value) {
     if (!value ||
         typeof value.baseUrl !== "string" ||
-        typeof value.accessToken !== "string" ||
+        !(typeof value.accessToken === "string" || isSecretReference(value.accessToken)) ||
         typeof value.channelType !== "string" ||
         typeof value.externalIdentity !== "string") {
         throw new Error("Theseus plugin configuration is invalid");
     }
     return value;
+}
+function requireResolvedClientConfig(config) {
+    if (typeof config.accessToken !== "string") {
+        throw new Error("Theseus integration credential is unavailable in this OpenClaw registration mode");
+    }
+    return config;
+}
+function isSecretReference(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+        return false;
+    const candidate = value;
+    return ((candidate.source === "env" ||
+        candidate.source === "file" ||
+        candidate.source === "exec") &&
+        typeof candidate.provider === "string" &&
+        candidate.provider.length > 0 &&
+        typeof candidate.id === "string" &&
+        candidate.id.length > 0);
 }
 function hasTrustedSource(config) {
     return Boolean(config.trustedChannelId?.trim() && config.trustedSenderId?.trim());
