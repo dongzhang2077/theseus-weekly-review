@@ -1,6 +1,6 @@
 {
   "name": "@theseus/openclaw-plugin",
-  "version": "0.1.2",
+  "version": "0.1.6",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",

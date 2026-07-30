@@ -341,9 +341,19 @@ private-pilot API contract.
 STORY-027 gate-three implementation checkpoint (2026-07-27 PDT): the native
 OpenClaw adapter now registers optional context, pending-proposal, and narrow
 proposal-decision tools. Proposal-changing invocation is blocked unless the
-host supplies a matching inbound `messageId`, `runId`, configured channel, and
-configured sender. The runtime passes only an opaque, short-lived reference
-into the tool; model input never becomes the external message ID. A decision is
+host supplies either a matching inbound `messageId`/`runId`, or matching
+host-controlled canonical session keys across the trusted message and tool
+hooks. Telegram direct messages use OpenClaw's recommended
+`session.dmScope=per-channel-peer` so those hooks share an isolated canonical
+session instead of the default collapsed main session. The session fallback is
+channel/sender scoped, retained for at most 60 seconds, promoted once to the
+host tool run, and cleared at `agent_end`.
+Isolated runtimes may also bridge a host-authoritative run only when the
+configured channel/sender and `senderIsOwner: true` all match. The runtime
+passes only a short-lived HMAC-authenticated reference into the tool, allowing
+separate OpenClaw hook/tool plugin instances to verify it without shared
+mutable memory; model input never becomes the external message ID, session
+key, runtime run ID, or signing key. A decision is
 limited to `approve` or `reject`, requires a distinct integration scope, and
 only appends to the Proposal ledger; it cannot edit or execute a plan change.
 Gate four adds a fourth optional execution tool. It requires `action:execute`,

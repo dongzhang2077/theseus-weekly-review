@@ -13,12 +13,22 @@ This native OpenClaw plugin exposes five optional tools:
 - `theseus_weekly_plan_undo` undoes one successful reversible Action from an
   approved proposal; it never accepts plan content.
 
-The proposal-changing tools are fail-closed. The plugin observes OpenClaw's trusted
-`message_received` hook, binds the runtime-provided inbound message ID to its
-single `runId`, and injects an opaque reference only in the matching
-`before_tool_call` hook. The model never supplies the backend message ID.
-References expire after ten minutes and are kept in a bounded in-memory cache,
-so concurrent turns in one chat cannot reuse each other's message ID.
+The proposal-changing tools are fail-closed. When channel and tool hooks share
+one runtime, the plugin binds OpenClaw's trusted inbound message ID to its
+single `runId`. OpenClaw 2026.7.1-2 can omit that run ID from Telegram's
+`message_received` hook while still supplying the canonical `sessionKey` to
+both message and tool hooks when direct messages use
+`session.dmScope: "per-channel-peer"`. In that mode, the plugin keeps the exact
+channel/sender-matched message for at most 60 seconds, promotes it once to the
+host-provided tool run ID in the same session, and clears unused state at
+`agent_end`. An isolated runtime may alternatively establish the same bridge
+through `before_agent_run`, but only with the configured channel and sender
+plus explicit `senderIsOwner: true`. In every mode, only the matching
+`before_tool_call` receives a short-lived HMAC-authenticated reference. The
+reference remains verifiable when OpenClaw registers hooks and tools in
+separate plugin instances, but cannot be forged or altered by the model. The
+model never supplies the backend message ID, session key, runtime run ID, or
+signing key. Run references expire after ten minutes and all maps are bounded.
 
 ## Runtime requirements
 
@@ -71,6 +81,16 @@ plaintext in `openclaw.json`. To enable proposal drafting, also configure
 host-trusted sender allowed to act for this Theseus pairing. Without both
 values, proposal calls are blocked. Treat the token, external identity, and
 sender identifier as secrets; never commit them or place them in this package.
+Set `session.dmScope` to `per-channel-peer` so a Telegram direct message and
+its tool run share one isolated canonical session. OpenClaw documents this as
+the recommended direct-message scope; the default `main` scope collapses all
+DMs into the agent's main session and cannot safely correlate the trusted
+message hook with the isolated runtime-policy session.
+Non-bundled plugins must also be granted
+`plugins.entries.theseus.hooks.allowConversationAccess: true` so OpenClaw can
+deliver the typed Agent lifecycle metadata used for same-session cleanup and
+the optional `before_agent_run` bridge. Theseus does not inspect or retain the
+prompt or conversation history exposed by those hooks.
 
 For the local Telegram pilot, run
 `bash scripts/configure_openclaw_local_secrets.sh` from the repository root. It

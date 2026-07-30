@@ -51,34 +51,68 @@ const plugin = definePluginEntry({
         const config = requirePluginConfig(api.pluginConfig);
         const bridge = new TrustedMessageBridge();
         api.on("message_received", (event, context) => {
-            const runId = event.runId ?? context.runId;
+            const runId = event.runId ?? context?.runId;
+            const sessionKey = event.sessionKey ?? context.sessionKey;
             const messageId = event.messageId ?? context.messageId;
             const senderId = event.senderId ?? context.senderId;
             if (!hasTrustedSource(config) ||
-                !runId ||
+                (!runId && !sessionKey) ||
                 !messageId ||
                 !senderId ||
                 context.channelId !== config.trustedChannelId ||
                 senderId !== config.trustedSenderId) {
                 return;
             }
+            if (runId) {
+                bridge.recordInbound({
+                    runId,
+                    messageId,
+                    channelId: context.channelId,
+                    senderId,
+                });
+            }
+            if (sessionKey) {
+                bridge.recordSessionInbound({
+                    sessionKey,
+                    messageId,
+                    channelId: context.channelId,
+                    senderId,
+                });
+            }
+        });
+        api.on("before_agent_run", (event, context) => {
+            const runId = context.runId;
+            const channelId = event.channelId ?? context.channelId;
+            const senderId = event.senderId ?? context.senderId;
+            if (!hasTrustedSource(config) ||
+                !runId ||
+                !channelId ||
+                !senderId ||
+                event.senderIsOwner !== true ||
+                channelId !== config.trustedChannelId ||
+                senderId !== config.trustedSenderId) {
+                return;
+            }
             bridge.recordInbound({
                 runId,
-                messageId,
-                channelId: context.channelId,
+                messageId: `openclaw-run:${runId}`,
+                channelId,
                 senderId,
             });
         });
-        api.on("before_tool_call", (event) => {
+        api.on("before_tool_call", (event, context) => {
             if (!trustedProposalToolNames.has(event.toolName))
                 return;
-            if (!event.runId) {
+            const runId = event.runId ?? context?.runId;
+            if (!runId) {
                 return {
                     block: true,
                     blockReason: "Theseus proposal changes require a trusted inbound message from the configured channel and sender.",
                 };
             }
-            const reference = bridge.createProposalReference(event.runId);
+            const reference = typeof config.accessToken === "string"
+                ? bridge.createProposalReference(runId, context?.sessionKey, config.accessToken)
+                : undefined;
             if (!reference) {
                 return {
                     block: true,
@@ -88,6 +122,10 @@ const plugin = definePluginEntry({
             return {
                 params: { ...event.params, trustedMessageReference: reference },
             };
+        });
+        api.on("agent_end", (event, context) => {
+            bridge.clearRun(event.runId ?? context.runId);
+            bridge.clearSession(context.sessionKey);
         });
         api.registerTool({
             name: "theseus_context_read",
@@ -117,11 +155,12 @@ const plugin = definePluginEntry({
             }, { additionalProperties: false }),
             async execute(_toolCallId, params, signal) {
                 signal?.throwIfAborted();
-                const messageId = bridge.resolveProposalReference(params.trustedMessageReference);
+                const clientConfig = requireResolvedClientConfig(config);
+                const messageId = bridge.resolveProposalReference(params.trustedMessageReference, clientConfig.accessToken);
                 if (!messageId) {
                     throw new Error("Theseus proposal creation requires a trusted runtime message reference");
                 }
-                return jsonResult(await draftTheseusWeeklyPlanProposal(requireResolvedClientConfig(config), {
+                return jsonResult(await draftTheseusWeeklyPlanProposal(clientConfig, {
                     reviewWeekStart: params.reviewWeekStart,
                     reviewWeekEnd: params.reviewWeekEnd,
                     targetWeekStart: params.targetWeekStart,
@@ -144,11 +183,12 @@ const plugin = definePluginEntry({
             }, { additionalProperties: false }),
             async execute(_toolCallId, params, signal) {
                 signal?.throwIfAborted();
-                const messageId = bridge.resolveProposalReference(params.trustedMessageReference);
+                const clientConfig = requireResolvedClientConfig(config);
+                const messageId = bridge.resolveProposalReference(params.trustedMessageReference, clientConfig.accessToken);
                 if (!messageId) {
                     throw new Error("Theseus proposal changes require a trusted runtime message reference");
                 }
-                return jsonResult(await decideTheseusWeeklyPlanProposal(requireResolvedClientConfig(config), {
+                return jsonResult(await decideTheseusWeeklyPlanProposal(clientConfig, {
                     proposalId: params.proposalId,
                     expectedVersion: params.expectedVersion,
                     decision: params.decision,
@@ -167,10 +207,11 @@ const plugin = definePluginEntry({
             }, { additionalProperties: false }),
             async execute(_toolCallId, params, signal) {
                 signal?.throwIfAborted();
-                const messageId = bridge.resolveProposalReference(params.trustedMessageReference);
+                const clientConfig = requireResolvedClientConfig(config);
+                const messageId = bridge.resolveProposalReference(params.trustedMessageReference, clientConfig.accessToken);
                 if (!messageId)
                     throw new Error("Theseus proposal execution requires a trusted runtime message reference");
-                return jsonResult(await executeTheseusWeeklyPlanProposal(requireResolvedClientConfig(config), {
+                return jsonResult(await executeTheseusWeeklyPlanProposal(clientConfig, {
                     proposalId: params.proposalId,
                     expectedVersion: params.expectedVersion,
                 }, { messageId }));
@@ -188,10 +229,11 @@ const plugin = definePluginEntry({
             }, { additionalProperties: false }),
             async execute(_toolCallId, params, signal) {
                 signal?.throwIfAborted();
-                const messageId = bridge.resolveProposalReference(params.trustedMessageReference);
+                const clientConfig = requireResolvedClientConfig(config);
+                const messageId = bridge.resolveProposalReference(params.trustedMessageReference, clientConfig.accessToken);
                 if (!messageId)
                     throw new Error("Theseus proposal undo requires a trusted runtime message reference");
-                return jsonResult(await undoTheseusWeeklyPlanAction(requireResolvedClientConfig(config), {
+                return jsonResult(await undoTheseusWeeklyPlanAction(clientConfig, {
                     proposalId: params.proposalId,
                     actionId: params.actionId,
                     expectedVersion: params.expectedVersion,

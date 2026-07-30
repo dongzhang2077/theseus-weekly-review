@@ -2,7 +2,7 @@
   "id": "theseus",
   "name": "Theseus",
   "description": "Read Theseus context, draft and decide weekly-plan proposals, and execute or undo approved changes through scoped integration access.",
-  "version": "0.1.2",
+  "version": "0.1.6",
   "configSchema": {
     "type": "object",
     "required": [

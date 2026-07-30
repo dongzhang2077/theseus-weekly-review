@@ -58,7 +58,9 @@ test("registers optional context, proposal, decision, execution, and undo tools 
   assert.equal(registrations[3].options.optional, true);
   assert.equal(registrations[4].options.optional, true);
   assert.equal(typeof hooks.get("message_received"), "function");
+  assert.equal(typeof hooks.get("before_agent_run"), "function");
   assert.equal(typeof hooks.get("before_tool_call"), "function");
+  assert.equal(typeof hooks.get("agent_end"), "function");
 });
 
 test("registers discovery metadata with an unresolved SecretRef and fails closed before execution", async () => {
@@ -73,7 +75,7 @@ test("registers discovery metadata with an unresolved SecretRef and fails closed
         id: "value",
       },
       channelType: "telegram",
-      externalIdentity: "8891353746",
+      externalIdentity: "telegram-user-42",
     },
     registerTool(tool, options) {
       registrations.push({tool, options});
@@ -166,4 +168,252 @@ test("proposal uses only a matching trusted inbound message", async () => {
   const undoAccepted = await beforeToolCall({toolName: "theseus_weekly_plan_undo", runId: "run-1", params: {proposalId: 7, actionId: 12, expectedVersion: 3}});
   assert.equal(undoAccepted.block, undefined);
   assert.equal(typeof undoAccepted.params.trustedMessageReference, "string");
+});
+
+test("proposal accepts the host run ID from before_tool_call context", async () => {
+  const hooks = new Map();
+  plugin.register({
+    pluginConfig: {
+      baseUrl: "http://127.0.0.1:8000",
+      accessToken: "ths_int_test-token-value",
+      channelType: "telegram",
+      externalIdentity: "telegram-user-42",
+      trustedChannelId: "telegram",
+      trustedSenderId: "telegram-user-42",
+    },
+    registerTool() {},
+    on(name, handler) {
+      hooks.set(name, handler);
+    },
+  });
+
+  const receiveMessage = hooks.get("message_received");
+  const beforeToolCall = hooks.get("before_tool_call");
+  await receiveMessage(
+    {messageId: "telegram-message-42", senderId: "telegram-user-42"},
+    {
+      runId: "runtime-run-42",
+      messageId: "telegram-message-42",
+      channelId: "telegram",
+      senderId: "telegram-user-42",
+    },
+  );
+
+  const accepted = await beforeToolCall(
+    {
+      toolName: "theseus_weekly_plan_proposal",
+      params: {
+        reviewWeekStart: "2026-06-08",
+        reviewWeekEnd: "2026-06-14",
+        targetWeekStart: "2026-06-15",
+        targetWeekEnd: "2026-06-21",
+      },
+    },
+    {runId: "runtime-run-42", toolName: "theseus_weekly_plan_proposal"},
+  );
+
+  assert.equal(accepted.block, undefined);
+  assert.equal(typeof accepted.params.trustedMessageReference, "string");
+  assert.notEqual(accepted.params.trustedMessageReference, "telegram-message-42");
+});
+
+test("proposal tool verifies a trusted reference created by another plugin instance", async () => {
+  const hooks = new Map();
+  const sharedConfig = {
+    baseUrl: "http://127.0.0.1:1",
+    accessToken: "ths_int_cross-instance-test-token",
+    channelType: "telegram",
+    externalIdentity: "telegram-user-42",
+    trustedChannelId: "telegram",
+    trustedSenderId: "telegram-user-42",
+  };
+  plugin.register({
+    pluginConfig: sharedConfig,
+    registerTool() {},
+    on(name, handler) {
+      hooks.set(name, handler);
+    },
+  });
+
+  const registrations = [];
+  plugin.register({
+    pluginConfig: sharedConfig,
+    registerTool(tool) {
+      registrations.push(tool);
+    },
+    on() {},
+  });
+
+  await hooks.get("message_received")(
+    {
+      runId: "runtime-run-cross-instance",
+      messageId: "telegram-message-cross-instance",
+      senderId: "telegram-user-42",
+    },
+    {
+      runId: "runtime-run-cross-instance",
+      channelId: "telegram",
+      senderId: "telegram-user-42",
+    },
+  );
+  const accepted = await hooks.get("before_tool_call")({
+    toolName: "theseus_weekly_plan_proposal",
+    runId: "runtime-run-cross-instance",
+    params: {
+      reviewWeekStart: "2026-06-08",
+      reviewWeekEnd: "2026-06-14",
+      targetWeekStart: "2026-06-15",
+      targetWeekEnd: "2026-06-21",
+    },
+  });
+
+  await assert.rejects(
+    registrations[1].execute(
+      "cross-instance-call",
+      accepted.params,
+    ),
+    (error) => {
+      assert.equal(error.code, "theseus_unavailable");
+      return true;
+    },
+  );
+});
+
+test("proposal bridges an owner-authorized channel run inside the tool runtime", async () => {
+  const hooks = new Map();
+  plugin.register({
+    pluginConfig: {
+      baseUrl: "http://127.0.0.1:8000",
+      accessToken: "ths_int_test-token-value",
+      channelType: "telegram",
+      externalIdentity: "telegram-user-42",
+      trustedChannelId: "telegram",
+      trustedSenderId: "telegram-user-42",
+    },
+    registerTool() {},
+    on(name, handler) {
+      hooks.set(name, handler);
+    },
+  });
+
+  const beforeAgentRun = hooks.get("before_agent_run");
+  const beforeToolCall = hooks.get("before_tool_call");
+  const proposalParams = {
+    reviewWeekStart: "2026-06-08",
+    reviewWeekEnd: "2026-06-14",
+    targetWeekStart: "2026-06-15",
+    targetWeekEnd: "2026-06-21",
+  };
+
+  await beforeAgentRun(
+    {
+      prompt: "model-visible content is not used by the trust bridge",
+      messages: [],
+      channelId: "telegram",
+      senderId: "telegram-user-42",
+      senderIsOwner: false,
+    },
+    {runId: "runtime-run-untrusted", channelId: "telegram", senderId: "telegram-user-42"},
+  );
+  assert.equal(
+    (
+      await beforeToolCall(
+        {toolName: "theseus_weekly_plan_proposal", params: proposalParams},
+        {runId: "runtime-run-untrusted", toolName: "theseus_weekly_plan_proposal"},
+      )
+    ).block,
+    true,
+  );
+
+  await beforeAgentRun(
+    {
+      prompt: "model-visible content is not used by the trust bridge",
+      messages: [],
+      channelId: "telegram",
+      senderId: "telegram-user-42",
+      senderIsOwner: true,
+    },
+    {runId: "runtime-run-owner", channelId: "telegram", senderId: "telegram-user-42"},
+  );
+  const accepted = await beforeToolCall(
+    {toolName: "theseus_weekly_plan_proposal", params: proposalParams},
+    {
+      runId: "runtime-run-owner",
+      channelId: "telegram",
+      toolName: "theseus_weekly_plan_proposal",
+    },
+  );
+
+  assert.equal(accepted.block, undefined);
+  assert.equal(typeof accepted.params.trustedMessageReference, "string");
+  assert.notEqual(accepted.params.trustedMessageReference, "runtime-run-owner");
+});
+
+test("proposal uses a single host session fallback when message_received has no run ID", async () => {
+  const hooks = new Map();
+  plugin.register({
+    pluginConfig: {
+      baseUrl: "http://127.0.0.1:8000",
+      accessToken: "ths_int_test-token-value",
+      channelType: "telegram",
+      externalIdentity: "telegram-user-42",
+      trustedChannelId: "telegram",
+      trustedSenderId: "telegram-user-42",
+    },
+    registerTool() {},
+    on(name, handler) {
+      hooks.set(name, handler);
+    },
+    logger: {info() {}},
+  });
+
+  const receiveMessage = hooks.get("message_received");
+  const beforeToolCall = hooks.get("before_tool_call");
+  const endAgent = hooks.get("agent_end");
+  const proposalParams = {
+    reviewWeekStart: "2026-06-08",
+    reviewWeekEnd: "2026-06-14",
+    targetWeekStart: "2026-06-15",
+    targetWeekEnd: "2026-06-21",
+  };
+
+  await receiveMessage(
+    {
+      messageId: "telegram-message-84",
+      senderId: "telegram-user-42",
+      sessionKey: "agent:main:telegram-owner",
+    },
+    {
+      messageId: "telegram-message-84",
+      channelId: "telegram",
+      senderId: "telegram-user-42",
+    },
+  );
+  const accepted = await beforeToolCall(
+    {toolName: "theseus_weekly_plan_proposal", params: proposalParams},
+    {
+      runId: "runtime-run-84",
+      sessionKey: "agent:main:telegram-owner",
+      toolName: "theseus_weekly_plan_proposal",
+    },
+  );
+  assert.equal(accepted.block, undefined);
+  assert.equal(typeof accepted.params.trustedMessageReference, "string");
+
+  await endAgent(
+    {runId: "runtime-run-84", messages: [], success: true},
+    {
+      runId: "runtime-run-84",
+      sessionKey: "agent:main:telegram-owner",
+    },
+  );
+  const nextRun = await beforeToolCall(
+    {toolName: "theseus_weekly_plan_proposal", params: proposalParams},
+    {
+      runId: "runtime-run-85",
+      sessionKey: "agent:main:telegram-owner",
+      toolName: "theseus_weekly_plan_proposal",
+    },
+  );
+  assert.equal(nextRun.block, true);
 });

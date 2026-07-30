@@ -609,8 +609,19 @@ five. The schema-v11 pairing/list/revoke path, HMAC-protected channel/message
 identities, explicit scopes, read-only context operation, pending-only channel
 proposal endpoint, and narrow channel proposal-decision endpoint are
 implemented. The native OpenClaw package binds the host-provided inbound
-message ID to the single runtime `runId`, rejects an unconfigured channel or
-sender, and passes an opaque short-lived reference to proposal-changing tools.
+message ID to the single runtime `runId` when channel and tool hooks are
+co-located. When Telegram omits the message-hook run ID, the package matches
+the exact configured channel and sender, holds the message under the
+host-controlled canonical session key for at most 60 seconds, promotes it once
+to the matching tool run, and clears unused state at `agent_end`. Telegram
+direct messages use `session.dmScope=per-channel-peer`, OpenClaw's recommended
+isolated DM scope, so the message and tool hooks share that canonical key. An
+isolated Agent runtime may instead require the configured channel/sender plus
+host-authoritative `senderIsOwner: true`. It rejects missing or mismatched
+trust metadata and passes only a short-lived HMAC-authenticated reference to
+proposal-changing tools. The signed reference remains verifiable when
+OpenClaw registers hook and tool callbacks in separate plugin instances,
+without exposing the message ID or signing key to the model.
 The decision endpoint accepts only `approve` or `reject`, requires the distinct
 `proposal:decide` scope, appends a decision record, and never edits a plan
 change. Gate four adds the separately scoped `action:execute` operation, which
@@ -636,6 +647,18 @@ and pairing, starts a temporary local API, then drives the OpenClaw client
 through context read, proposal draft, approval, execution, and undo. It revokes
 the credential and removes temporary data afterward, so developer verification
 does not require copying a token or identity into a shell.
+
+Telegram private-pilot checkpoint (2026-07-29 PDT): OpenClaw plugin `0.1.6`
+completed a real trusted inbound Telegram proposal flow against the local
+Theseus API. The channel request returned `201 Created` and produced exactly
+one pending weekly-plan adjustment. Read-only database verification found no
+proposal decision, Agent Action, or target-week WeeklyPlan, confirming that the
+proposal-only scope did not approve or execute a change. The final plugin suite
+passes 23 tests, including separate hook/tool registration instances, signature
+tampering, expiry, and session cleanup; the five-operation disposable adapter
+E2E also passes. The local pilot keeps `session.dmScope=per-channel-peer`,
+SecretRef-backed credentials, exact channel/sender trust, and the existing
+proposal-only tool allowlist.
 
 Acceptance verification: 27 focused tests pass. The complete inventory reached
 196 of 197 with one previously tracked intermittent authenticated Activity
