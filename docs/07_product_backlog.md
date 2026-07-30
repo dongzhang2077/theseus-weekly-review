@@ -983,7 +983,14 @@ moving to `Ready`.
 As a daily user, I want the App to summarize streams visually so that I can
 understand my day and week without reading repeated review prose.
 
-Priority: P0 after the current candidate is integrated
+Priority: P0 next product slice, after the current candidate is integrated
+
+Planning checkpoint (2026-07-30 PDT): the product owner set UI optimization as
+the first post-pilot direction. Assistant Gateway, next-action, Calendar,
+in-App conversation, and voice stories remain sequenced after an accepted UI
+baseline. The first STORY-040 artifact is the product-owner-review wireframe in
+`docs/design/daily-workspace-wireframes-v2.md`; HTML and React work may not
+begin before its acceptance gate.
 
 Acceptance criteria:
 
@@ -1018,7 +1025,7 @@ Acceptance criteria:
 As a local account user, I want cloud language help without uploading my whole
 history so that conversation remains useful and bounded.
 
-Priority: P0 before new App or Calendar assistant surfaces
+Priority: P0 within the Assistant phase, after STORY-040 and STORY-041
 
 Acceptance criteria:
 
@@ -1035,7 +1042,8 @@ Acceptance criteria:
 As a user, I want a trustworthy answer to what I should do now so that current
 commitments do not crowd out long-running Projects.
 
-Priority: P0 after stable Task, Plan, Focus, and review services
+Priority: P0 within the Assistant phase, after the accepted UI baseline and
+stable Task, Plan, Focus, and review services
 
 Acceptance criteria:
 

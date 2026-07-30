@@ -160,6 +160,10 @@ The first visual slice is accepted only when:
 - mobile and desktop screenshots, keyboard behavior, accessible names, focused
   frontend tests, TypeScript, and the production build pass.
 
+The current STORY-040 wireframe proposal is maintained in
+[`design/daily-workspace-wireframes-v2.md`](design/daily-workspace-wireframes-v2.md).
+It must pass product-owner review before the HTML prototype begins.
+
 ## 5. Direction B: Local-First Conversational Assistant
 
 ### 5.1 Outcome
@@ -322,16 +326,19 @@ not keep two cross-module slices in progress at once.
 | Order | Slice | Depends on | Demonstrable result |
 |---:|---|---|---|
 | 0 | Integrate and freeze the current accepted candidate | Current PR verification and product-owner merge decision | One reproducible baseline |
-| 1 | Privacy and Assistant Gateway contract | Existing typed Assistant API | A testable minimal context envelope with no model call required |
-| 2 | Deterministic NextActionService | Plans, Tasks, Focus, review evidence | Local "what now" result with evidence and alternatives |
-| 3 | Visual information architecture | Accepted local data views | Wireframes for Today, week, month, distribution, and combined weekly insight |
-| 4 | App text assistant | Slices 1-2 | In-App query and proposal preview using the shared gateway |
-| 5 | Read-only Calendar commitments | Slices 1-2 | Fixed commitments influence the same local next-action result |
-| 6 | HTML visual prototype and chart validation | Slice 3 | Accepted app-sized interactive prototype |
-| 7 | React visual restoration | Slice 6 | Donut and weekly visual flow backed by persisted evidence |
-| 8 | Turn-based multilingual voice | Slice 4 | Tap/hold-to-talk query with visible cloud boundary |
-| 9 | Conversational onboarding | Slices 4-5 and accepted setup contracts | Voice/text setup with preview and form fallback |
-| 10 | Later gates | Real usage evidence | Realtime voice, calendar writes, bounded proactive behavior |
+| 1 | Visual information architecture and wireframes | Accepted local data views | Accepted Today, Insights, Plan, Day/Week/Month, mobile, and desktop wireframes |
+| 2 | Responsive HTML prototype and chart validation | Slice 1 accepted | Accepted interactive hierarchy without production behavior |
+| 3 | React Today visual restoration | Slice 2 accepted | Persisted Focus, donut, timeline, and seven-day views in the new shell |
+| 4 | Insights presentation convergence | Slice 2 and preserved Review/Signal contracts | One Level 1 weekly insight flow with inspectable evidence |
+| 5 | Plan visual refinement and frontend cleanup | Slices 3-4 | Accepted daily UI baseline with component and legacy-CSS debt reduced |
+| 6 | UI integration and release gate | Slices 3-5 | Tests, builds, screenshots, browser acceptance, and one reproducible baseline |
+| 7 | Privacy and Assistant Gateway contract | UI baseline and existing typed Assistant API | A testable minimal context envelope with no model call required |
+| 8 | Deterministic NextActionService | Plans, Tasks, Focus, review evidence | Local "what now" result with evidence and alternatives |
+| 9 | App text assistant | Slices 7-8 | In-App query and proposal preview using the shared gateway |
+| 10 | Read-only Calendar commitments | Slices 7-8 | Fixed commitments influence the same local next-action result |
+| 11 | Turn-based multilingual voice | Slice 9 | Tap/hold-to-talk query with visible cloud boundary |
+| 12 | Conversational onboarding | Slices 9-10 and accepted setup contracts | Voice/text setup with preview and form fallback |
+| 13 | Later gates | Real usage evidence | Realtime voice, calendar writes, bounded proactive behavior |
 
 ## 7. Candidate Backlog Split
 
@@ -342,8 +349,8 @@ ready or released.
 |---|---|---|
 | STORY-040 | Freeze the visual-first information architecture and HTML prototype | Current baseline integrated |
 | STORY-041 | Add evidence-backed time distribution and multi-scale charts | STORY-040 accepted |
-| STORY-042 | Add the local Assistant Gateway and minimal-context policy | Existing Assistant API |
-| STORY-043 | Add deterministic next-action recommendation | Stable Task/Plan/Focus services |
+| STORY-042 | Add the local Assistant Gateway and minimal-context policy | Accepted UI baseline and existing Assistant API |
+| STORY-043 | Add deterministic next-action recommendation | Accepted UI baseline and stable Task/Plan/Focus services |
 | STORY-044 | Add the in-App text assistant | STORY-042 and STORY-043 |
 | STORY-045 | Add read-only Google Calendar commitments | STORY-042 and STORY-043 |
 | STORY-046 | Add multilingual push-to-talk | STORY-044 |
