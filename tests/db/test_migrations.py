@@ -91,7 +91,7 @@ def test_v1_database_migrates_to_local_user_ownership(tmp_path) -> None:
         "weekly_reviews": (10, 1),
     }
     assert tuple(item) == (7, 6, 4)
-    assert version == 12
+    assert version == 13
     assert violations == []
 
 
@@ -155,7 +155,7 @@ def test_v2_database_adds_auth_tables_without_rewriting_personal_data(tmp_path) 
     assert tuple(goal) == (7, 4, "Existing goal")
     assert auth_tables == {"auth_credentials", "auth_sessions"}
     assert credential_count == 0
-    assert version == 12
+    assert version == 13
     assert violations == []
 
 
@@ -220,7 +220,7 @@ def test_v3_database_removes_recovery_code_without_rewriting_account(tmp_path) -
         "existing@example.com",
         "$argon2id$preserved-password-hash",
     )
-    assert version == 12
+    assert version == 13
     assert violations == []
 
 
@@ -411,7 +411,7 @@ def test_v4_database_adds_task_foundation_without_rewriting_personal_data(
         }
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 12
+    assert version == 13
     assert tuple(activity) == (6, 1)
     assert tuple(item) == (8, None, "Existing block")
     assert tuple(time_log) == (9, None, None)
@@ -595,7 +595,7 @@ def test_v5_database_adds_focus_foundation_and_preserves_time_logs(
         ).fetchone()
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 12
+    assert version == 13
     assert tables == {
         "focus_sessions",
         "focus_session_segments",
@@ -695,7 +695,7 @@ def test_v6_database_adds_correction_history_and_preserves_evidence(tmp_path) ->
         ).fetchone()
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 12
+    assert version == 13
     assert tuple(time_log) == (9, 1800, 1, None)
     assert tuple(review) == (10, None)
     assert revision_table is not None
@@ -780,7 +780,7 @@ def test_v7_database_adds_trust_ledger_without_rewriting_account(tmp_path) -> No
         }
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 12
+    assert version == 13
     assert tuple(user) == (4, "Existing account")
     assert ledger_tables == {
         "preferences",
@@ -850,25 +850,21 @@ def test_v8_database_adds_channel_identity_tables_without_rewriting_users(
     tmp_path,
 ) -> None:
     database_path = tmp_path / "owned-v8.db"
-    database = Database(database_path)
-    database.initialize()
-    with database.session() as connection:
-        connection.execute(
-            """
-            INSERT INTO users (id, display_name, timezone, locale)
-            VALUES (41, 'Version Eight User', 'UTC', 'en')
-            """
-        )
-        connection.executescript(
-            """
-            DROP TABLE integration_message_receipts;
-            DROP TABLE channel_bindings;
-            DROP TABLE integration_credential_scopes;
-            DROP TABLE integration_credentials;
-            PRAGMA user_version = 8;
-            """
-        )
+    connection = sqlite3.connect(database_path)
+    connection.executescript(
+        connection_module.SCHEMA_PATH.read_text(encoding="utf-8")
+        + connection_module.V8_MIGRATION_PATH.read_text(encoding="utf-8")
+    )
+    connection.execute(
+        """
+        INSERT INTO users (id, display_name, timezone, locale)
+        VALUES (41, 'Version Eight User', 'UTC', 'en')
+        """
+    )
+    connection.commit()
+    connection.close()
 
+    database = Database(database_path)
     database.initialize()
 
     with database.session() as connection:
@@ -884,7 +880,7 @@ def test_v8_database_adds_channel_identity_tables_without_rewriting_users(
         }
         violations = connection.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 12
+    assert version == 13
     assert user["display_name"] == "Version Eight User"
     assert {
         "integration_credentials",
@@ -937,7 +933,7 @@ def test_v9_database_adds_proposal_decide_scope_without_losing_pairing_scopes(
         )
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 12
+    assert version == 13
     assert [row["scope"] for row in scopes] == ["proposal:create"]
     assert violations == []
 
@@ -983,7 +979,7 @@ def test_v10_database_adds_undo_scope_without_losing_execution_scope(tmp_path) -
         )
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 12
+    assert version == 13
     assert [row["scope"] for row in scopes] == ["action:execute"]
     assert violations == []
 
@@ -1061,8 +1057,60 @@ def test_v11_database_allows_telegram_without_losing_existing_bindings(
         )
         violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
 
-    assert version == 12
+    assert version == 13
     assert tuple(existing) == ("openclaw", "existing-identity")
+    assert violations == []
+
+
+def test_v12_migration_preserves_outcome_and_defaults_consent_off(
+    tmp_path,
+) -> None:
+    database_path = tmp_path / "v12.db"
+    connection = sqlite3.connect(database_path)
+    connection.executescript(
+        connection_module.SCHEMA_PATH.read_text(encoding="utf-8")
+        + connection_module.V8_MIGRATION_PATH.read_text(encoding="utf-8")
+        + connection_module.V9_MIGRATION_PATH.read_text(encoding="utf-8")
+        + connection_module.V10_MIGRATION_PATH.read_text(encoding="utf-8")
+        + connection_module.V11_MIGRATION_PATH.read_text(encoding="utf-8")
+        + connection_module.V12_MIGRATION_PATH.read_text(encoding="utf-8")
+    )
+    connection.executescript(
+        """
+        INSERT INTO users (id, display_name)
+        VALUES (51, 'Version Twelve User');
+        INSERT INTO proposals (
+            id, user_id, proposal_type, title, before_json, after_json
+        ) VALUES (
+            7, 51, 'weekly_plan_adjustment', 'Existing proposal', '{}', '{}'
+        );
+        INSERT INTO proposal_outcomes (
+            id, user_id, proposal_id, result, usefulness, note
+        ) VALUES (
+            9, 51, 7, 'completed', 4, 'Existing feedback'
+        );
+        """
+    )
+    connection.commit()
+    connection.close()
+
+    database = Database(database_path)
+    database.initialize()
+    database.initialize()
+
+    with database.session() as migrated:
+        version = migrated.execute("PRAGMA user_version").fetchone()[0]
+        outcome = migrated.execute(
+            """
+            SELECT result, usefulness, personalization_consent,
+                   consent_version, consent_updated_at
+            FROM proposal_outcomes WHERE id = 9
+            """
+        ).fetchone()
+        violations = migrated.execute("PRAGMA foreign_key_check").fetchall()
+
+    assert version == 13
+    assert tuple(outcome) == ("completed", 4, 0, 1, None)
     assert violations == []
 
 

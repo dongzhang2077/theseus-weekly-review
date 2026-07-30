@@ -845,11 +845,14 @@ class ProposalOutcomeCreate(APIModel):
     actual_duration_minutes: int | None = Field(default=None, ge=0)
     energy_feedback: ActivityType | None = None
     note: str = Field(default="", max_length=4000)
+    personalization_consent: bool = False
 
 
 class ProposalOutcomeRead(ProposalOutcomeCreate):
     id: int
     user_id: int
+    consent_version: int = Field(ge=1)
+    consent_updated_at: datetime | None = None
     created_at: datetime
 
 
@@ -860,6 +863,34 @@ class ProposalOutcomeFeedback(APIModel):
     actual_duration_minutes: int | None = Field(default=None, ge=0)
     energy_feedback: ActivityType | None = None
     note: str = Field(default="", max_length=4000)
+    personalization_consent: bool = False
+
+
+class ProposalOutcomeConsentUpdate(APIModel):
+    expected_version: int = Field(ge=1)
+    personalization_consent: bool
+
+
+class PersonalizationBaselineGroup(APIModel):
+    proposal_type: ProposalType
+    outcome_count: int = Field(ge=1)
+    rated_outcome_count: int = Field(ge=0)
+    average_usefulness: float | None = Field(default=None, ge=1.0, le=5.0)
+    completed_count: int = Field(ge=0)
+    partial_count: int = Field(ge=0)
+    not_completed_count: int = Field(ge=0)
+    dismissed_count: int = Field(ge=0)
+    completion_rate: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class PersonalizationBaselineRead(APIModel):
+    baseline_version: Literal["v1"] = "v1"
+    status: Literal["insufficient_data", "ready"]
+    minimum_outcomes: int = Field(ge=1)
+    consented_outcome_count: int = Field(ge=0)
+    remaining_outcome_count: int = Field(ge=0)
+    ranking_applied: Literal[False] = False
+    groups: list[PersonalizationBaselineGroup] = Field(default_factory=list)
 
 
 class ProposalDetailRead(APIModel):

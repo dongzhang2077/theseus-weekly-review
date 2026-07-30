@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import sqlite3
@@ -10,6 +11,8 @@ from ..schemas import (
     AgentActionCreate,
     AgentActionRead,
     AgentActionStatus,
+    PersonalizationBaselineGroup,
+    PersonalizationBaselineRead,
     PreferenceCreate,
     PreferenceDetailRead,
     PreferenceRead,
@@ -46,6 +49,16 @@ class ProposalVersionConflict(Exception):
 
 class ProposalExpired(Exception):
     pass
+
+
+class ProposalOutcomeNotFound(Exception):
+    pass
+
+
+class ProposalOutcomeConsentVersionConflict(Exception):
+    def __init__(self, current: ProposalOutcomeRead) -> None:
+        super().__init__("The outcome consent changed after it was loaded")
+        self.current = current
 
 
 class ActionIdempotencyConflict(Exception):
@@ -339,6 +352,110 @@ class ProposalLedgerService:
             return self.repository.add_outcome(outcome)
         except sqlite3.IntegrityError as exc:
             raise ProposalNotFound from exc
+
+    def update_outcome_consent(
+        self,
+        proposal_id: int,
+        outcome_id: int,
+        *,
+        expected_version: int,
+        personalization_consent: bool,
+    ) -> ProposalOutcomeRead:
+        self.get(proposal_id)
+        try:
+            return self.repository.update_outcome_consent(
+                proposal_id,
+                outcome_id,
+                expected_version=expected_version,
+                personalization_consent=personalization_consent,
+            )
+        except LookupError as exc:
+            raise ProposalOutcomeNotFound from exc
+        except RuntimeError as exc:
+            if str(exc) != "outcome_consent_version_conflict":
+                raise
+            current = self.repository.get_outcome(proposal_id, outcome_id)
+            raise ProposalOutcomeConsentVersionConflict(current) from exc
+
+
+class PersonalizationBaselineService:
+    MINIMUM_OUTCOMES = 5
+
+    def __init__(self, connection: sqlite3.Connection, user_id: int) -> None:
+        self.repository = ProposalRepository(connection, user_id)
+
+    def read(self) -> PersonalizationBaselineRead:
+        observations = self.repository.list_personalization_outcomes()
+        grouped = defaultdict(list)
+        for observation in observations:
+            grouped[observation.proposal_type].append(observation)
+
+        groups: list[PersonalizationBaselineGroup] = []
+        for proposal_type in sorted(grouped):
+            items = grouped[proposal_type]
+            ratings = [
+                item.usefulness
+                for item in items
+                if item.usefulness is not None
+            ]
+            result_counts = {
+                result: sum(1 for item in items if item.result == result)
+                for result in (
+                    "completed",
+                    "partial",
+                    "not_completed",
+                    "dismissed",
+                )
+            }
+            completion_denominator = (
+                result_counts["completed"]
+                + result_counts["partial"]
+                + result_counts["not_completed"]
+            )
+            groups.append(
+                PersonalizationBaselineGroup(
+                    proposal_type=proposal_type,
+                    outcome_count=len(items),
+                    rated_outcome_count=len(ratings),
+                    average_usefulness=(
+                        round(sum(ratings) / len(ratings), 2)
+                        if ratings
+                        else None
+                    ),
+                    completed_count=result_counts["completed"],
+                    partial_count=result_counts["partial"],
+                    not_completed_count=result_counts["not_completed"],
+                    dismissed_count=result_counts["dismissed"],
+                    completion_rate=(
+                        round(
+                            (
+                                result_counts["completed"]
+                                + 0.5 * result_counts["partial"]
+                            )
+                            / completion_denominator,
+                            3,
+                        )
+                        if completion_denominator
+                        else None
+                    ),
+                )
+            )
+
+        outcome_count = len(observations)
+        return PersonalizationBaselineRead(
+            status=(
+                "ready"
+                if outcome_count >= self.MINIMUM_OUTCOMES
+                else "insufficient_data"
+            ),
+            minimum_outcomes=self.MINIMUM_OUTCOMES,
+            consented_outcome_count=outcome_count,
+            remaining_outcome_count=max(
+                self.MINIMUM_OUTCOMES - outcome_count,
+                0,
+            ),
+            groups=groups,
+        )
 
 
 @contextmanager

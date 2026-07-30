@@ -429,3 +429,11 @@ This gives the team a real product foundation while still keeping the course MVP
 Current status: the persistence foundation is implemented. The active runway
 continues in `docs/13_product_agent_development_strategy.md` with truthful
 Signals/Plan states before any LangGraph or OpenClaw integration.
+
+STORY-028 observation checkpoint (2026-07-29 PDT): schema v13 keeps recorded
+proposal outcomes as canonical ledger evidence while adding separately
+versioned, default-off personalization consent. The first personalization
+service is a deterministic, read-only aggregate over currently consented
+outcomes. It returns `insufficient_data` below five observations and never
+applies ranking. This preserves the repository/service/API boundary and avoids
+turning sparse pilot data into a claimed learned preference.

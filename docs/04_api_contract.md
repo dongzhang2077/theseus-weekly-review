@@ -23,6 +23,9 @@ Contract status:
   STORY-038C approved Weekly Plan execution operation.
 - Section 13.4 is the focused-test verified and product-owner accepted
   STORY-038D typed Weekly Plan Undo operation.
+- Section 12.3 is the automatically verified STORY-028 consented-outcome
+  observation baseline. It remains a candidate until product-owner browser
+  acceptance.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -1102,6 +1105,7 @@ GET  /proposals?status=
 GET  /proposals/{proposal_id}
 POST /proposals/{proposal_id}/decisions
 POST /proposals/{proposal_id}/outcomes
+PATCH /proposals/{proposal_id}/outcomes/{outcome_id}/consent
 ```
 
 Public proposal creation records `source = deterministic`; a client cannot
@@ -1112,8 +1116,14 @@ optional edited after-state, and reason. Expired proposals return
 `409 version_conflict`.
 
 Outcome feedback may record completion, usefulness from 1-5, actual duration,
-energy feedback, and a note. A referenced Action must belong to the same
-account and Proposal.
+energy feedback, a note, and explicit personalization consent. Consent defaults
+to `false`; existing outcomes migrated to schema v13 remain unconsented. A
+referenced Action must belong to the same account and Proposal.
+
+Consent correction accepts `expected_version` and
+`personalization_consent`. It updates only the consent fields, increments
+`consent_version`, and returns `409 version_conflict` with the current safe
+outcome when stale. It does not alter the recorded result or usefulness.
 
 There is deliberately no public generic Action-create or Action-execute route
 in STORY-025B. Actions retain user-scoped idempotency, request/result,
@@ -1124,6 +1134,20 @@ neither a browser nor a model receives arbitrary operation authority.
 All requests derive `user_id` from authentication. Cross-account resources
 return a non-disclosing `404`, optimistic conflicts include the current safe
 read representation, and multi-record mutations are transactional.
+
+### 12.3 Consented Personalization Baseline
+
+```text
+GET /personalization/baseline
+```
+
+The authenticated, read-only v1 baseline counts only proposal outcomes whose
+explicit consent is currently enabled. It reports per-proposal-type outcome
+counts, usefulness averages, result counts, and a deterministic completion
+rate. Fewer than five consented outcomes returns `status =
+insufficient_data`. At five it returns `status = ready`; in both states
+`ranking_applied` remains `false`. This slice neither creates inferred
+preferences nor changes suggestion ordering.
 
 ## 13. Bounded Assistant API
 

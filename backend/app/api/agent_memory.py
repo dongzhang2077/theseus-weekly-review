@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from ..schemas import (
     AccountRead,
+    PersonalizationBaselineRead,
     PreferenceCorrection,
     PreferenceCreate,
     PreferenceDetailRead,
@@ -21,6 +22,7 @@ from ..schemas import (
     ProposalDetailRead,
     ProposalDraftCreate,
     ProposalOutcomeCreate,
+    ProposalOutcomeConsentUpdate,
     ProposalOutcomeFeedback,
     ProposalOutcomeRead,
     ProposalRead,
@@ -28,11 +30,14 @@ from ..schemas import (
 )
 from ..services import (
     PreferenceNotFound,
+    PersonalizationBaselineService,
     PreferenceService,
     PreferenceVersionConflict,
     ProposalExpired,
     ProposalLedgerService,
     ProposalNotFound,
+    ProposalOutcomeConsentVersionConflict,
+    ProposalOutcomeNotFound,
     ProposalVersionConflict,
 )
 from .dependencies import get_connection, get_current_user
@@ -294,6 +299,55 @@ async def create_proposal_outcome(
         )
     except ProposalNotFound as exc:
         raise _proposal_not_found(proposal_id) from exc
+
+
+@router.patch(
+    "/proposals/{proposal_id}/outcomes/{outcome_id}/consent",
+    response_model=ProposalOutcomeRead,
+)
+async def update_proposal_outcome_consent(
+    proposal_id: int,
+    outcome_id: int,
+    request: ProposalOutcomeConsentUpdate,
+    user: AccountRead = Depends(get_current_user),
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> ProposalOutcomeRead:
+    try:
+        return ProposalLedgerService(
+            connection, user.id
+        ).update_outcome_consent(
+            proposal_id,
+            outcome_id,
+            expected_version=request.expected_version,
+            personalization_consent=request.personalization_consent,
+        )
+    except ProposalNotFound as exc:
+        raise _proposal_not_found(proposal_id) from exc
+    except ProposalOutcomeNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "proposal_outcome_not_found",
+                "message": f"Outcome {outcome_id} was not found",
+            },
+        ) from exc
+    except ProposalOutcomeConsentVersionConflict as exc:
+        raise _conflict(
+            "version_conflict",
+            "The outcome consent changed after it was loaded",
+            current=exc.current.model_dump(mode="json"),
+        ) from exc
+
+
+@router.get(
+    "/personalization/baseline",
+    response_model=PersonalizationBaselineRead,
+)
+async def get_personalization_baseline(
+    user: AccountRead = Depends(get_current_user),
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> PersonalizationBaselineRead:
+    return PersonalizationBaselineService(connection, user.id).read()
 
 
 def _preference_not_found(preference_id: int) -> HTTPException:
