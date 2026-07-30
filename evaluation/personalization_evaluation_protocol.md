@@ -1,8 +1,9 @@
 # Personalization Evaluation Protocol
 
 - Protocol version: `v1`
-- Status: frozen STORY-028C candidate
+- Status: accepted STORY-028C protocol
 - Frozen: 2026-07-30 PDT
+- Product-owner acceptance: 2026-07-30 PDT
 - Scope: local, offline usefulness baseline only
 
 ## 1. Decision Boundary

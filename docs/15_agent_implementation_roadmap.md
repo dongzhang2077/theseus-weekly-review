@@ -745,6 +745,8 @@ Ranking evaluation remains blocked because candidate-set exposure is not
 recorded. The current real database truthfully reports zero eligible Outcomes,
 30 remaining, no baseline metric, and no ranking support. Three focused
 evaluation tests, the 27-test evaluation/consent/schema slice, all 217 backend
-tests, Python compilation, and the deterministic sample review pass. The
-remaining gate is product-owner acceptance of the frozen protocol and
-aggregate CLI output.
+tests, Python compilation, and the deterministic sample review pass.
+Product-owner acceptance of the frozen protocol and aggregate CLI output
+passed on 2026-07-30 PDT. The next personalization gate is accumulation of 30
+real, currently consented, rated Outcomes; no learned or ranking method is
+authorized while that evidence and candidate-set exposure remain absent.

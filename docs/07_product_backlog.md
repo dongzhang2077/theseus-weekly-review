@@ -701,7 +701,8 @@ Because the ledger does not record candidate-set exposure, every snapshot
 blocks ranking evaluation explicitly. Three focused evaluation tests, the
 27-test evaluation/consent/schema slice, all 217 backend tests, Python
 compilation, and the deterministic sample review pass. Product-owner protocol
-acceptance remains required.
+acceptance passed on 2026-07-30 PDT. STORY-028C is accepted; collecting enough
+real consented Outcomes remains an evidence gate, not an implementation claim.
 
 ## Epic 9: Agent-Ready Domain And Integration
 
