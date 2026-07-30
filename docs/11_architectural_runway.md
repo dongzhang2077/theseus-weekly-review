@@ -381,6 +381,18 @@ approved three-item Plan, including the bounded 30-minute restart allocation,
 and no Undo Action. The independent `action:undo` scope and Undo tool remain
 disabled for the next explicit rollout gate.
 
+STORY-027 gate-five runtime checkpoint (2026-07-29 PDT): the pilot added the
+independent Undo scope and tool only after the executed Plan was verified in
+the App. A trusted inbound request supplied only the Proposal ID, Action ID,
+and expected Proposal version to the typed Undo endpoint. The existing Undo
+service matched the persisted Plan against the original Action result,
+restored the null before-state by deleting that exact created Plan, marked the
+original Action and Proposal undone, and appended one verified,
+non-reversible Undo Action. Read-only persistence verification confirmed that
+the source-week Plan and approval Decision remained intact and that no
+unrelated Plan was written. Final App consistency confirmation passed, and the
+five-gate private-pilot rollout is product-owner accepted.
+
 ## 10. Anti-Patterns to Avoid
 
 Avoid:

@@ -899,6 +899,19 @@ including the bounded 30-minute restart allocation, and no Undo Action. The
 focused execution/scope tests pass 2 cases and the OpenClaw plugin suite passes
 all 23 tests.
 
+Telegram undo-gate checkpoint (2026-07-29 PDT): after the execution state was
+verified in the App, the active pairing was rotated to add the independent
+`action:undo` scope and the runtime allowlist added only
+`theseus_weekly_plan_undo`. A real trusted Telegram Undo returned `200`,
+advanced the Proposal from executed version 3 to undone version 4, marked the
+original reversible Action undone, and recorded exactly one non-reversible,
+succeeded `weekly_plan.undo_create` Action linked to it. Read-only verification
+confirmed that the Undo matched the recorded before-state, removed the one
+target-week Plan created by the original Action, preserved the source-week
+Plan and approval Decision, and made no unrelated plan write. The focused
+Undo/scope tests pass 2 cases. Final App consistency confirmation passed, so
+the product owner accepted the complete five-gate private pilot.
+
 Persistence correction checkpoint (2026-07-29 PDT): schema v12 rebuilds the
 channel binding constraint to accept Telegram while preserving existing
 bindings, uniqueness, ownership triggers, and foreign keys. A focused

@@ -604,11 +604,11 @@ Verification checkpoint: all 191 backend/workflow tests pass in one run;
 Python compilation, `pip check`, deterministic sample review, and a real
 four-process start/status/resume/replay CLI demonstration pass.
 
-Current sequential gate: STORY-027 OpenClaw Conversation Adapter, rollout gate
-five. The schema-v11 pairing/list/revoke path, HMAC-protected channel/message
-identities, explicit scopes, read-only context operation, pending-only channel
-proposal endpoint, and narrow channel proposal-decision endpoint are
-implemented. The native OpenClaw package binds the host-provided inbound
+Completed sequential gate: STORY-027 OpenClaw Conversation Adapter. The
+schema-v12 pairing/list/revoke path, HMAC-protected channel/message identities,
+explicit scopes, read-only context operation, pending-only channel proposal
+endpoint, and narrow channel proposal-decision endpoint are implemented. The
+native OpenClaw package binds the host-provided inbound
 message ID to the single runtime `runId` when channel and tool hooks are
 co-located. When Telegram omits the message-hook run ID, the package matches
 the exact configured channel and sender, holds the message under the
@@ -628,7 +628,7 @@ change. Gate four adds the separately scoped `action:execute` operation, which
 accepts no plan content and delegates to the accepted reversible execution
 service. Gate five adds independent `action:undo`, which can only undo that
 successful reversible Action through the same service. Product-owner acceptance
-is still required for this gate.
+passed after the final App consistency confirmation recorded below.
 
 App-management checkpoint (2026-07-28 PDT): authenticated users can open
 Account > Integrations in the Theseus app to create an OpenClaw pairing,
@@ -679,6 +679,20 @@ Plan contains three items, including the bounded 30-minute restart allocation.
 Read-only verification found no Undo Action. `action:undo` and
 `theseus_weekly_plan_undo` remain disabled pending the separate gate-five
 approval.
+
+Telegram undo-gate checkpoint (2026-07-29 PDT): after the executed state was
+verified in the App, the pairing and runtime allowlist added only the
+independent `action:undo` scope and `theseus_weekly_plan_undo` tool. A real
+trusted Telegram Undo returned `200`, advanced the Proposal from executed
+version 3 to undone version 4, marked the original reversible Action undone,
+and appended exactly one non-reversible, succeeded
+`weekly_plan.undo_create` Action linked to it. Its verification matched the
+recorded null before-state. Read-only persistence verification found no target
+week Plan, retained the source-week Plan and the original approval Decision,
+and found no unrelated Plan write. Focused Undo/scope tests pass 2 cases.
+Final App consistency confirmation passed; the five-gate private pilot is
+accepted. The next sequential product stage is STORY-028 bounded preference
+observation and baseline evaluation, not broader channel authority.
 
 Acceptance verification: 27 focused tests pass. The complete inventory reached
 196 of 197 with one previously tracked intermittent authenticated Activity
