@@ -56,6 +56,26 @@ Account, integrations, preferences, and history controls remain utilities, not
 primary destinations. A future assistant is an overlay invoked from the shell,
 not a fourth tab. No assistant control appears until it has working behavior.
 
+### Companion character boundary
+
+The existing companion character remains part of Theseus, but it is absent from
+the routine Level 1 Today, Insights, and Plan surfaces. The portrait workspace
+uses palette, paper texture, line treatment, spacing, and chart style—not a
+mascot—to preserve the fresh stationery identity.
+
+Allowed placements are bounded:
+
+- onboarding and first-use guidance;
+- meaningful empty states;
+- Review completion or other infrequent confirmed outcomes;
+- a compact Review detail at approximately 48–72px;
+- the future in-App assistant entry and voice state, only after that behavior is
+  implemented and accessible.
+
+The character must not occupy chart space, appear in primary navigation, repeat
+on every destination, animate continuously, or imply that an unavailable
+assistant can be invoked.
+
 ### Default entry
 
 Authenticated startup opens `Today`. A deep link may still open Insights,
@@ -397,7 +417,7 @@ Rules:
 
 - remove the oversized Review character from the operational Level 1 layout;
 - meaningful character art remains available for empty, completion, onboarding,
-  or a compact review detail state;
+  a compact review detail state, or the later working assistant entry;
 - show one priority issue, one measured value, and one action;
 - do not repeat the priority issue in `Other issues`;
 - `Weekly review` opens the bounded narrative at Level 2;

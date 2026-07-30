@@ -98,6 +98,19 @@ Decoration is allowed only as a light stationery cue.
 - Do not use emoji as decoration.
 - Do not use generic AI illustrations.
 
+### Companion character
+
+- Preserve the existing hand-drawn companion as a brand asset, not persistent
+  Level 1 decoration.
+- Do not place it beside Today charts, primary navigation, or routine controls.
+- Use it only for onboarding, meaningful empty states, completion feedback, or
+  a compact Review detail where it communicates a real state.
+- A future working assistant may reuse the companion as its interaction entry
+  and listening/thinking state. Do not show that entry before the assistant is
+  available.
+- Keep the character restrained, normally 48–72px, static by default, and away
+  from evidence or action labels.
+
 ## Typography
 
 - Use a clean sans-serif for the product UI.

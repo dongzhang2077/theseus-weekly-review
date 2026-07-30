@@ -1018,6 +1018,13 @@ diff at wide browser sizes. Wide-screen output is QA preview evidence rather
 than a separate desktop product. STORY-040 remains `In Progress` pending review
 of this corrected portrait-first prototype.
 
+Companion placement decision (2026-07-30 PDT): the product owner retained the
+fresh stationery visual direction and the existing companion as a bounded
+brand asset, while keeping it off routine Today, Insights, and Plan Level 1
+surfaces. Allowed use is onboarding, meaningful empty/completion states, a
+compact Review detail, and the future working assistant entry. No inactive
+assistant placeholder or persistent decorative character is authorized.
+
 Acceptance criteria:
 
 - the information architecture specifies a daily timeline, seven-day stacked
