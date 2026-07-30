@@ -698,3 +698,15 @@ Acceptance verification: 27 focused tests pass. The complete inventory reached
 196 of 197 with one previously tracked intermittent authenticated Activity
 request failure, which passed in isolation. Compilation and deterministic
 sample review pass; STORY-031 remains responsible for the unrelated flake.
+
+Current sequential gate: STORY-028 bounded personalization, observation slice.
+The candidate schema-v13 and Assistant flow collect explicit proposal outcome
+feedback while keeping personalization consent off by default and independently
+withdrawable through optimistic versioning. Its read-only baseline counts only
+currently consented outcomes, requires five observations before reporting
+`ready`, and keeps `ranking_applied = false`. This gate does not train a model,
+create inferred preferences, or reorder suggestions. Automated verification
+passes 214 backend tests and 145 frontend tests, plus Python compilation,
+deterministic sample review, frontend typecheck, and production build.
+Product-owner browser acceptance must pass before the observation period or
+any ranking experiment begins.

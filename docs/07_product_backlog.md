@@ -661,6 +661,17 @@ Acceptance criteria:
 - Optimization targets are bounded, such as usefulness, plan adherence,
   protected slack, or restart success.
 
+Implementation checkpoint (2026-07-29 PDT): the first observation slice is
+implemented on `feature/028-consented-outcome-baseline`. Schema v13 adds
+explicit, versioned outcome consent with a safe default of off. The
+authenticated Assistant can record an outcome and grant or withdraw consent.
+A read-only deterministic baseline includes only currently consented outcomes,
+reports `insufficient_data` below five observations, and never ranks
+suggestions or creates an inferred preference. Automated verification is
+complete: 214 backend tests and 145 frontend tests pass, along with Python
+compilation, deterministic sample review, frontend typecheck, and production
+build. Product-owner browser acceptance remains required.
+
 ## Epic 9: Agent-Ready Domain And Integration
 
 These stories turn the personal-assistant strategy into independently
