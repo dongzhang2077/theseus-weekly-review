@@ -878,6 +878,15 @@ with an exact numeric trusted sender and only `context:read` plus
 `proposal:create`; decision, execution, and undo remain disabled until a later
 explicit approval gate.
 
+Telegram decision-gate checkpoint (2026-07-29 PDT): after the pending-only
+runtime gate passed, the active pairing was rotated to add only
+`proposal:decide`, and the OpenClaw allowlist added only the narrow decision
+tool. A real trusted Telegram `approve` request returned `200`, moved the
+existing Proposal from pending version 1 to approved version 2, and appended
+exactly one Decision. Read-only verification found no Agent Action and no
+target-week WeeklyPlan. `action:execute` and `action:undo` remain absent from
+both the pairing and tool allowlist.
+
 Persistence correction checkpoint (2026-07-29 PDT): schema v12 rebuilds the
 channel binding constraint to accept Telegram while preserving existing
 bindings, uniqueness, ownership triggers, and foreign keys. A focused

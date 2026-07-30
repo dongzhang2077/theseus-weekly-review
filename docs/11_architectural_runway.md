@@ -362,6 +362,14 @@ service, preserving verification and Undo data. Gate five adds a fifth optional
 undo tool with the independent `action:undo` scope; it accepts only a proposal,
 Action, and expected version, then delegates to the same undo service.
 
+STORY-027 gate-three runtime checkpoint (2026-07-29 PDT): the Telegram private
+pilot rotated its scoped credential from read/create to
+read/create/decision and added only the decision tool to the OpenClaw
+allowlist. A trusted inbound approval appended one Decision and advanced the
+Proposal to approved, while read-only persistence verification confirmed zero
+Agent Actions and zero target-week WeeklyPlans. Execution and Undo remain
+disabled at both the credential and runtime-tool layers.
+
 ## 10. Anti-Patterns to Avoid
 
 Avoid:

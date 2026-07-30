@@ -657,8 +657,15 @@ proposal-only scope did not approve or execute a change. The final plugin suite
 passes 23 tests, including separate hook/tool registration instances, signature
 tampering, expiry, and session cleanup; the five-operation disposable adapter
 E2E also passes. The local pilot keeps `session.dmScope=per-channel-peer`,
-SecretRef-backed credentials, exact channel/sender trust, and the existing
-proposal-only tool allowlist.
+SecretRef-backed credentials and exact channel/sender trust.
+
+Telegram decision-gate checkpoint (2026-07-29 PDT): the active pairing was
+rotated to read/create/decision and the runtime allowlist added only
+`theseus_weekly_plan_decision`. A real trusted Telegram approval returned
+`200`, advanced the existing Proposal to approved version 2, and appended
+exactly one Decision. Read-only verification found zero Agent Actions and zero
+target-week WeeklyPlans. The production pairing and tool allowlist still omit
+execution and Undo, so approval cannot mutate the plan.
 
 Acceptance verification: 27 focused tests pass. The complete inventory reached
 196 of 197 with one previously tracked intermittent authenticated Activity
