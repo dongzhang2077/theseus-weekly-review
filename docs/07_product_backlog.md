@@ -670,7 +670,14 @@ reports `insufficient_data` below five observations, and never ranks
 suggestions or creates an inferred preference. Automated verification is
 complete: 214 backend tests and 145 frontend tests pass, along with Python
 compilation, deterministic sample review, frontend typecheck, and production
-build. Product-owner browser acceptance remains required.
+build.
+
+Product-owner acceptance checkpoint (2026-07-30 PDT): the authenticated
+browser flow recorded one real Outcome, included it in the baseline only after
+explicit consent, and removed it again after consent withdrawal. Persistence
+evidence retained the Outcome, advanced only `consent_version` from 1 to 2,
+returned the consented count to zero, and passed foreign-key verification. The
+observation slice is accepted; sparse data still blocks any ranking claim.
 
 ## Epic 9: Agent-Ready Domain And Integration
 

@@ -710,3 +710,13 @@ passes 214 backend tests and 145 frontend tests, plus Python compilation,
 deterministic sample review, frontend typecheck, and production build.
 Product-owner browser acceptance must pass before the observation period or
 any ranking experiment begins.
+
+STORY-028 observation acceptance (2026-07-30 PDT): the product owner completed
+the authenticated App flow against the local v13 database. One real Outcome
+was saved, explicit consent raised the Baseline count, and withdrawing consent
+returned the count to zero without deleting or rewriting the Outcome.
+`consent_version` advanced from 1 to 2 and the foreign-key check remained
+clean. The first observation slice is accepted. The next bounded slice may
+make the baseline inputs and readiness explanation inspectable; learned
+ranking remains blocked until enough real consented outcomes exist and an
+offline evaluation protocol is frozen.
