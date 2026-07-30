@@ -735,3 +735,16 @@ collecting/readiness state, aggregate boundary, Back navigation, and explicit
 inspectability slices are accepted. The next gate is a frozen offline
 evaluation protocol plus enough real consented outcomes; it is not a learned
 ranker implementation.
+
+Current sequential gate: STORY-028C frozen offline evaluation protocol. The
+candidate separates the five-Outcome readable aggregate from a conservative
+30-rated-Outcome evaluation threshold, holds out at least the latest 10
+observations, and measures a Proposal-type usefulness mean with global
+fallback. The CLI is local, read-only, account-scoped, and aggregate-only.
+Ranking evaluation remains blocked because candidate-set exposure is not
+recorded. The current real database truthfully reports zero eligible Outcomes,
+30 remaining, no baseline metric, and no ranking support. Three focused
+evaluation tests, the 27-test evaluation/consent/schema slice, all 217 backend
+tests, Python compilation, and the deterministic sample review pass. The
+remaining gate is product-owner acceptance of the frozen protocol and
+aggregate CLI output.

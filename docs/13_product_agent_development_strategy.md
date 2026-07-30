@@ -303,6 +303,13 @@ plan adherence, protected slack, and restart success. Start with rules and
 simple statistics. Introduce learned ranking only after the product records
 enough proposal, decision, and outcome examples to evaluate it honestly.
 
+STORY-028C freezes the first offline usefulness protocol in
+`evaluation/personalization_evaluation_protocol.md`. Five consented Outcomes
+make the UI aggregate readable; they do not authorize training. The first
+chronological baseline comparison requires 30 consented, rated Outcomes and a
+minimum 10-Outcome holdout. Current records do not contain candidate-set
+exposure, so ranking evaluation remains explicitly unsupported.
+
 ## 9. Agent Workflow and Autonomy
 
 The first LangGraph workflow should be narrow:

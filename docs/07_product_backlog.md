@@ -691,6 +691,18 @@ collecting/readiness detail, exposed the current consented count and aggregate
 boundary, preserved Back navigation, and stated that ranking was not applied.
 STORY-028B is accepted.
 
+STORY-028C candidate checkpoint (2026-07-30 PDT): the offline usefulness
+evaluation protocol is frozen before enough data exists to inspect a holdout
+result. A read-only local CLI includes only currently consented, rated Outcomes,
+uses a chronological 30-record minimum with at least 10 holdout records, and
+measures a Proposal-type mean baseline with global fallback by mean absolute
+error. Its aggregate output excludes proposal titles and Outcome notes.
+Because the ledger does not record candidate-set exposure, every snapshot
+blocks ranking evaluation explicitly. Three focused evaluation tests, the
+27-test evaluation/consent/schema slice, all 217 backend tests, Python
+compilation, and the deterministic sample review pass. Product-owner protocol
+acceptance remains required.
+
 ## Epic 9: Agent-Ready Domain And Integration
 
 These stories turn the personal-assistant strategy into independently
