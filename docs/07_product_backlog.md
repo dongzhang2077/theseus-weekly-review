@@ -992,6 +992,15 @@ baseline. The first STORY-040 artifact is the product-owner-review wireframe in
 `docs/design/daily-workspace-wireframes-v2.md`; HTML and React work may not
 begin before its acceptance gate.
 
+Conditional-review checkpoint (2026-07-30 PDT): the three-destination
+information architecture, default Today entry, Day/Week/Month chart split, and
+Review/Signals Level 1 convergence remain approved in direction. The revised
+wireframe now defines independent live-Focus and selected-period contexts,
+Previous/Next/Today/timezone rules, concurrent Focus foreground selection and
+the running-Activities sheet, explicit Insights and Plan state matrices, and
+visible chart titles, totals, legends, and accessible data entries. STORY-040
+remains unaccepted and HTML remains blocked until product-owner re-review.
+
 Acceptance criteria:
 
 - the information architecture specifies a daily timeline, seven-day stacked
