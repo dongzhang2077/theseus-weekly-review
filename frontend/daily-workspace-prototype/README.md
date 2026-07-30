@@ -4,6 +4,10 @@ This is a static, responsive acceptance prototype for the approved
 `Today / Insights / Plan` workspace contract. It uses sanitized sample data and
 does not call Theseus APIs or modify React application code.
 
+Theseus is treated as a mobile App. The product workspace stays 430px and
+single-column at wide browser sizes; the surrounding canvas is only a QA
+preview surface, not a desktop information architecture.
+
 Run from the repository root:
 
 ```bash

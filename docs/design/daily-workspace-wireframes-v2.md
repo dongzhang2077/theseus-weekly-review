@@ -3,7 +3,7 @@
 - Status: accepted for responsive HTML prototype
 - Story: STORY-040
 - Wireframe date: 2026-07-30
-- Revision: product-owner acceptance recorded after final consistency review
+- Revision: portrait-first product clarification recorded during HTML review
 - Product owner: Dong Zhang
 - Scope: information architecture only; no released UI behavior is claimed
 
@@ -145,26 +145,28 @@ Rules:
 - No persistent sample badge, explanation banner, or assistant placeholder
   consumes Level 1 space.
 
-### Desktop shell
+### Wide-screen preview shell
 
 ```text
-+------+---------------------------------------------------------------+
-|      | current date / week                              account      |
-|  T   |---------------------------------------------------------------|
-|  I   |                                                               |
-|  P   |                       workspace                               |
-|      |                                                               |
-|      |                                                               |
-+------+---------------------------------------------------------------+
++----------------------+  wide-screen preview space
+| current date account |
+|----------------------|
+|                      |
+| portrait workspace   |
+|                      |
+|----------------------|
+| Today Insights Plan  |
++----------------------+
 ```
 
-- A narrow left rail replaces bottom navigation at desktop width.
-- The workspace uses available width; it is not forced into a centered 430px
-  phone simulation.
-- Content remains bounded to readable columns and does not become an admin
-  dashboard.
-- The desktop view rearranges the same hierarchy; it does not add unrelated
-  metrics.
+- Theseus is a mobile App; the 430px portrait workspace is the product baseline.
+- A wide browser centers the same portrait workspace for development, QA, and
+  accessibility testing. It does not introduce a landscape information
+  architecture or side rail.
+- Bottom navigation, reading order, chart proportions, and Level 1 depth remain
+  identical across the preview width.
+- A future tablet or desktop product requires a separate product decision; it
+  must not emerge implicitly from responsive CSS.
 
 ## 5. Today
 
@@ -319,25 +321,28 @@ it never silently opens the current date while history is selected.
 - Month is allowed to ship after Day and Week. Its placeholder must not imply
   unavailable data has been analyzed.
 
-### 5.4 Desktop Today
+### 5.4 Wide-screen Today preview
 
 ```text
-+------+---------------------------------------------------------------+
-|      | Today                                             account      |
-| [T]  | Day  Week  Month           < Thu, Jul 30 >                    |
-|  I   |---------------------------------------------------------------|
-|  P   | NOW          2 running | TIME BY PROJECT              [data] |
-|      | Backend schema   18:42 |        4h 35m                       |
-|      | [Start / End]          |       (donut + legend)              |
-|      |-------------------------|-------------------------------------|
-|      | TODAY TIMELINE          | SEVEN-DAY CONTEXT                   |
-|      | ordered session bands   | compact stacked bars               |
-|      |                         |                                     |
-+------+---------------------------------------------------------------+
++--------------------------------------+
+| Today                        account |
+| Day          Week          Month     |
+|--------------------------------------|
+| NOW                       [2 running]|
+| Backend schema             18:42  [■]|
+|--------------------------------------|
+| < Thu, Jul 30 >                      |
+| TIME BY PROJECT              [data]  |
+|             donut + legend           |
+|--------------------------------------|
+| TODAY TIMELINE                     > |
+|--------------------------------------|
+|       Today   Insights   Plan        |
++--------------------------------------+
 ```
 
-Desktop may show the current Day distribution and compact seven-day context
-together. Both remain connected to the same records and range selector.
+The wide-screen preview keeps the mobile order. It does not place the donut and
+timeline side by side or add a simultaneous seven-day panel.
 
 ### 5.5 Running Activities sheet
 
@@ -417,21 +422,24 @@ Level 1 priority action
 Evidence remains reachable within two taps. The Plan action is not repeated on
 the read-only evidence page.
 
-### 6.3 Desktop Insights
+### 6.3 Wide-screen Insights preview
 
 ```text
-+------+---------------------------------------------------------------+
-|      | < Jun 8 - Jun 14 >                         [This week]        |
-|  T   |---------------------------------------------------------------|
-| [I]  | STATUS + COUNTS          | PRIORITY + ACTION                   |
-|  P   |--------------------------|------------------------------------|
-|      | Wins                     | Other issues                        |
-|      | Weekly review            | Steady checks                       |
-+------+---------------------------------------------------------------+
++--------------------------------------+
+| < Jun 8 - Jun 14 >        [This week]|
+|--------------------------------------|
+| STATUS + COUNTS                      |
+|--------------------------------------|
+| PRIORITY + ACTION                    |
+|--------------------------------------|
+| Wins / Other / Steady / Review       |
+|--------------------------------------|
+|       Today   Insights   Plan        |
++--------------------------------------+
 ```
 
-The priority remains first in reading and keyboard order even when it occupies
-the right desktop column visually.
+Priority follows status in both visual and keyboard order. Wide-screen preview
+does not introduce a second column.
 
 ## 7. Plan
 
@@ -470,19 +478,28 @@ shown in mobile and `Next week` shown in desktop appear only when another target
 week is selected; they restore the default next-week target without changing
 Today or Insights.
 
-### 7.2 Desktop Plan
+### 7.2 Wide-screen Plan preview
 
 ```text
-+------+---------------------------------------------------------------+
-|      | < Jun 15 - Jun 21 >             [Next week]          edit     |
-|  T   |---------------------------------------------------------------|
-|  I   | LOAD + SLACK             | SUGGESTED ADJUSTMENT               |
-| [P]  | planned/capacity bar     | before -> after + Apply            |
-|      |--------------------------|------------------------------------|
-|      | PLAN BLOCKS              | TASKS                              |
-|      | compact ordered rows     | compact active rows                |
-+------+---------------------------------------------------------------+
++--------------------------------------+
+| < Jun 15 - Jun 21 >       [Next week]|
+|--------------------------------------|
+| LOAD + SLACK                         |
+|--------------------------------------|
+| SUGGESTED ADJUSTMENT                 |
+| before                               |
+|   ↓                                  |
+| after                                |
+| Apply                                |
+|--------------------------------------|
+| PLAN BLOCKS / TASKS                  |
+|--------------------------------------|
+|       Today   Insights   Plan        |
++--------------------------------------+
 ```
+
+Before and after stack vertically on the mobile baseline. The proposal must not
+depend on a landscape comparison to remain legible.
 
 ## 8. State Wireframes
 
@@ -850,7 +867,8 @@ Accepted items:
 - the mobile Day view is not too dense;
 - Review and Signals should merge at Level 1 only;
 - the Review character can leave the operational Level 1 screen;
-- desktop should use adaptive workspace width rather than a 430px simulation;
+- wide-screen browsers should center the 430px mobile workspace rather than
+  inventing a landscape product layout;
 - no future assistant control should appear until it works;
 - Day and Week may ship before Month;
 - Current Focus remains live and independent from the selected historical

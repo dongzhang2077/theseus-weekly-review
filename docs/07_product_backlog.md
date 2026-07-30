@@ -1006,8 +1006,17 @@ the final visual-first workspace contract after historical Day drill-down
 semantics, exact Month totals, visible Insights/Plan reset controls, and
 distinct Plan load, failed-save, and unknown-save recovery were reconciled.
 Responsive HTML prototyping is authorized. STORY-040 remains `In Progress`, and
-React implementation remains blocked until the app-sized mobile and desktop
-prototype, interactions, and represented states pass product-owner review.
+React implementation remains blocked until the app-sized portrait prototype,
+wide-screen QA preview, interactions, and represented states pass product-owner
+review.
+
+HTML review correction (2026-07-30 PDT): the product owner clarified that
+Theseus is a mobile App and rejected a landscape-oriented wide-screen
+rearrangement. The prototype and contract now keep the 430px portrait workspace,
+bottom navigation, single-column reading order, and vertically stacked Plan
+diff at wide browser sizes. Wide-screen output is QA preview evidence rather
+than a separate desktop product. STORY-040 remains `In Progress` pending review
+of this corrected portrait-first prototype.
 
 Acceptance criteria:
 
