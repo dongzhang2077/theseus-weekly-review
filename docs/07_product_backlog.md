@@ -884,8 +884,20 @@ runtime gate passed, the active pairing was rotated to add only
 tool. A real trusted Telegram `approve` request returned `200`, moved the
 existing Proposal from pending version 1 to approved version 2, and appended
 exactly one Decision. Read-only verification found no Agent Action and no
-target-week WeeklyPlan. `action:execute` and `action:undo` remain absent from
-both the pairing and tool allowlist.
+target-week WeeklyPlan. At that checkpoint, `action:execute` and `action:undo`
+remained absent from both the pairing and tool allowlist.
+
+Telegram execution-gate checkpoint (2026-07-29 PDT): the active pairing was
+rotated again to add only `action:execute`, and the OpenClaw allowlist added
+only `theseus_weekly_plan_execute`; `action:undo` and the Undo tool remained
+disabled. A real trusted Telegram execution returned `200`, advanced the
+approved Proposal from version 2 to executed version 3, and recorded exactly
+one Decision-linked, reversible, succeeded `weekly_plan.create` Action whose
+verification matched the approved after-state. Read-only verification found
+one target-week WeeklyPlan with the complete approved three-item plan,
+including the bounded 30-minute restart allocation, and no Undo Action. The
+focused execution/scope tests pass 2 cases and the OpenClaw plugin suite passes
+all 23 tests.
 
 Persistence correction checkpoint (2026-07-29 PDT): schema v12 rebuilds the
 channel binding constraint to accept Telegram while preserving existing

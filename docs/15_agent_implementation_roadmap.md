@@ -664,8 +664,21 @@ rotated to read/create/decision and the runtime allowlist added only
 `theseus_weekly_plan_decision`. A real trusted Telegram approval returned
 `200`, advanced the existing Proposal to approved version 2, and appended
 exactly one Decision. Read-only verification found zero Agent Actions and zero
-target-week WeeklyPlans. The production pairing and tool allowlist still omit
-execution and Undo, so approval cannot mutate the plan.
+target-week WeeklyPlans. At this checkpoint, the production pairing and tool
+allowlist still omitted execution and Undo, so approval could not mutate the
+plan.
+
+Telegram execution-gate checkpoint (2026-07-29 PDT): after focused
+execution/scope tests passed 2 cases and the plugin suite passed all 23 tests,
+the pairing was rotated to add only `action:execute` and the runtime allowlist
+added only `theseus_weekly_plan_execute`. A real trusted Telegram execution
+returned `200`, advanced the approved Proposal to executed version 3, created
+one verified target-week WeeklyPlan, and recorded exactly one reversible,
+succeeded, Decision-linked `weekly_plan.create` Action. The complete approved
+Plan contains three items, including the bounded 30-minute restart allocation.
+Read-only verification found no Undo Action. `action:undo` and
+`theseus_weekly_plan_undo` remain disabled pending the separate gate-five
+approval.
 
 Acceptance verification: 27 focused tests pass. The complete inventory reached
 196 of 197 with one previously tracked intermittent authenticated Activity

@@ -367,8 +367,19 @@ pilot rotated its scoped credential from read/create to
 read/create/decision and added only the decision tool to the OpenClaw
 allowlist. A trusted inbound approval appended one Decision and advanced the
 Proposal to approved, while read-only persistence verification confirmed zero
-Agent Actions and zero target-week WeeklyPlans. Execution and Undo remain
-disabled at both the credential and runtime-tool layers.
+Agent Actions and zero target-week WeeklyPlans. At that checkpoint, execution
+and Undo remained disabled at both the credential and runtime-tool layers.
+
+STORY-027 gate-four runtime checkpoint (2026-07-29 PDT): the pilot rotated the
+credential to read/create/decision/execute and added only the execution tool to
+the runtime allowlist. A trusted inbound request called the typed channel
+execution endpoint with only the Proposal ID and expected version. The
+existing execution service created and verified one target WeeklyPlan, moved
+the Proposal to executed, and recorded exactly one reversible, succeeded,
+Decision-linked Action. Read-only persistence verification confirmed the
+approved three-item Plan, including the bounded 30-minute restart allocation,
+and no Undo Action. The independent `action:undo` scope and Undo tool remain
+disabled for the next explicit rollout gate.
 
 ## 10. Anti-Patterns to Avoid
 
