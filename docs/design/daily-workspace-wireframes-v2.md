@@ -1,9 +1,9 @@
 # Theseus Daily Workspace v2 Wireframes
 
-- Status: product-owner review required
+- Status: accepted for responsive HTML prototype
 - Story: STORY-040
 - Wireframe date: 2026-07-30
-- Revision: conditional-review findings incorporated; re-acceptance required
+- Revision: product-owner acceptance recorded after final consistency review
 - Product owner: Dong Zhang
 - Scope: information architecture only; no released UI behavior is claimed
 
@@ -219,8 +219,8 @@ Interactions:
 - Next is disabled on the account-local current Day;
 - a visible `Today` reset replaces the right-side spacer whenever a historical
   Day is selected;
-- donut segment opens filtered Today records;
-- donut center or timeline row opens complete Today history;
+- donut segment opens records for the selected Day, filtered by that segment;
+- donut center or timeline row opens complete history for the selected Day;
 - `[data]` opens a Level 2 accessible list of every segment and exact value;
 - `Project` is the default distribution dimension;
 - a compact Level 2 segmented control may switch `Project` and `Energy`.
@@ -228,6 +228,11 @@ Interactions:
 The donut is not shown when total time is zero. A single segment remains a
 truthful full ring, but its accessible summary states that only one category is
 recorded.
+
+The timeline heading follows the selected Day. It is `Today timeline` for the
+account-local current date and a dated label such as `Thu, Jul 23 timeline` for
+a historical date. Every timeline and donut drill-down uses the selected Day;
+it never silently opens the current date while history is selected.
 
 ### 5.2 Mobile Week view
 
@@ -282,7 +287,7 @@ recorded.
 | NOW                       [2 running]|
 | Backend schema             18:42  [■]|
 |--------------------------------------|
-| < July 2026 >                [Today]|
+| < July 2026 >                       |
 | RECORDED TIME INTENSITY       [data]|
 |  M  T  W  T  F  S  S                 |
 |        ·  ░  ▒  ░  ·                 |
@@ -291,6 +296,7 @@ recorded.
 |  ▒  ▒  ░  ▓  ▒  ░  ·                 |
 |  None ·   Low ░   Med ▒   High ▓     |
 |--------------------------------------|
+|  Total 57h 36m                       |
 |  18 active days       3h 12m average |
 |  Selected: Jul 28                 >  |
 |--------------------------------------|
@@ -363,7 +369,7 @@ threshold, evidence, and proposal IDs remain distinct and inspectable.
 
 ```text
 +--------------------------------------+
-| <        Jun 8 - Jun 14        >     |
+| < Jun 8 - Jun 14 >        [This week]|
 |--------------------------------------|
 | NEEDS ATTENTION                      |
 | 2 wins                         1 risk|
@@ -393,6 +399,9 @@ Rules:
 - wins, risks, and steady checks expose counts before lists;
 - no decorative rhythm dots or unlabeled computed status marks.
 
+The example shows a historical week, so `This week` is visible. The reset is
+omitted on the account-local current week in both mobile and desktop layouts.
+
 ### 6.2 Insight depth
 
 ```text
@@ -412,7 +421,7 @@ the read-only evidence page.
 
 ```text
 +------+---------------------------------------------------------------+
-|      | < Jun 8 - Jun 14 >                                           |
+|      | < Jun 8 - Jun 14 >                         [This week]        |
 |  T   |---------------------------------------------------------------|
 | [I]  | STATUS + COUNTS          | PRIORITY + ACTION                   |
 |  P   |--------------------------|------------------------------------|
@@ -430,7 +439,7 @@ the right desktop column visually.
 
 ```text
 +--------------------------------------+
-| Jun 15 - Jun 21                  [+] |
+| < Jun 15 - Jun 21 >   [Next]    [+] |
 |--------------------------------------|
 | 12h planned       18h capacity       |
 | ████████████░░░░░░  6h slack         |
@@ -455,11 +464,17 @@ Rules:
 - do not add time-distribution charts to Plan;
 - a plan block continues to hand off to Today Focus.
 
+Plan defaults to the next account-local Monday-to-Sunday target week. Previous
+and Next browse target weeks, including future weeks. The compact `Next` reset
+shown in mobile and `Next week` shown in desktop appear only when another target
+week is selected; they restore the default next-week target without changing
+Today or Insights.
+
 ### 7.2 Desktop Plan
 
 ```text
 +------+---------------------------------------------------------------+
-|      | Jun 15 - Jun 21                                      edit     |
+|      | < Jun 15 - Jun 21 >             [Next week]          edit     |
 |  T   |---------------------------------------------------------------|
 |  I   | LOAD + SLACK             | SUGGESTED ADJUSTMENT               |
 | [P]  | planned/capacity bar     | before -> after + Apply            |
@@ -666,11 +681,25 @@ Plan could not be restored                  [Retry]
 The last verified saved Plan remains current and visible.
 ```
 
-General Plan load or save error:
+Plan load error:
 
 ```text
-Plan could not load or save                 [Retry]
-Preserve any unsaved local draft when safe; never label it persisted.
+Plan could not load                         [Retry]
+Do not substitute sample or previously selected week data.
+```
+
+Plan save error with a confirmed failed write:
+
+```text
+Plan was not saved                          [Retry]
+Preserve the local draft and label it unsaved.
+```
+
+Plan save result unknown:
+
+```text
+Save status unknown                    [Verify]
+Preserve the draft. Reload and verify server state before offering Retry.
 ```
 
 ## 9. Chart Semantics and Evidence
@@ -720,6 +749,11 @@ Preserve any unsaved local draft when safe; never label it persisted.
   duration thresholds rather than relative color alone;
 - data entry: an icon control named `View monthly recorded time data` opens a
   date-ordered semantic list.
+
+The absolute duration thresholds for Low, Medium, and High remain intentionally
+unfrozen. They must be documented and accepted against real date density before
+Month implementation begins. This does not block the Day/Week HTML prototype,
+and the Month prototype must label its sample thresholds as provisional.
 
 ### Plan versus actual
 
@@ -802,7 +836,11 @@ Maintainability rules:
 
 ## 13. Wireframe Acceptance Checklist
 
-Product-owner acceptance is required before HTML work. Confirm:
+Product-owner acceptance was recorded on 2026-07-30 PDT. The accepted contract
+authorizes responsive HTML prototyping only; React remains blocked until the
+prototype screenshots and interactions pass a separate product-owner review.
+
+Accepted items:
 
 - `Today / Insights / Plan` is the correct primary navigation;
 - authenticated startup should open Today;

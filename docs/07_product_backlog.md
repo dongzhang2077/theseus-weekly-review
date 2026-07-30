@@ -999,7 +999,15 @@ wireframe now defines independent live-Focus and selected-period contexts,
 Previous/Next/Today/timezone rules, concurrent Focus foreground selection and
 the running-Activities sheet, explicit Insights and Plan state matrices, and
 visible chart titles, totals, legends, and accessible data entries. STORY-040
-remains unaccepted and HTML remains blocked until product-owner re-review.
+remained unaccepted and HTML remained blocked until product-owner re-review.
+
+Wireframe acceptance checkpoint (2026-07-30 PDT): the product owner accepted
+the final visual-first workspace contract after historical Day drill-down
+semantics, exact Month totals, visible Insights/Plan reset controls, and
+distinct Plan load, failed-save, and unknown-save recovery were reconciled.
+Responsive HTML prototyping is authorized. STORY-040 remains `In Progress`, and
+React implementation remains blocked until the app-sized mobile and desktop
+prototype, interactions, and represented states pass product-owner review.
 
 Acceptance criteria:
 
