@@ -38,9 +38,11 @@ class StoredPreferenceRevision:
 
 @dataclass(frozen=True)
 class PersonalizationOutcomeObservation:
+    outcome_id: int
     proposal_type: str
     result: str
     usefulness: int | None
+    created_at: str
 
 
 class PreferenceRepository:
@@ -565,22 +567,25 @@ class ProposalRepository:
     ) -> list[PersonalizationOutcomeObservation]:
         rows = self.connection.execute(
             """
-            SELECT p.proposal_type, o.result, o.usefulness
+            SELECT o.id AS outcome_id, p.proposal_type, o.result,
+                   o.usefulness, o.created_at
             FROM proposal_outcomes AS o
             JOIN proposals AS p
               ON p.id = o.proposal_id
              AND p.user_id = o.user_id
             WHERE o.user_id = ?
               AND o.personalization_consent = 1
-            ORDER BY o.id
+            ORDER BY o.created_at, o.id
             """,
             (self.user_id,),
         ).fetchall()
         return [
             PersonalizationOutcomeObservation(
+                outcome_id=row["outcome_id"],
                 proposal_type=row["proposal_type"],
                 result=row["result"],
                 usefulness=row["usefulness"],
+                created_at=row["created_at"],
             )
             for row in rows
         ]

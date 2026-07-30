@@ -78,6 +78,11 @@ from .review_writer import (
 )
 from .sample_import import SampleImportResult, import_sample_week, load_sample_payload
 from .planning import InvalidPlanTaskReference, WeeklyPlanService
+from .personalization_evaluation import (
+    PersonalizationEvaluationService,
+    PersonalizationEvaluationSnapshot,
+    UsefulnessBaselineMetrics,
+)
 from .tasks import (
     InvalidTaskTransition,
     TaskInUse,
@@ -143,6 +148,8 @@ __all__ = [
     "InvalidPlanTaskReference",
     "InvalidTaskTransition",
     "PersonalizationBaselineService",
+    "PersonalizationEvaluationService",
+    "PersonalizationEvaluationSnapshot",
     "PreferenceNotFound",
     "PreferenceService",
     "PreferenceVersionConflict",
@@ -170,6 +177,7 @@ __all__ = [
     "TimeLogRevisionNotFound",
     "TimeLogService",
     "TimeLogVersionConflict",
+    "UsefulnessBaselineMetrics",
     "WeeklyPlanNotFound",
     "WeeklyPlanService",
     "build_structured_review_prompt",
