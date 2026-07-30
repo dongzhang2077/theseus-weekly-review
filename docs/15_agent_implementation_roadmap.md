@@ -720,3 +720,13 @@ clean. The first observation slice is accepted. The next bounded slice may
 make the baseline inputs and readiness explanation inspectable; learned
 ranking remains blocked until enough real consented outcomes exist and an
 offline evaluation protocol is frozen.
+
+STORY-028B inspectability candidate (2026-07-30 PDT): the Assistant Baseline
+row now opens a separate mobile-first detail layer using the accepted read-only
+aggregate. It distinguishes collecting from evaluation-ready state, shows the
+consented threshold, remaining count, usefulness, completion, and result
+breakdown, and explicitly reports that ranking is not applied. The candidate
+does not add persistence, API behavior, inferred Preferences, or ranking.
+Four focused Assistant tests, all 146 frontend tests, TypeScript verification,
+and the production build pass. Product-owner browser acceptance is the
+remaining gate.

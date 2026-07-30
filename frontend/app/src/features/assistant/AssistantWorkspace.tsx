@@ -34,6 +34,7 @@ type Section = "pending" | "history" | "memory";
 type Route =
   | { kind: "summary" }
   | { kind: "section"; section: Section }
+  | { kind: "baseline" }
   | { kind: "proposal"; id: number }
   | { kind: "preference"; id: number }
   | { kind: "new-preference" };
@@ -142,6 +143,7 @@ export function AssistantWorkspace({
             preferences={activePreferences}
             baseline={baseline}
             onOpen={(section) => setRoute({ kind: "section", section })}
+            onOpenBaseline={() => setRoute({ kind: "baseline" })}
           />
         ) : null}
         {!loading && !error && route.kind === "section" ? (
@@ -167,6 +169,9 @@ export function AssistantWorkspace({
               );
             }}
           />
+        ) : null}
+        {!loading && !error && route.kind === "baseline" ? (
+          <BaselineDetail baseline={baseline} />
         ) : null}
         {!loading && !error && route.kind === "preference" ? (
           <PreferenceDetailView
@@ -210,13 +215,15 @@ function AssistantSummary({
   history,
   preferences,
   baseline,
-  onOpen
+  onOpen,
+  onOpenBaseline
 }: {
   pending: ProposalRecord[];
   history: ProposalRecord[];
   preferences: PreferenceRecord[];
   baseline: PersonalizationBaseline | null;
   onOpen: (section: Section) => void;
+  onOpenBaseline: () => void;
 }) {
   const lastDecision = [...history].sort(byUpdatedAt)[0];
   return (
@@ -228,12 +235,15 @@ function AssistantSummary({
         <SummaryRow icon="fileText" label="Pending" value={pending.length ? String(pending.length) : "None"} onClick={() => onOpen("pending")} />
         <SummaryRow icon="check" label="History" value={lastDecision ? `${statusLabel(lastDecision.status)} · ${shortDate(lastDecision.updated_at)}` : "None"} onClick={() => onOpen("history")} />
         <SummaryRow icon="layers" label="Memory" value={String(preferences.length)} onClick={() => onOpen("memory")} />
-        <SummaryStatusRow
-          icon="layers"
+        <SummaryRow
+          icon="gauge"
           label="Baseline"
           value={baseline?.status === "ready"
             ? "Ready"
-            : `${baseline?.consented_outcome_count ?? 0}/${baseline?.minimum_outcomes ?? 5}`}
+            : baseline
+              ? `${baseline.consented_outcome_count}/${baseline.minimum_outcomes}`
+              : "Unavailable"}
+          onClick={onOpenBaseline}
         />
       </div>
       <div className="mt-5 rounded-[14px] border border-desk-line bg-desk-sunk px-4 py-3">
@@ -257,14 +267,100 @@ function SummaryRow({ icon, label, value, onClick }: { icon: IconName; label: st
   );
 }
 
-function SummaryStatusRow({ icon, label, value }: { icon: IconName; label: string; value: string }) {
+function BaselineDetail({ baseline }: { baseline: PersonalizationBaseline | null }) {
+  if (!baseline) {
+    return (
+      <WorkspaceState
+        icon="info"
+        title="Baseline unavailable"
+        body="Reopen Assistant to retry."
+      />
+    );
+  }
+
+  const ready = baseline.status === "ready";
   return (
-    <div className="grid min-h-[72px] w-full grid-cols-[42px_minmax(0,1fr)_auto_20px] items-center gap-2 border-b border-desk-line px-4 text-left last:border-b-0">
-      <span className="grid size-9 place-items-center rounded-full bg-desk-accent-soft text-desk-accent" aria-hidden="true"><Icon name={icon} className="size-5" /></span>
-      <span className="font-bold">{label}</span>
-      <span className="max-w-36 truncate text-sm text-desk-muted">{value}</span>
-      <span aria-hidden="true" />
+    <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="m-0 text-xl leading-7">
+            {ready ? "Ready for evaluation" : "Collecting feedback"}
+          </h3>
+          <p className="mb-0 mt-1 text-sm leading-5 text-desk-muted">
+            {ready
+              ? "Enough consented outcomes for a first offline comparison."
+              : `${baseline.remaining_outcome_count} more consented ${baseline.remaining_outcome_count === 1 ? "outcome" : "outcomes"} needed.`}
+          </p>
+        </div>
+        <Tag tone={ready ? "accent" : "warn"}>{ready ? "Ready" : "Collecting"}</Tag>
+      </div>
+
+      <DetailSection title="Readiness">
+        <MetaRow
+          label="Consented outcomes"
+          value={`${baseline.consented_outcome_count}/${baseline.minimum_outcomes}`}
+        />
+        <MetaRow label="Remaining" value={String(baseline.remaining_outcome_count)} />
+        <MetaRow label="Ranking" value="Not applied" />
+      </DetailSection>
+
+      <DetailSection title="Included outcomes">
+        {baseline.groups.length ? (
+          <div className="border-t border-desk-line">
+            {baseline.groups.map((group) => (
+              <BaselineGroup key={group.proposal_type} group={group} />
+            ))}
+          </div>
+        ) : (
+          <p className={bodyClass}>No consented outcomes.</p>
+        )}
+      </DetailSection>
+
+      <Disclosure title="How it is counted">
+        <p className={bodyClass}>
+          Only feedback with current consent is included. Partial results count
+          as half completion; dismissed results are excluded.
+        </p>
+      </Disclosure>
     </div>
+  );
+}
+
+function BaselineGroup({
+  group
+}: {
+  group: PersonalizationBaseline["groups"][number];
+}) {
+  const results = [
+    `${group.completed_count} done`,
+    `${group.partial_count} partial`,
+    `${group.not_completed_count} not done`,
+    `${group.dismissed_count} dismissed`
+  ].join(" · ");
+  return (
+    <section className="border-b border-desk-line py-3 last:border-b-0">
+      <div className="flex items-start justify-between gap-3">
+        <h4 className="m-0 min-w-0 text-sm font-bold">
+          {humanize(group.proposal_type)}
+        </h4>
+        <span className="shrink-0 text-xs text-desk-muted">
+          {group.outcome_count}
+        </span>
+      </div>
+      <MetaRow
+        label="Usefulness"
+        value={group.average_usefulness === null
+          ? "Not rated"
+          : `${group.average_usefulness.toFixed(1)}/5`}
+      />
+      <MetaRow
+        label="Completion"
+        value={group.completion_rate === null
+          ? "Not available"
+          : `${Math.round(group.completion_rate * 100)}%`}
+      />
+      <MetaRow label="Results" value={results} />
+    </section>
   );
 }
 
@@ -753,6 +849,7 @@ function InlineError({ message }: { message: string }) {
 
 function routeTitle(route: Route): string {
   if (route.kind === "section") return sectionLabel(route.section);
+  if (route.kind === "baseline") return "Baseline";
   if (route.kind === "proposal") return "Proposal";
   if (route.kind === "preference") return "Memory";
   if (route.kind === "new-preference") return "New memory";

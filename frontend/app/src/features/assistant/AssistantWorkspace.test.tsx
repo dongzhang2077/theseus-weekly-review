@@ -75,6 +75,12 @@ describe("AssistantWorkspace", () => {
     expect(await screen.findByText("Your control")).toBeInTheDocument();
     expect(screen.queryByText(proposal.title)).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: /Baseline/ }));
+    expect(screen.getByText("Collecting feedback")).toBeInTheDocument();
+    expect(screen.getByText("5 more consented outcomes needed.")).toBeInTheDocument();
+    expect(screen.getByText("Not applied")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
     fireEvent.click(screen.getByRole("button", { name: /Pending/ }));
     fireEvent.click(screen.getByRole("button", { name: /Reduce Friday load/ }));
 
@@ -237,6 +243,55 @@ describe("AssistantWorkspace", () => {
       );
     });
     expect(screen.getByRole("checkbox", { name: "Use for future suggestions" })).not.toBeChecked();
+  });
+
+  it("shows inspectable aggregate metrics without claiming ranking", async () => {
+    const fetchImpl = routeFetch({
+      "GET /proposals": [],
+      "GET /preferences?include_deleted=true": [],
+      "GET /personalization/baseline": {
+        baseline_version: "v1",
+        status: "ready",
+        minimum_outcomes: 5,
+        consented_outcome_count: 5,
+        remaining_outcome_count: 0,
+        ranking_applied: false,
+        groups: [
+          {
+            proposal_type: "weekly_plan_adjustment",
+            outcome_count: 5,
+            rated_outcome_count: 5,
+            average_usefulness: 3,
+            completed_count: 2,
+            partial_count: 1,
+            not_completed_count: 1,
+            dismissed_count: 1,
+            completion_rate: 0.625
+          }
+        ]
+      }
+    });
+
+    render(
+      <AssistantWorkspace
+        open
+        apiBaseUrl="http://127.0.0.1:8000"
+        fetchImpl={fetchImpl}
+        onClose={vi.fn()}
+      />
+    );
+
+    await screen.findByText("Your control");
+    fireEvent.click(screen.getByRole("button", { name: /Baseline/ }));
+
+    expect(screen.getByText("Ready for evaluation")).toBeInTheDocument();
+    expect(screen.getByText("Weekly plan adjustment")).toBeInTheDocument();
+    expect(screen.getByText("3.0/5")).toBeInTheDocument();
+    expect(screen.getByText("63%")).toBeInTheDocument();
+    expect(
+      screen.getByText("2 done · 1 partial · 1 not done · 1 dismissed")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Not applied")).toBeInTheDocument();
   });
 });
 

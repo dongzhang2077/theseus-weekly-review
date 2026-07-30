@@ -679,6 +679,15 @@ evidence retained the Outcome, advanced only `consent_version` from 1 to 2,
 returned the consented count to zero, and passed foreign-key verification. The
 observation slice is accepted; sparse data still blocks any ranking claim.
 
+STORY-028B candidate checkpoint (2026-07-30 PDT): the existing Assistant
+Baseline summary now opens a focused read-only detail layer. It exposes the
+current consent threshold and remaining count, per-proposal-type usefulness,
+completion, and result aggregates when available, and always states that
+ranking is not applied. It adds no endpoint, schema, inferred Preference, or
+suggestion-order change. Four focused Assistant tests, all 146 frontend tests,
+TypeScript verification, and the production build pass. Product-owner browser
+acceptance remains required.
+
 ## Epic 9: Agent-Ready Domain And Integration
 
 These stories turn the personal-assistant strategy into independently
