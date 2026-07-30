@@ -970,3 +970,148 @@ The full suite completed 196 of 197 tests; the sole failure was the previously
 tracked intermittent authenticated Activity request and passed immediately in
 isolation. Python compilation and deterministic sample review pass. This is
 not evidence that the separate authentication flake has been fixed.
+
+## Epic 10: Daily Visual Workspace and Local-First Assistant
+
+These candidate stories implement the two accepted product directions in
+`docs/17_product_direction_v2.md`. They reserve boundaries only. Each needs a
+focused issue, owner, contract, verification commands, and demo evidence before
+moving to `Ready`.
+
+### STORY-040 Freeze the visual-first workspace contract
+
+As a daily user, I want the App to summarize streams visually so that I can
+understand my day and week without reading repeated review prose.
+
+Priority: P0 after the current candidate is integrated
+
+Acceptance criteria:
+
+- the information architecture specifies a daily timeline, seven-day stacked
+  bars, a time-distribution donut, and a longer-range calendar heatmap;
+- each visual answers a distinct question and opens matching persisted records;
+- overlapping Review and Signals content has one accepted Level 1 hierarchy;
+- wireframes and an app-sized HTML prototype pass product-owner review before
+  React implementation begins;
+- mobile, desktop, sparse, empty, loading, error, and accessibility states are
+  represented.
+
+### STORY-041 Add evidence-backed time visualizations
+
+As a daily user, I want to see time distribution and change across useful time
+scales so that I can notice imbalance and choose what to inspect.
+
+Priority: P1 after STORY-040
+
+Acceptance criteria:
+
+- the first React slice implements the accepted donut and seven-day visual
+  against authenticated persisted TimeLogs;
+- totals, segments, dates, and drill-down records reconcile exactly;
+- charts retain accessible summaries and never use color as the only meaning;
+- the monthly heatmap is implemented only after enough date density exists;
+- focused tests, TypeScript, production build, and mobile/desktop browser
+  review pass.
+
+### STORY-042 Add a local Assistant Gateway and minimum-context policy
+
+As a local account user, I want cloud language help without uploading my whole
+history so that conversation remains useful and bounded.
+
+Priority: P0 before new App or Calendar assistant surfaces
+
+Acceptance criteria:
+
+- provider API keys remain in the local backend and are absent from frontend
+  storage, model context, channel output, and logs;
+- every cloud request is triggered by explicit user interaction;
+- the gateway sends an allowlisted, request-specific context envelope;
+- serialized-envelope tests reject credentials, unrelated history, raw
+  evidence dumps, and cross-account records;
+- provider failure preserves deterministic local behavior.
+
+### STORY-043 Add deterministic next-action recommendation
+
+As a user, I want a trustworthy answer to what I should do now so that current
+commitments do not crowd out long-running Projects.
+
+Priority: P0 after stable Task, Plan, Focus, and review services
+
+Acceptance criteria:
+
+- a shared service ranks bounded candidates from active Focus, the next fixed
+  commitment, WeeklyPlan, open Tasks, project state, available time, and
+  explicit preferences;
+- the result includes evidence, alternatives, and uncertainty;
+- App and Telegram receive the same result for the same account and context;
+- a model may phrase but cannot invent ranking evidence;
+- empty, conflict, stale, and offline cases have deterministic tests.
+
+### STORY-044 Add the in-App text assistant
+
+As a user, I want to ask Theseus questions inside the App so that conversation
+is not limited to Telegram.
+
+Priority: P1 after STORY-042 and STORY-043
+
+Acceptance criteria:
+
+- one restrained, accessible App affordance opens a focused text conversation;
+- reads use the shared Assistant Gateway and typed tools;
+- writes show typed previews and preserve approval, audit, verification, and
+  Undo;
+- Telegram and App do not maintain competing assistant memory or policy;
+- loading, cancellation, timeout, offline, provider-error, and cost-limit
+  states are visible and tested.
+
+### STORY-045 Add read-only Google Calendar commitments
+
+As a user, I want fixed Calendar commitments considered when Theseus recommends
+my next action so that the recommendation fits the time actually available.
+
+Priority: P1 after STORY-042 and STORY-043
+
+Acceptance criteria:
+
+- connection is explicit and OAuth credentials stay in protected local backend
+  storage;
+- free/busy is the default imported context and selected event detail is
+  opt-in;
+- external commitments remain distinct from Tasks and TimeLogs;
+- sync state, last refresh, error, disconnect, and credential deletion are
+  visible;
+- no Calendar write or broad scope is included.
+
+### STORY-046 Add multilingual push-to-talk
+
+As a user, I want to hold a control and speak in English or Chinese so that I
+can query and plan while reducing setup and navigation effort.
+
+Priority: P1 after STORY-044
+
+Acceptance criteria:
+
+- recording begins only after a deliberate action and is visibly active;
+- a non-long-press accessible recording control provides equivalent behavior;
+- the first release uses the bounded record, transcribe, tool, present, and
+  optional speech pipeline;
+- raw audio is not retained by default and transcript retention is visible and
+  controllable;
+- cancel, timeout, denial, transcription error, and cloud-unavailable states
+  are tested.
+
+### STORY-047 Add conversational onboarding
+
+As a new user, I want the assistant to guide initial setup one question at a
+time so that I can start using Theseus without learning every screen first.
+
+Priority: P2 after STORY-044 and STORY-045
+
+Acceptance criteria:
+
+- the assistant collects only the minimum timezone, working window, Goals,
+  Projects, commitments, focus preference, slack, and first-plan inputs;
+- the complete structured result is previewed before any write;
+- setup writes use existing authenticated domain services and approval rules;
+- conventional forms remain available for fallback and correction;
+- partial, cancelled, resumed, invalid, and duplicate setup paths are tested.

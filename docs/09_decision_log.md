@@ -210,3 +210,68 @@ Consequences:
 - The accepted lifecycle and API shapes live in `docs/03_data_model.md` and
   `docs/04_api_contract.md`; ordered delivery gates live in
   `docs/15_agent_implementation_roadmap.md`.
+
+## 2026-07-30: Develop a Visual-First Daily Workspace
+
+Decision:
+
+Reduce first-level prose and present daily and weekly activity streams through
+question-specific visuals. Use a timeline for one day, stacked bars for seven
+days, a donut for time distribution, and a calendar heatmap only for
+longer-range consistency. Consider one combined weekly-insight experience when
+Review and Signals repeat the same deterministic conclusion.
+
+Reason:
+
+Theseus is becoming a daily-use personal tool, but the current interface asks
+the user to read too much before understanding time allocation or the next
+action. A seven-day heatmap also lacks the density that makes a heatmap useful.
+
+Consequences:
+
+- Charts must answer a specific question and open the exact persisted evidence
+  that produced them.
+- Review and Signals may share one Level 1 flow without prematurely merging
+  their evidence contracts.
+- Chart color is never the only state indicator.
+- Material UI work follows the accepted pipeline: wireframe, app-sized HTML
+  prototype, screenshot and interaction acceptance, then React restoration.
+- Keep-like products may inform scanability, but not replace Theseus UX,
+  evidence, accessibility, or visual identity.
+- The detailed mapping and acceptance gate live in
+  `docs/17_product_direction_v2.md`.
+
+## 2026-07-30: Use Local Data with User-Initiated Cloud AI
+
+Decision:
+
+Keep personal data and canonical behavior local. Use cloud AI only for a
+user-initiated text or voice conversation. Store provider API keys and
+third-party credentials only in the local backend, and send a fresh,
+allowlisted minimum context envelope for each request.
+
+Reason:
+
+Conversation and multilingual voice can make Theseus substantially easier to
+use, including through Telegram and App onboarding, without requiring cloud
+storage of the user's complete history. The boundary also keeps deterministic
+planning, review, and recovery usable during provider failure.
+
+Consequences:
+
+- SQLite and shared domain services remain the only source of truth.
+- App and Telegram use one Assistant Gateway and the same typed tools.
+- No background listening or unsolicited cloud inference is enabled by
+  default.
+- Models cannot access SQLite, secrets, unrestricted history, or direct write
+  authority.
+- Material writes keep proposal, preview, approval, execution, verification,
+  audit, and Undo gates.
+- A deterministic `NextActionService` chooses what to do now; a model may
+  explain or translate the evidence-backed result.
+- Google Calendar begins as an explicitly connected, read-only external
+  commitment adapter. Credentials stay local and event details are minimized.
+- Turn-based push-to-talk precedes continuous realtime voice.
+- Privacy regressions are tested against the serialized provider request.
+- The complete boundary and delivery order live in
+  `docs/17_product_direction_v2.md`.

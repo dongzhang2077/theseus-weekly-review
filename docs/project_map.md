@@ -69,6 +69,7 @@ flowchart LR
 | GitHub collaboration workflow | [10_github_workflow.md](10_github_workflow.md) |
 | Sustainable architecture runway | [11_architectural_runway.md](11_architectural_runway.md) |
 | Product and Agent development strategy | [13_product_agent_development_strategy.md](13_product_agent_development_strategy.md) |
+| Accepted visual workspace and conversational assistant direction | [17_product_direction_v2.md](17_product_direction_v2.md) |
 | Mobile capture plan | [mobile_capture_plan.md](mobile_capture_plan.md) |
 
 ## 5. MVP Execution Flow

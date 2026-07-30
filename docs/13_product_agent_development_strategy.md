@@ -3,6 +3,7 @@
 - Status: guiding document
 - Baseline date: 2026-07-15
 - Near-term checkpoint: midterm demo on 2026-07-18
+- Latest accepted product direction: 2026-07-30
 - Product owners: Dong Zhang and Zhi Kang
 
 ## 1. Purpose and Authority
@@ -19,6 +20,11 @@ contracts.
 The sequential implementation branches, story dependencies, verification
 commands, and product-owner acceptance gates are maintained in
 [`15_agent_implementation_roadmap.md`](15_agent_implementation_roadmap.md).
+The accepted post-pilot visual-workspace and local-first conversational
+assistant direction is maintained in
+[`17_product_direction_v2.md`](17_product_direction_v2.md). That document
+supersedes broad future-direction examples here when deciding the next product
+slice; it does not supersede accepted data, API, or security contracts.
 
 When sources disagree, use this order:
 
@@ -806,3 +812,28 @@ External implementation references:
 External tools are fast-moving dependencies. Recheck their official
 documentation when the corresponding phase begins and keep each integration
 behind a replaceable adapter.
+
+## 16. Post-Pilot Product Direction
+
+The 2026-07-30 product-owner decision establishes two coordinated workstreams:
+
+1. a visual-first daily App that replaces repeated prose with evidence-backed
+   timelines, weekly bars, a time-distribution donut, and a longer-range
+   calendar heatmap; and
+2. a local-first conversational assistant shared by the App and Telegram, with
+   deliberate text or push-to-talk activation, a deterministic next-action
+   service, minimal cloud context, and read-only Calendar commitments before
+   any external writes.
+
+The visual delivery pipeline is mandatory:
+
+```text
+Wireframe -> HTML prototype -> visual acceptance -> React restoration
+```
+
+The AI boundary is also mandatory: API keys remain in the local backend, cloud
+inference occurs only after explicit user interaction, and each request
+contains only an allowlisted minimum context envelope. The complete scope,
+chart mapping, privacy rules, candidate stories, order, and acceptance gates
+are authoritative in
+[`17_product_direction_v2.md`](17_product_direction_v2.md).
