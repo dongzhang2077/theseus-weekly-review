@@ -97,6 +97,9 @@ For the local Telegram pilot, run
 prompts without echo and writes the Bot Token and Theseus pairing token outside
 the repository under `~/.openclaw/secrets/` with owner-only permissions. The
 script does not modify OpenClaw configuration or start the Gateway.
+When rotating only the scoped Theseus pairing, run
+`bash scripts/configure_openclaw_local_secrets.sh --theseus-only`; it replaces
+that secret atomically without asking for or changing the Telegram Bot Token.
 
 For channels that gate inbound hook data, the OpenClaw operator must also opt
 this trusted plugin into `message_received` for the specific account. For
