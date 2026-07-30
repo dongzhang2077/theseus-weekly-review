@@ -686,7 +686,10 @@ completion, and result aggregates when available, and always states that
 ranking is not applied. It adds no endpoint, schema, inferred Preference, or
 suggestion-order change. Four focused Assistant tests, all 146 frontend tests,
 TypeScript verification, and the production build pass. Product-owner browser
-acceptance remains required.
+acceptance passed on 2026-07-30 PDT after the Baseline row opened the
+collecting/readiness detail, exposed the current consented count and aggregate
+boundary, preserved Back navigation, and stated that ranking was not applied.
+STORY-028B is accepted.
 
 ## Epic 9: Agent-Ready Domain And Integration
 

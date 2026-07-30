@@ -728,5 +728,10 @@ consented threshold, remaining count, usefulness, completion, and result
 breakdown, and explicitly reports that ranking is not applied. The candidate
 does not add persistence, API behavior, inferred Preferences, or ranking.
 Four focused Assistant tests, all 146 frontend tests, TypeScript verification,
-and the production build pass. Product-owner browser acceptance is the
-remaining gate.
+and the production build pass. Product-owner browser acceptance passed on
+2026-07-30 PDT after verifying the clickable Baseline entry, truthful
+collecting/readiness state, aggregate boundary, Back navigation, and explicit
+`Ranking: Not applied` status. The first two STORY-028 observation and
+inspectability slices are accepted. The next gate is a frozen offline
+evaluation protocol plus enough real consented outcomes; it is not a learned
+ranker implementation.

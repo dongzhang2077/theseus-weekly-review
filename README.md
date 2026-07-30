@@ -172,6 +172,12 @@ Run the React app against the local API:
 VITE_THESEUS_API_BASE_URL=http://127.0.0.1:8000 npm --prefix frontend/app run dev
 ```
 
+When the repository is on a Windows-mounted WSL path such as `/mnt/d`, Vite
+may miss a filesystem event and continue serving an older transformed module.
+If a verified source change remains stale after a hard refresh, restart the
+frontend dev process. This affects development hot reload, not the production
+build.
+
 ## GitHub Setup
 
 This workspace is initialized as a local Git repository. On Windows-mounted WSL paths, Git may require a safe-directory override:
