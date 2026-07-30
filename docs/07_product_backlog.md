@@ -1025,6 +1025,14 @@ surfaces. Allowed use is onboarding, meaningful empty/completion states, a
 compact Review detail, and the future working assistant entry. No inactive
 assistant placeholder or persistent decorative character is authorized.
 
+Tracker preservation decision (2026-07-30 PDT): the product owner confirmed
+that the existing fast, minimal Tracker is protected rather than removed. Today
+keeps direct Start/End at Level 1, and tapping Current Focus opens the full-screen
+Level 2 Tracker with Activity selection, the primary timer control, concurrent
+running access, Today total, and correctable history. Tracker is absorbed into
+Today navigation, not reduced to the compact summary row or restored as a fourth
+tab.
+
 Acceptance criteria:
 
 - the information architecture specifies a daily timeline, seven-day stacked

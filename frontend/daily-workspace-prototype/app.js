@@ -69,6 +69,7 @@
   const drawerBody = $("#drawer-body");
   const toast = $("#toast");
   let lastFocused = null;
+  let drawerReturnView = null;
   let toastTimer = null;
 
   function setDestination(destination, focusWorkspace = true) {
@@ -453,11 +454,14 @@
     return `<section class="panel" aria-label="${label}" aria-busy="true"><div class="skeleton skeleton-line short"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-chart"></div></section>`;
   }
 
-  function openDrawer(name, trigger) {
-    lastFocused = trigger || document.activeElement;
+  function openDrawer(name, trigger, returnView = null) {
+    if (drawer.hidden) lastFocused = trigger || document.activeElement;
+    drawerReturnView = returnView;
     const views = drawerViews(name);
     drawerTitle.textContent = views.title;
     drawerBody.innerHTML = views.body;
+    drawer.dataset.view = name;
+    drawer.classList.toggle("is-tracker", name === "tracker");
     overlay.hidden = false;
     drawer.hidden = false;
     document.body.style.overflow = "hidden";
@@ -466,8 +470,16 @@
 
   function closeDrawer() {
     if (drawer.hidden) return;
+    if (drawerReturnView) {
+      const returnView = drawerReturnView;
+      drawerReturnView = null;
+      openDrawer(returnView, null);
+      return;
+    }
     drawer.hidden = true;
     overlay.hidden = true;
+    drawer.classList.remove("is-tracker");
+    delete drawer.dataset.view;
     document.body.style.overflow = "";
     if (lastFocused && typeof lastFocused.focus === "function") lastFocused.focus();
   }
@@ -498,9 +510,41 @@
       "plan-blocks": ["Plan blocks", `${drawerRow("Theseus", "Mon / Wed / Fri", "6h")}${drawerRow("Coursework", "Tue / Thu", "4h")}${drawerRow("Resume project", "Tue morning", "2h")}`],
       tasks: ["Tasks", `${drawerRow("Schema contract", "Theseus · In progress", "Current")}${drawerRow("Review notes", "Coursework · Open", "Next")}${drawerRow("Resume outline", "Resume · Open", "Next")}${drawerRow("Weekly reflection", "Theseus · Open", "Later")}`],
     };
+    if (name === "tracker") return trackerDrawer();
     if (name === "running") return runningDrawer();
     const result = map[name] || ["Detail", drawerRow("Selected record", "Static prototype detail", "Open")];
     return { title: result[0], body: result[1] };
+  }
+
+  function trackerDrawer() {
+    const runningMeta = state.focusRunning
+      ? `Theseus · Focus${state.runningCount > 1 ? ` · ${state.runningCount} running` : ""}`
+      : "Theseus · Ready";
+    const actionLabel = state.focusRunning ? "End Backend schema" : "Start Backend schema";
+    return {
+      title: "Focus",
+      body: `<div class="tracker-workspace">
+        <button class="tracker-activity" type="button" data-open="activities" aria-label="Choose Activity">
+          <span class="tracker-activity-mark" aria-hidden="true">${icon("today")}</span>
+          <span><strong>Backend schema</strong><small>${runningMeta}</small></span>
+          ${icon("chevron-right")}
+        </button>
+        <button class="tracker-timer-button" type="button" data-tracker-toggle aria-label="${actionLabel}">
+          <span class="tracker-run-mark" aria-hidden="true"></span>
+          <strong>${state.focusRunning ? "00:18:42" : "00:00:00"}</strong>
+        </button>
+        <button class="tracker-focus-control" type="button" data-tracker-toggle aria-label="${actionLabel}">
+          ${icon(state.focusRunning ? "stop" : "play")}
+        </button>
+        <button class="tracker-total" type="button" data-open="day-history" aria-label="Open Today history, 4 hours 35 minutes">
+          <span class="swatch" aria-hidden="true"></span><span>Today total</span><strong>4h 35m</strong>${icon("chevron-right")}
+        </button>
+        <div class="tracker-links">
+          <button class="row-button" type="button" data-open="running"><span><strong>Running Activities</strong><span class="meta">${state.runningCount} active</span></span>${icon("chevron-right")}</button>
+          <button class="row-button" type="button" data-open="day-history"><span><strong>Today history</strong><span class="meta">3 records · correctable</span></span>${icon("chevron-right")}</button>
+        </div>
+      </div>`,
+    };
   }
 
   function runningDrawer() {
@@ -597,7 +641,17 @@
 
     const open = event.target.closest("[data-open]");
     if (open) {
-      openDrawer(open.dataset.open, open);
+      const returnView = drawer.dataset.view === "tracker" ? "tracker" : null;
+      openDrawer(open.dataset.open, open, returnView);
+      return;
+    }
+
+    if (event.target.closest("[data-tracker-toggle]")) {
+      state.focusRunning = !state.focusRunning;
+      state.runningCount = state.focusRunning ? Math.max(2, state.runningCount + 1) : Math.max(1, state.runningCount - 1);
+      renderFocus();
+      openDrawer("tracker", null);
+      showToast(state.focusRunning ? "Backend schema started." : "Backend schema ended. Other Activities keep running.");
       return;
     }
 
@@ -637,7 +691,7 @@
     if (event.target.closest("[data-new-plan]")) { state.preview.plan = "normal"; updateStateSelect(); renderPlan(); return; }
     if (event.target.closest("[data-set-capacity]")) { state.preview.plan = "normal"; updateStateSelect(); renderPlan(); showToast("Sample capacity restored."); return; }
     if (event.target.closest("[data-undo-history]")) { state.preview.today = "normal"; updateStateSelect(); renderToday(); showToast("Correction undone in prototype."); return; }
-    if (event.target.closest("[data-select-activity]")) { closeDrawer(); state.preview.today = "normal"; state.focusRunning = false; updateStateSelect(); renderToday(); showToast("Backend schema selected. Start remains a separate action."); return; }
+    if (event.target.closest("[data-select-activity]")) { state.preview.today = "normal"; state.focusRunning = false; updateStateSelect(); renderToday(); closeDrawer(); showToast("Backend schema selected. Start remains a separate action."); return; }
 
     const endRunning = event.target.closest("[data-end-running]");
     if (endRunning) {
@@ -667,7 +721,7 @@
   });
 
   $("#running-control").addEventListener("click", (event) => openDrawer("running", event.currentTarget));
-  $("#focus-identity").addEventListener("click", (event) => openDrawer(state.preview.today === "no-focus" ? "activities" : "activity", event.currentTarget));
+  $("#focus-identity").addEventListener("click", (event) => openDrawer(state.preview.today === "no-focus" ? "activities" : "tracker", event.currentTarget));
   $(".account-button").addEventListener("click", (event) => openDrawer("account", event.currentTarget));
   $("#today-reset").addEventListener("click", () => { state.periodOffset[state.mode] = 0; renderToday(); });
   $("#insights-reset").addEventListener("click", () => { state.insightsOffset = 0; renderInsights(); });
@@ -711,7 +765,10 @@
   });
 
   const initialDestination = window.location.hash.slice(1);
-  if (["today", "insights", "plan"].includes(initialDestination)) {
+  if (initialDestination === "tracker") {
+    setDestination("today", false);
+    openDrawer("tracker", null);
+  } else if (["today", "insights", "plan"].includes(initialDestination)) {
     setDestination(initialDestination, false);
   } else {
     setDestination("today", false);

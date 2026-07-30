@@ -16,10 +16,10 @@ python3 -m http.server 4173 --directory frontend/daily-workspace-prototype
 
 Then open `http://127.0.0.1:4173`.
 
-Direct prototype entry points are available at `#today`, `#insights`, and
-`#plan`. The checked reference captures are `mobile.png` (a 430px app shell)
-and `desktop.png` for Today, plus `insights.png` and `plan.png` for destination
-coverage.
+Direct prototype entry points are available at `#today`, `#tracker`,
+`#insights`, and `#plan`. The checked reference captures are `mobile.png` (a
+430px app shell) and `desktop.png` for Today, `tracker.png` for the full-screen
+Tracker, plus `insights.png` and `plan.png` for destination coverage.
 
 Use the `Prototype` control to inspect loading, empty, sparse, stale, conflict,
 save, verification, and error states for the active destination.

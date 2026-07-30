@@ -233,7 +233,7 @@ Information budget:
 
 Interactions:
 
-- current Focus row opens Activity detail;
+- current Focus row opens the full-screen Tracker workspace;
 - Start/End affects only the foreground Activity and remains exactly once;
 - `N running` opens the running-Activities sheet and is omitted below two;
 - if no foreground Activity exists, Start opens the Activity picker;
@@ -364,7 +364,48 @@ it never silently opens the current date while history is selected.
 The wide-screen preview keeps the mobile order. It does not place the donut and
 timeline side by side or add a simultaneous seven-day panel.
 
-### 5.5 Running Activities sheet
+### 5.5 Full-screen Tracker
+
+Today keeps the fast Level 1 Start/End action, while the accepted focused
+tracking experience remains available one tap deeper:
+
+```text
++--------------------------------------+
+| <                Focus          [≡] |
+|--------------------------------------|
+| Backend schema                       |
+| Theseus · Focus · 2 running          |
+|                                      |
+|               00:18:42               |
+|                                      |
+|                 [■]                  |
+|                                      |
+|        Today total · 4h 35m        > |
+|--------------------------------------|
+| Running Activities                 > |
+| Today history                      > |
++--------------------------------------+
+```
+
+Rules:
+
+- tapping the Level 1 Current Focus row opens this opaque Level 2 workspace;
+- the selected Activity, timer, and one Start/End control remain the visual
+  center without adding a form;
+- tapping the selected Activity opens the Activity picker; selection returns to
+  Tracker and does not start an idle Activity;
+- `Running Activities` opens the existing multi-session sheet, where each row
+  ends independently;
+- `Today total` and `Today history` open the same correctable record list used
+  by the Today timeline;
+- Activity detail and create/edit remain Level 3, reachable from Tracker;
+- Back returns to Today without ending or pausing a running FocusSession;
+- no fourth bottom-navigation destination is added.
+
+The React Tracker/Focus workflow is protected behavior. STORY-040 may reorganize
+its entry under Today but may not replace it with only the compact Level 1 row.
+
+### 5.6 Running Activities sheet
 
 ```text
 +--------------------------------------+
