@@ -1109,6 +1109,14 @@ Insights. All 174 frontend tests, TypeScript, the production build,
 `git diff --check`, and sanitized 320px/390px Level 1 plus 390px drawer visual
 QA pass. Product-owner browser acceptance remains pending.
 
+Product-owner acceptance (2026-07-30 PDT): Dong tested the authenticated
+Insights workspace with persisted student-routine data and accepted the
+three-destination navigation, default Today entry, weekly browsing and reset,
+merged Level 1 hierarchy, and inspectable Review and Signal evidence.
+STORY-040B is accepted at commit `c1e7189`. This acceptance does not authorize
+a PR or merge to `main`; the pushed feature branch remains available for the
+later UI integration gate.
+
 ### STORY-040C Converge the Plan workspace
 
 As a daily user, I want a compact target-week Plan workspace so that capacity,
@@ -1152,6 +1160,14 @@ week navigation. Confirmed writes now report `Plan saved and verified`. All
 179 frontend tests, TypeScript, the production build, `git diff --check`, and
 sanitized 320px/390px plus missing-capacity visual QA pass. Product-owner
 browser acceptance remains pending.
+
+Product-owner acceptance (2026-07-30 PDT): Dong tested the authenticated Plan
+workspace with persisted current- and next-week student data and accepted
+target-week navigation, compact capacity evidence, the combined Plan blocks /
+Tasks collection, safe disabled states, verified save feedback, and the
+preserved proposal and Undo boundaries. STORY-040C is accepted at commit
+`138680c`. This acceptance does not authorize a PR or merge to `main`; the
+pushed feature branch remains available for the later UI integration gate.
 
 ### STORY-041 Add evidence-backed time visualizations
 
