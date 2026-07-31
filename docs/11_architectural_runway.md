@@ -117,6 +117,7 @@ Theseus should support several data sources through adapters:
 | Source | Near-Term Role | Long-Term Role |
 |---|---|---|
 | `sample_week.json` | Demo and tests | Regression fixture |
+| `college_student_month.json` | Final defense demo and tests | Sanitized month-scale visualization fixture |
 | Manual web form | MVP input path | Still useful for editing/correction |
 | Mobile capture module | Planned capture path | Primary time capture path |
 | Historical RefTime CSV | Evaluation/test material | Optional import source |

@@ -145,6 +145,11 @@ the [Midterm Demo Runbook](docs/14_midterm_demo_runbook.md) for startup,
 preflight, the five-minute flow, screenshots, fallback behavior, and known
 limitations.
 
+For the final defense, use the sanitized month-scale college-student fixture
+and the [Final Defense Demo Runbook](docs/18_final_defense_demo_runbook.md).
+It covers the app plus Telegram flow, preflight, teammate UI feedback, and
+fallbacks.
+
 Start the backend after installing dependencies:
 
 ```bash
