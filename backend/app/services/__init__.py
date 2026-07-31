@@ -21,6 +21,12 @@ from .assistant import (
     AssistantUndoUnavailable,
     InvalidAssistantContextWindow,
 )
+from .assistant_gateway import (
+    AssistantContextPolicyViolation,
+    AssistantGatewayService,
+    assistant_gateway_provider_status,
+    serialize_provider_envelope,
+)
 from .agent_memory import (
     ActionIdempotencyConflict,
     ActionNotFound,
@@ -106,6 +112,8 @@ __all__ = [
     "ActivityVersionConflict",
     "AssistantActionInProgress",
     "AssistantContextService",
+    "AssistantContextPolicyViolation",
+    "AssistantGatewayService",
     "AssistantPlanPersistenceConflict",
     "AssistantPlanStateConflict",
     "AssistantProposalNotApproved",
@@ -184,4 +192,6 @@ __all__ = [
     "import_sample_week",
     "load_sample_payload",
     "review_writer_from_environment",
+    "assistant_gateway_provider_status",
+    "serialize_provider_envelope",
 ]

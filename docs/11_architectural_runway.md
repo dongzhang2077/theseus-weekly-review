@@ -78,6 +78,9 @@ backend/
     services/         authenticated domain commands and orchestration
       tasks.py        Task lifecycle and Project ownership
       activities.py   durable Activity creation and correction
+      assistant_gateway.py
+                      request-specific provider context reduction and privacy
+                      validation; no SQL, model policy, or write authority
       focus.py        transitions, segments, allocation, idempotency
       time_logs.py    correction, revisions, invalidation, project recalc
       review_service.py

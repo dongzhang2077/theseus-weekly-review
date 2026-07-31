@@ -32,6 +32,12 @@ IntegrationScope = Literal[
     "action:undo",
 ]
 ReviewMode = Literal["deterministic_first", "supportive_text"]
+AssistantGatewayPurpose = Literal[
+    "focus_status",
+    "task_status",
+    "plan_status",
+    "weekly_review",
+]
 RiskType = Literal[
     "alignment_gap",
     "plan_drift",
@@ -983,6 +989,161 @@ class AssistantContextRead(APIModel):
     time_logs: list[TimeLogRead] = Field(default_factory=list)
     latest_review: AssistantReviewSummary | None = None
     preferences: list[PreferenceRead] = Field(default_factory=list)
+
+
+class AssistantGatewayEnvelopeRequest(APIModel):
+    utterance: str = Field(min_length=1, max_length=4000, repr=False)
+    purpose: AssistantGatewayPurpose
+    window_start: date
+    window_end: date
+
+    @field_validator("utterance")
+    @classmethod
+    def strip_gateway_utterance(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+    @model_validator(mode="after")
+    def validate_gateway_window(self) -> AssistantGatewayEnvelopeRequest:
+        window_days = (self.window_end - self.window_start).days + 1
+        if window_days < 1 or window_days > 31:
+            raise ValueError("window must cover between 1 and 31 days")
+        return self
+
+
+class AssistantGatewayProviderStatusRead(APIModel):
+    gateway_version: Literal["v1"] = "v1"
+    provider: Literal["local", "openai", "unsupported"]
+    configured: bool
+    model: str | None = None
+    cloud_calls_enabled: Literal[False] = False
+
+
+class AssistantGatewayWindow(APIModel):
+    start: date
+    end: date
+
+
+class AssistantGatewayProjectSummary(APIModel):
+    id: int
+    title: str
+    stage: ProjectStage
+    deadline: date | None = None
+    weekly_min_minutes: int = Field(ge=0)
+    weekly_target_minutes: int = Field(ge=0)
+    last_activity_date: date | None = None
+
+
+class AssistantGatewayTaskSummary(APIModel):
+    id: int
+    project_id: int
+    title: str
+    status: TaskStatus
+    priority: int = Field(ge=1)
+    estimated_minutes: int | None = Field(default=None, gt=0)
+    due_date: date | None = None
+
+
+class AssistantGatewayFocusSummary(APIModel):
+    id: int
+    activity_id: int
+    task_id: int | None = None
+    project_id: int | None = None
+    activity_name: str
+    activity_type: ActivityType
+    task_title: str | None = None
+    elapsed_seconds: int = Field(ge=0)
+    started_at: datetime
+
+
+class AssistantGatewayPlanItemSummary(APIModel):
+    id: int
+    project_id: int | None = None
+    task_id: int | None = None
+    title: str
+    planned_minutes: int = Field(gt=0)
+    priority: int = Field(ge=1)
+    is_completed: bool
+
+
+class AssistantGatewayPlanSummary(APIModel):
+    id: int
+    week_start: date
+    week_end: date
+    planned_capacity_minutes: int = Field(ge=0)
+    planned_minutes: int = Field(ge=0)
+    slack_target_percent: int = Field(ge=0, le=100)
+    items: list[AssistantGatewayPlanItemSummary] = Field(default_factory=list)
+
+
+class AssistantGatewayProjectTimeSummary(APIModel):
+    project_id: int | None = None
+    duration_minutes: int = Field(ge=0)
+
+
+class AssistantGatewayActivityTypeTimeSummary(APIModel):
+    activity_type: ActivityType
+    duration_minutes: int = Field(ge=0)
+
+
+class AssistantGatewayDateTimeSummary(APIModel):
+    date: date
+    duration_minutes: int = Field(ge=0)
+
+
+class AssistantGatewayTimeSummary(APIModel):
+    total_minutes: int = Field(ge=0)
+    record_count: int = Field(ge=0)
+    by_project: list[AssistantGatewayProjectTimeSummary] = Field(
+        default_factory=list
+    )
+    by_activity_type: list[AssistantGatewayActivityTypeTimeSummary] = Field(
+        default_factory=list
+    )
+    by_date: list[AssistantGatewayDateTimeSummary] = Field(default_factory=list)
+
+
+class AssistantGatewayRiskSummary(APIModel):
+    type: RiskType
+    severity: RiskSeverity
+
+
+class AssistantGatewayReviewSummary(APIModel):
+    id: int
+    week_start: date
+    week_end: date
+    win_titles: list[str] = Field(default_factory=list)
+    risks: list[AssistantGatewayRiskSummary] = Field(default_factory=list)
+    next_step_titles: list[str] = Field(default_factory=list)
+    stale: bool
+
+
+class AssistantGatewayContextEnvelope(APIModel):
+    gateway_version: Literal["v1"] = "v1"
+    purpose: AssistantGatewayPurpose
+    utterance: str
+    timezone: str
+    locale: str
+    window: AssistantGatewayWindow
+    included_sections: list[
+        Literal[
+            "projects",
+            "tasks",
+            "running_focus",
+            "weekly_plan",
+            "time_summary",
+            "review_summary",
+        ]
+    ]
+    projects: list[AssistantGatewayProjectSummary] = Field(default_factory=list)
+    tasks: list[AssistantGatewayTaskSummary] = Field(default_factory=list)
+    running_focus: list[AssistantGatewayFocusSummary] = Field(default_factory=list)
+    weekly_plan: AssistantGatewayPlanSummary | None = None
+    time_summary: AssistantGatewayTimeSummary | None = None
+    review_summary: AssistantGatewayReviewSummary | None = None
+    omitted_counts: dict[str, int] = Field(default_factory=dict)
 
 
 class AssistantWeeklyPlanProposalRequest(APIModel):

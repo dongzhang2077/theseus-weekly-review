@@ -1363,6 +1363,89 @@ Missing or foreign records return non-disclosing `404` responses. Unsupported,
 already-undone, stale-version, malformed-payload, drift, and persistence states
 return controlled `409` responses.
 
+### 13.5 Inspect A Minimum Assistant Context Envelope
+
+Implementation status: STORY-042 is implemented on
+`feature/042-local-assistant-gateway` as a backend-only, no-model-call privacy
+gate.
+
+```text
+GET  /assistant/gateway/status
+POST /assistant/gateway/envelope
+```
+
+Both operations require the normal browser account bearer token. The status
+response reports only the selected local-backend provider, whether its required
+environment configuration is present, and an optional model name:
+
+```json
+{
+  "gateway_version": "v1",
+  "provider": "openai",
+  "configured": false,
+  "model": null,
+  "cloud_calls_enabled": false
+}
+```
+
+`THESEUS_ASSISTANT_PROVIDER=local` is the deterministic default. Selecting
+`openai` requires both `OPENAI_API_KEY` and an explicit
+`THESEUS_ASSISTANT_MODEL` before status becomes configured. The raw key is
+never returned by this API, placed in an envelope, or logged by the gateway.
+An unsupported provider is reported as `provider = unsupported` and
+`configured = false`. Provider status never blocks local context preparation.
+
+Envelope preparation is itself the explicit user-triggered operation:
+
+```json
+{
+  "utterance": "Summarize the useful patterns in this week.",
+  "purpose": "weekly_review",
+  "window_start": "2026-06-08",
+  "window_end": "2026-06-14"
+}
+```
+
+`utterance` must contain between 1 and 4,000 characters. The inclusive date
+window must contain between 1 and 31 days. `purpose` is one of
+`focus_status`, `task_status`, `plan_status`, or `weekly_review`; each purpose
+selects a fixed server-side allowlist:
+
+| Purpose | Included sections |
+|---|---|
+| `focus_status` | active Project summaries, open Task summaries, running Focus summaries |
+| `task_status` | active Project summaries, open Task summaries |
+| `plan_status` | active Project summaries, open Task summaries, exact-window Plan summary |
+| `weekly_review` | active Project summaries, exact-window Plan summary, TimeLog aggregates, compact Review summary |
+
+The response is `AssistantGatewayContextEnvelope` version `v1`. It deliberately
+omits account ID and email, descriptions, notes, Preferences, generated review
+prose, finding evidence strings, raw TimeLogs, credentials, and unrelated
+history. TimeLog input becomes only totals grouped by Project, Activity type,
+and date. Lists are bounded to 20 Projects, 20 Tasks, 10 running Focus
+sessions, 20 Plan items, and five entries per Review collection. Any overflow
+is visible in `omitted_counts`.
+
+The serializer rejects denied field names and credential-, token-, or
+email-shaped values before a provider payload can be produced. Rejection
+returns:
+
+```json
+{
+  "detail": {
+    "code": "sensitive_context_rejected",
+    "message": "The request contains data that is not allowed in cloud assistant context"
+  }
+}
+```
+
+Status: `422 Unprocessable Entity`. Account scoping is inherited from
+`AssistantContextService`; another account's records are not available to the
+reducer. This slice performs no network request and grants no tool or write
+authority. A later provider adapter must serialize this same checked envelope,
+use non-persisted Responses requests, and preserve the deterministic local
+result when provider configuration or transport fails.
+
 ## 14. Channel Identity And Scoped Integration Access
 
 Implementation status: STORY-039 was product-owner accepted on 2026-07-26

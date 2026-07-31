@@ -9,6 +9,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from ..schemas import (
     AccountRead,
     AssistantContextRead,
+    AssistantGatewayContextEnvelope,
+    AssistantGatewayEnvelopeRequest,
+    AssistantGatewayProviderStatusRead,
     AssistantProposalExecutionRequest,
     AssistantWeeklyPlanExecutionRead,
     AssistantWeeklyPlanUndoRead,
@@ -21,7 +24,9 @@ from ..services import (
     ActionNotFound,
     ActionUndoConflict,
     AssistantActionInProgress,
+    AssistantContextPolicyViolation,
     AssistantContextService,
+    AssistantGatewayService,
     AssistantPlanPersistenceConflict,
     AssistantPlanStateConflict,
     AssistantProposalNotApproved,
@@ -39,6 +44,7 @@ from ..services import (
     InvalidAssistantContextWindow,
     ProposalNotFound,
     ProposalVersionConflict,
+    assistant_gateway_provider_status,
 )
 from .dependencies import get_connection, get_current_user
 
@@ -82,6 +88,40 @@ async def get_assistant_context(
             detail={
                 "code": "invalid_context_window",
                 "message": "Assistant context must cover between 1 and 31 days",
+            },
+        ) from exc
+
+
+@router.get(
+    "/gateway/status",
+    response_model=AssistantGatewayProviderStatusRead,
+)
+async def get_assistant_gateway_status(
+    _: AccountRead = Depends(get_current_user),
+) -> AssistantGatewayProviderStatusRead:
+    return assistant_gateway_provider_status()
+
+
+@router.post(
+    "/gateway/envelope",
+    response_model=AssistantGatewayContextEnvelope,
+)
+async def prepare_assistant_gateway_envelope(
+    request: AssistantGatewayEnvelopeRequest,
+    user: AccountRead = Depends(get_current_user),
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> AssistantGatewayContextEnvelope:
+    try:
+        return AssistantGatewayService(connection, user).prepare(request)
+    except AssistantContextPolicyViolation as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "sensitive_context_rejected",
+                "message": (
+                    "The request contains data that is not allowed in cloud "
+                    "assistant context"
+                ),
             },
         ) from exc
 

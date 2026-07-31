@@ -53,6 +53,23 @@ export THESEUS_OPENAI_MODEL=gpt-5.5  # Optional.
 
 Do not commit API keys or `.env` files.
 
+The STORY-042 Assistant Gateway privacy preview does not make a model request.
+It can report whether a future OpenAI provider is ready without returning the
+secret:
+
+```bash
+export THESEUS_ASSISTANT_PROVIDER=openai
+export THESEUS_ASSISTANT_MODEL=your_explicit_model
+export OPENAI_API_KEY=your_api_key
+```
+
+Keep these values in the backend process environment or an ignored local
+`.env`; never place them in frontend storage. `GET /assistant/gateway/status`
+returns only provider, configured state, and model. Authenticated
+`POST /assistant/gateway/envelope` creates the exact checked, bounded context
+that a later provider adapter may receive while `cloud_calls_enabled` remains
+`false` in this slice.
+
 OpenCode Go is also supported through its OpenAI-compatible Chat Completions
 endpoint:
 

@@ -1225,6 +1225,14 @@ history so that conversation remains useful and bounded.
 
 Priority: P0 within the Assistant phase, after STORY-040 and STORY-041
 
+Ready checkpoint (2026-07-30 PDT): Dong owns the backend-only slice on
+`feature/042-local-assistant-gateway`, tracked by GitHub Issue #85. It depends
+on the accepted daily UI baseline and the existing authenticated, typed
+Assistant API. The slice adds an auditable request-specific envelope, local
+provider-status boundary, sensitive-field rejection, and deterministic local
+fallback. It does not call a cloud model or add chat UI, voice, Calendar,
+assistant memory, or new write authority.
+
 Acceptance criteria:
 
 - provider API keys remain in the local backend and are absent from frontend
@@ -1234,6 +1242,18 @@ Acceptance criteria:
 - serialized-envelope tests reject credentials, unrelated history, raw
   evidence dumps, and cross-account records;
 - provider failure preserves deterministic local behavior.
+
+Implementation checkpoint (2026-07-30 PDT): the backend-only contract is
+implemented on `feature/042-local-assistant-gateway`. Authenticated status and
+envelope-preview endpoints expose no key and make no network request. Four
+request purposes select fixed context sections; record lists are bounded with
+visible omission counts; TimeLogs become aggregates; and a recursive policy
+rejects sensitive field names, credential-shaped values, account email, raw
+history, and cross-account records. Missing or unsupported provider
+configuration leaves envelope preparation and all deterministic local APIs
+available. All 15 Gateway tests and all 234 backend tests pass; Python
+compilation, deterministic sample review, and `git diff --check` pass.
+Product-owner API acceptance remains pending.
 
 ### STORY-043 Add deterministic next-action recommendation
 
