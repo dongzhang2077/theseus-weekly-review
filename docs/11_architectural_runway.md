@@ -81,6 +81,8 @@ backend/
       assistant_gateway.py
                       request-specific provider context reduction and privacy
                       validation; no SQL, model policy, or write authority
+      next_action.py  deterministic evidence ranking shared by App and channel
+                      adapters; no model calls or mutation authority
       focus.py        transitions, segments, allocation, idempotency
       time_logs.py    correction, revisions, invalidation, project recalc
       review_service.py

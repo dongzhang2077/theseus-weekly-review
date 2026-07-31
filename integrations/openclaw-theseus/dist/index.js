@@ -1,13 +1,15 @@
 import { Type } from "typebox";
 import { buildJsonPluginConfigSchema, definePluginEntry, } from "openclaw/plugin-sdk/plugin-entry";
 import { jsonResult } from "openclaw/plugin-sdk/tool-results";
-import { decideTheseusWeeklyPlanProposal, executeTheseusWeeklyPlanProposal, undoTheseusWeeklyPlanAction, draftTheseusWeeklyPlanProposal, readTheseusContext, } from "./client.js";
+import { decideTheseusWeeklyPlanProposal, executeTheseusWeeklyPlanProposal, undoTheseusWeeklyPlanAction, draftTheseusWeeklyPlanProposal, readTheseusContext, readTheseusNextAction, } from "./client.js";
 import { TrustedMessageBridge } from "./trusted-message-bridge.js";
 const proposalToolName = "theseus_weekly_plan_proposal";
+const nextActionToolName = "theseus_next_action";
 const proposalDecisionToolName = "theseus_weekly_plan_decision";
 const proposalExecutionToolName = "theseus_weekly_plan_execute";
 const proposalUndoToolName = "theseus_weekly_plan_undo";
-const trustedProposalToolNames = new Set([
+const trustedToolNames = new Set([
+    nextActionToolName,
     proposalToolName,
     proposalDecisionToolName,
     proposalExecutionToolName,
@@ -45,7 +47,7 @@ const pluginConfigSchema = buildJsonPluginConfigSchema({
 const plugin = definePluginEntry({
     id: "theseus",
     name: "Theseus",
-    description: "Read Theseus context, draft and decide weekly-plan proposals, and execute or undo approved changes through scoped integration access.",
+    description: "Read Theseus context and deterministic next actions, or manage weekly-plan proposals through scoped integration access.",
     configSchema: pluginConfigSchema,
     register(api) {
         const config = requirePluginConfig(api.pluginConfig);
@@ -101,7 +103,7 @@ const plugin = definePluginEntry({
             });
         });
         api.on("before_tool_call", (event, context) => {
-            if (!trustedProposalToolNames.has(event.toolName))
+            if (!trustedToolNames.has(event.toolName))
                 return;
             const runId = event.runId ?? context?.runId;
             if (!runId) {
@@ -138,6 +140,32 @@ const plugin = definePluginEntry({
             async execute(_toolCallId, { weekStart, weekEnd }, signal) {
                 signal?.throwIfAborted();
                 return jsonResult(await readTheseusContext(requireResolvedClientConfig(config), { weekStart, weekEnd }));
+            },
+        }, { optional: true });
+        api.registerTool({
+            name: nextActionToolName,
+            label: "Theseus Next Action",
+            description: "Read one deterministic, evidence-backed next action plus alternatives and uncertainty. Preserve the returned recommendation and cite only its returned evidence when answering; do not invent ranking facts. This tool never changes user data.",
+            parameters: Type.Object({
+                availableMinutes: Type.Optional(Type.Integer({
+                    minimum: 5,
+                    maximum: 720,
+                    description: "Minutes the user explicitly says are available now.",
+                })),
+                trustedMessageReference: Type.Optional(Type.String({
+                    description: "Internal runtime field. OpenClaw injects it; callers must not set it.",
+                })),
+            }, { additionalProperties: false }),
+            async execute(_toolCallId, params, signal) {
+                signal?.throwIfAborted();
+                const clientConfig = requireResolvedClientConfig(config);
+                const messageId = bridge.resolveProposalReference(params.trustedMessageReference, clientConfig.accessToken);
+                if (!messageId) {
+                    throw new Error("Theseus next-action read requires a trusted runtime message reference");
+                }
+                return jsonResult(await readTheseusNextAction(clientConfig, params.availableMinutes === undefined
+                    ? {}
+                    : { availableMinutes: params.availableMinutes }, { messageId }));
             },
         }, { optional: true });
         api.registerTool({

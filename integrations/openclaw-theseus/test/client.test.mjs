@@ -8,6 +8,7 @@ import {
   undoTheseusWeeklyPlanAction,
   draftTheseusWeeklyPlanProposal,
   readTheseusContext,
+  readTheseusNextAction,
 } from "../dist/client.js";
 
 const config = {
@@ -42,6 +43,39 @@ test("read context sends only the scoped integration contract", async () => {
   assert.equal(captured.init.headers["X-Channel-Type"], "openclaw");
   assert.equal(captured.init.headers["X-External-Identity"], "gateway-owner");
   assert.equal(captured.init.headers["X-External-Message-ID"], "message-001");
+});
+
+test("next action requires trusted input and sends only bounded availability", async () => {
+  await assert.rejects(
+    readTheseusNextAction(config, {availableMinutes: 45}),
+    (error) => {
+      assert(error instanceof TheseusAdapterError);
+      assert.equal(error.code, "external_message_id_required");
+      return true;
+    },
+  );
+
+  let captured;
+  const result = await readTheseusNextAction(
+    config,
+    {availableMinutes: 45},
+    {
+      messageId: "trusted-next-action-001",
+      fetch: async (url, init) => {
+        captured = {url: String(url), init};
+        return new Response(
+          JSON.stringify({status: "ready", recommendation: {title: "Coursework"}}),
+          {status: 200, headers: {"content-type": "application/json"}},
+        );
+      },
+    },
+  );
+
+  assert.deepEqual(result, {status: "ready", recommendation: {title: "Coursework"}});
+  assert.equal(captured.url, "http://127.0.0.1:8000/integrations/channel/next-action");
+  assert.equal(captured.init.method, "POST");
+  assert.equal(captured.init.headers["X-External-Message-ID"], "trusted-next-action-001");
+  assert.deepEqual(JSON.parse(captured.init.body), {available_minutes: 45});
 });
 
 test("draft proposal requires a trusted message ID and sends only the draft contract", async () => {
@@ -214,6 +248,25 @@ test("scope and replay conflicts are represented without returning server detail
       assert.equal(error.code, "external_message_replay_conflict");
       assert.equal(error.message, "Theseus rejected the repeated request");
       assert(!error.message.includes("request hash"));
+      return true;
+    },
+  );
+});
+
+test("next-action timezone conflicts are actionable and redacted", async () => {
+  await assert.rejects(
+    readTheseusNextAction(config, {}, {
+      messageId: "next-action-timezone",
+      fetch: async () => new Response(
+        JSON.stringify({detail: {code: "invalid_account_timezone", internal: "bad zone"}}),
+        {status: 409},
+      ),
+    }),
+    (error) => {
+      assert(error instanceof TheseusAdapterError);
+      assert.equal(error.code, "invalid_account_timezone");
+      assert.match(error.message, /valid account timezone/);
+      assert(!error.message.includes("bad zone"));
       return true;
     },
   );

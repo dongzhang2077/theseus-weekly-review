@@ -10,6 +10,9 @@ export interface TheseusContextRequest {
     weekStart: string;
     weekEnd: string;
 }
+export interface TheseusNextActionRequest {
+    availableMinutes?: number;
+}
 export interface TheseusWeeklyProposalRequest {
     reviewWeekStart: string;
     reviewWeekEnd: string;
@@ -41,6 +44,12 @@ export declare class TheseusAdapterError extends Error {
     constructor(code: string, message: string, status?: number | undefined);
 }
 export declare function readTheseusContext(config: TheseusClientConfig, request: TheseusContextRequest, options?: TheseusRequestOptions): Promise<unknown>;
+/**
+ * Reads the backend-ranked next action without granting the model authority to
+ * invent evidence or mutate user data. The trusted inbound message ID binds
+ * the read to the configured channel owner.
+ */
+export declare function readTheseusNextAction(config: TheseusClientConfig, request: TheseusNextActionRequest, options?: TheseusRequestOptions): Promise<unknown>;
 /**
  * Draft only. The caller must supply the trusted inbound channel message ID;
  * a model tool-call ID and a generated UUID are not valid substitutes.

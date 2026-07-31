@@ -17,6 +17,8 @@ from ..schemas import (
     AssistantWeeklyPlanUndoRead,
     AssistantWeeklyPlanUndoRequest,
     AssistantWeeklyPlanProposalRequest,
+    NextActionRead,
+    NextActionRequest,
     ProposalRead,
 )
 from ..services import (
@@ -42,6 +44,8 @@ from ..services import (
     IdempotencyConflict,
     IdempotencyInProgress,
     InvalidAssistantContextWindow,
+    InvalidNextActionTimezone,
+    NextActionService,
     ProposalNotFound,
     ProposalVersionConflict,
     assistant_gateway_provider_status,
@@ -122,6 +126,27 @@ async def prepare_assistant_gateway_envelope(
                     "The request contains data that is not allowed in cloud "
                     "assistant context"
                 ),
+            },
+        ) from exc
+
+
+@router.post(
+    "/next-action",
+    response_model=NextActionRead,
+)
+async def recommend_next_action(
+    request: NextActionRequest,
+    user: AccountRead = Depends(get_current_user),
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> NextActionRead:
+    try:
+        return NextActionService(connection, user).recommend(request)
+    except InvalidNextActionTimezone as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "invalid_account_timezone",
+                "message": "Set a valid account timezone before requesting a next action",
             },
         ) from exc
 

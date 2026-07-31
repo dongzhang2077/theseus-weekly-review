@@ -1,9 +1,12 @@
 # Theseus OpenClaw Plugin
 
-This native OpenClaw plugin exposes five optional tools:
+This native OpenClaw plugin exposes six optional tools:
 
 - `theseus_context_read` reads evidence-backed context through the scoped
   STORY-039 Integration API.
+- `theseus_next_action` reads the shared deterministic recommendation,
+  alternatives, evidence, and uncertainty. It cannot change user data or
+  substitute model-generated ranking evidence.
 - `theseus_weekly_plan_proposal` creates a **pending** weekly-plan proposal;
   it cannot approve or execute a plan change.
 - `theseus_weekly_plan_decision` records an `approve` or `reject` decision for
@@ -13,7 +16,7 @@ This native OpenClaw plugin exposes five optional tools:
 - `theseus_weekly_plan_undo` undoes one successful reversible Action from an
   approved proposal; it never accepts plan content.
 
-The proposal-changing tools are fail-closed. When channel and tool hooks share
+The next-action and proposal-changing tools are fail-closed. When channel and tool hooks share
 one runtime, the plugin binds OpenClaw's trusted inbound message ID to its
 single `runId`. OpenClaw 2026.7.1-2 can omit that run ID from Telegram's
 `message_received` hook while still supplying the canonical `sessionKey` to
@@ -57,10 +60,10 @@ configured Gateway or a real Theseus credential.
 
 From the repository root, this one command prepares a temporary sanitized
 Theseus database, starts a temporary API, creates a temporary five-scope
-pairing, and verifies context read, proposal draft, approval, execution, and
-undo through this plugin's HTTP client. It revokes the pairing and removes all
-temporary data afterward. No token or identity needs to be copied into the
-terminal.
+pairing, and verifies context read, deterministic next-action read, proposal
+draft, approval, execution, and undo through this plugin's HTTP client. It
+revokes the pairing and removes all temporary data afterward. No token or
+identity needs to be copied into the terminal.
 
 ```bash
 python3 scripts/run_openclaw_adapter_e2e.py
@@ -76,10 +79,10 @@ Theseus API is running and a scoped integration token has been created.
 Configure `baseUrl`, `accessToken`, `channelType`, and `externalIdentity` in
 the plugin entry. OpenClaw 2026.7.1+ can store `accessToken` as a SecretRef;
 prefer a private file provider or another supported secret provider instead of
-plaintext in `openclaw.json`. To enable proposal drafting, also configure
+plaintext in `openclaw.json`. To enable next-action reads or proposal drafting, also configure
 `trustedChannelId` and `trustedSenderId` to the exact OpenClaw channel and
 host-trusted sender allowed to act for this Theseus pairing. Without both
-values, proposal calls are blocked. Treat the token, external identity, and
+values, those calls are blocked. Treat the token, external identity, and
 sender identifier as secrets; never commit them or place them in this package.
 Set `session.dmScope` to `per-channel-peer` so a Telegram direct message and
 its tool run share one isolated canonical session. OpenClaw documents this as
@@ -105,7 +108,7 @@ For channels that gate inbound hook data, the OpenClaw operator must also opt
 this trusted plugin into `message_received` for the specific account. For
 example, WhatsApp requires `channels.whatsapp.accounts.<account>.pluginHooks
 .messageReceived: true` (or the equivalent channel-level setting). Without
-that opt-in, both proposal-changing tools remain blocked.
+that opt-in, trusted next-action and proposal-changing tools remain blocked.
 
 All tools are deliberately optional. Enable or allowlist them only for a
 paired account, and revoke the Theseus integration credential when the channel

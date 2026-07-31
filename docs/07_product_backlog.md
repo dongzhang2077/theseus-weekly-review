@@ -1271,6 +1271,16 @@ commitments do not crowd out long-running Projects.
 Priority: P0 within the Assistant phase, after the accepted UI baseline and
 stable Task, Plan, Focus, and review services
 
+Ready checkpoint (2026-07-31 PDT): Dong owns the shared backend and OpenClaw
+slice on `feature/043-deterministic-next-action`, tracked by GitHub Issue #86.
+It depends on accepted STORY-042 plus the existing Task, WeeklyPlan, Focus,
+TimeLog, Review, Preference, pairing, and typed-tool boundaries. The service
+uses an explicit available-time value when supplied, otherwise a supported
+user-stated Focus-duration preference or a documented local default. Calendar
+commitments remain unavailable until STORY-045 and must appear as uncertainty,
+not invented evidence. This slice adds no App chat UI, voice, model ranking,
+write authority, Calendar adapter, or proactive execution.
+
 Acceptance criteria:
 
 - a shared service ranks bounded candidates from active Focus, the next fixed
@@ -1280,6 +1290,18 @@ Acceptance criteria:
 - App and Telegram receive the same result for the same account and context;
 - a model may phrase but cannot invent ranking evidence;
 - empty, conflict, stale, and offline cases have deterministic tests.
+
+Implementation checkpoint (2026-07-31 PDT): the shared account-scoped
+`NextActionService`, authenticated App endpoint, paired-channel endpoint, and
+trusted OpenClaw `theseus_next_action` tool are implemented on the feature
+branch. The result is read-only and includes one recommendation, up to three
+alternatives, structured evidence, candidate counts, and explicit uncertainty;
+Calendar remains visibly unavailable until STORY-045. Verification passed 28
+focused API/service/integration tests, 249 full Python tests, Python compilation,
+the deterministic sample Review, the OpenClaw 0.1.7 plugin suite, and a
+disposable HTTP adapter workflow covering `next_action.read` alongside context,
+proposal, decision, execution, and Undo. Product-owner conversation acceptance
+and any PR or merge to `main` remain pending.
 
 ### STORY-044 Add the in-App text assistant
 

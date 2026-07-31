@@ -20,6 +20,8 @@ from ..schemas import (
     IntegrationCredentialRead,
     IntegrationPairCreate,
     IntegrationPairRead,
+    NextActionRead,
+    NextActionRequest,
     ProposalDecisionRead,
     ProposalRead,
 )
@@ -44,6 +46,7 @@ from ..services import (
     IntegrationScopeDenied,
     IntegrationService,
     InvalidAssistantContextWindow,
+    InvalidNextActionTimezone,
     ProposalExpired,
     ProposalNotFound,
     ProposalVersionConflict,
@@ -186,6 +189,75 @@ async def channel_context(
             detail={
                 "code": "invalid_context_window",
                 "message": "Assistant context must cover between 1 and 31 days",
+            },
+        ) from exc
+
+
+@router.post("/channel/next-action", response_model=NextActionRead)
+async def channel_next_action(
+    request: NextActionRequest,
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(bearer_scheme)
+    ],
+    channel_type: Annotated[IntegrationChannelType, Header(alias="X-Channel-Type")],
+    external_identity: Annotated[
+        str,
+        Header(
+            alias="X-External-Identity",
+            min_length=1,
+            max_length=256,
+            pattern=r".*\S.*",
+        ),
+    ],
+    external_message_id: Annotated[
+        str,
+        Header(
+            alias="X-External-Message-ID",
+            min_length=1,
+            max_length=256,
+            pattern=r".*\S.*",
+        ),
+    ],
+    connection: sqlite3.Connection = Depends(get_connection),
+    auth: AuthService = Depends(get_auth_service),
+) -> NextActionRead:
+    if credentials is None or credentials.scheme.casefold() != "bearer":
+        raise _integration_unauthorized()
+    try:
+        return IntegrationService(
+            connection,
+            auth.settings.secret_key,
+        ).recommend_next_action(
+            token=credentials.credentials,
+            channel_type=channel_type,
+            external_identity=external_identity,
+            external_message_id=external_message_id,
+            request=request,
+        )
+    except IntegrationAccessDenied as exc:
+        raise _integration_unauthorized() from exc
+    except IntegrationScopeDenied as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "integration_scope_denied",
+                "message": "This integration is not allowed to request a next action",
+            },
+        ) from exc
+    except IntegrationReplayConflict as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "external_message_replay_conflict",
+                "message": "This external message ID was used for another request",
+            },
+        ) from exc
+    except InvalidNextActionTimezone as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "invalid_account_timezone",
+                "message": "Set a valid account timezone before requesting a next action",
             },
         ) from exc
 

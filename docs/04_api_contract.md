@@ -1446,6 +1446,68 @@ authority. A later provider adapter must serialize this same checked envelope,
 use non-persisted Responses requests, and preserve the deterministic local
 result when provider configuration or transport fails.
 
+### 13.6 Recommend A Deterministic Next Action
+
+Implementation status: STORY-043 is implemented on its feature branch pending
+product-owner acceptance.
+
+```text
+POST /assistant/next-action
+```
+
+Request:
+
+```json
+{
+  "available_minutes": 30
+}
+```
+
+`available_minutes` is optional and, when present, must be between 5 and 720.
+When omitted, the service uses the active user-stated
+`focus.default_minutes` Preference when it is a valid integer in that range,
+then a documented 30-minute local default. The response reports which source
+was used.
+
+The shared `NextActionService` ranks at most 20 candidates from running Focus
+sessions, incomplete current-week Plan items, open Tasks, under-supported or
+dormant Projects, and the first supported step of a current non-stale Review.
+Its stable tie-breakers prefer a running Focus, then explicit Plan priority,
+Goal and Task priority, due evidence, weekly-minimum gaps, Project inactivity,
+fit within available time, and stable entity IDs. The response returns one
+recommendation, at most three alternatives, structured evidence, total and
+omitted candidate counts, and uncertainty codes. A model may phrase these
+fields but cannot rank a different candidate or invent evidence.
+
+`status` is `ready`, `empty`, or `conflict`. A Plan item linked to a Task that
+is no longer open is excluded and produces `plan_task_conflict`; a stale
+Review is reported and excluded. Calendar evidence is deliberately absent
+until STORY-045, so every result reports `calendar_unavailable`. This operation
+does not call a model, provider, or network service and never changes a Task,
+Plan, Focus session, or Review.
+
+Invalid account timezones return `409 invalid_account_timezone`. Normal
+request validation returns `422`.
+
+The paired-channel equivalent is:
+
+```text
+POST /integrations/channel/next-action
+Authorization: Bearer <integration token>
+X-Channel-Type: local_test | openclaw | telegram | whatsapp
+X-External-Identity: <paired external identity>
+X-External-Message-ID: <channel message ID>
+```
+
+It accepts the same body, requires `context:read`, and delegates to the same
+service and account-scoped repositories as the App route. Exact retries are
+accepted and recomputed from the current persisted context; reusing the
+external message ID with another payload or operation returns
+`409 external_message_replay_conflict`. The
+OpenClaw `theseus_next_action` tool additionally binds the call to the
+configured trusted channel and sender before forwarding it. It grants no
+write authority.
+
 ## 14. Channel Identity And Scoped Integration Access
 
 Implementation status: STORY-039 was product-owner accepted on 2026-07-26

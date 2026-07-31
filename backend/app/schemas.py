@@ -38,6 +38,38 @@ AssistantGatewayPurpose = Literal[
     "plan_status",
     "weekly_review",
 ]
+NextActionStatus = Literal["ready", "empty", "conflict"]
+NextActionCandidateKind = Literal[
+    "running_focus",
+    "planned_item",
+    "open_task",
+    "project_restart",
+    "review_step",
+]
+NextActionAvailableTimeSource = Literal["request", "preference", "default"]
+NextActionEvidenceCode = Literal[
+    "running_now",
+    "plan_priority",
+    "task_priority",
+    "task_in_progress",
+    "due_date",
+    "fits_available_time",
+    "exceeds_available_time",
+    "goal_priority",
+    "weekly_minimum_gap",
+    "project_inactivity",
+    "review_recommendation",
+]
+NextActionUncertaintyCode = Literal[
+    "calendar_unavailable",
+    "available_time_defaulted",
+    "multiple_focus_sessions",
+    "review_missing",
+    "review_stale",
+    "plan_task_conflict",
+    "candidate_limit_reached",
+    "no_candidate_evidence",
+]
 RiskType = Literal[
     "alignment_gap",
     "plan_drift",
@@ -1144,6 +1176,52 @@ class AssistantGatewayContextEnvelope(APIModel):
     time_summary: AssistantGatewayTimeSummary | None = None
     review_summary: AssistantGatewayReviewSummary | None = None
     omitted_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class NextActionRequest(APIModel):
+    available_minutes: int | None = Field(default=None, ge=5, le=720)
+
+
+class NextActionEvidence(APIModel):
+    code: NextActionEvidenceCode
+    summary: str
+    value: str
+
+
+class NextActionCandidate(APIModel):
+    candidate_key: str
+    kind: NextActionCandidateKind
+    title: str
+    score: int
+    estimated_minutes: int = Field(gt=0)
+    project_id: int | None = None
+    task_id: int | None = None
+    activity_id: int | None = None
+    focus_session_id: int | None = None
+    weekly_plan_id: int | None = None
+    planned_item_id: int | None = None
+    review_id: int | None = None
+    evidence: list[NextActionEvidence] = Field(default_factory=list)
+
+
+class NextActionUncertainty(APIModel):
+    code: NextActionUncertaintyCode
+    message: str
+
+
+class NextActionRead(APIModel):
+    context_version: Literal["next-action-v1"] = "next-action-v1"
+    status: NextActionStatus
+    generated_at: datetime
+    local_date: date
+    timezone: str
+    available_minutes: int = Field(ge=5, le=720)
+    available_time_source: NextActionAvailableTimeSource
+    recommendation: NextActionCandidate | None = None
+    alternatives: list[NextActionCandidate] = Field(default_factory=list)
+    uncertainties: list[NextActionUncertainty] = Field(default_factory=list)
+    candidate_count: int = Field(ge=0)
+    omitted_candidate_count: int = Field(ge=0)
 
 
 class AssistantWeeklyPlanProposalRequest(APIModel):

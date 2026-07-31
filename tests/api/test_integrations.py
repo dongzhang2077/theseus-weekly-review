@@ -155,6 +155,119 @@ async def test_channel_context_is_scoped_and_replay_is_idempotent(database) -> N
     assert receipt_count == 1
 
 
+async def test_channel_next_action_matches_authenticated_service(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client, "Next action channel owner")
+        goal = (
+            await client.post(
+                "/goals",
+                json={"title": "Finish course work", "priority": 1},
+            )
+        ).json()
+        project = (
+            await client.post(
+                "/projects",
+                json={
+                    "goal_id": goal["id"],
+                    "title": "Course assignment",
+                    "stage": "startup",
+                    "weekly_min_minutes": 60,
+                    "weekly_target_minutes": 180,
+                },
+            )
+        ).json()
+        task = (
+            await client.post(
+                "/tasks",
+                json={
+                    "project_id": project["id"],
+                    "title": "Draft the assignment",
+                    "priority": 1,
+                    "estimated_minutes": 30,
+                },
+            )
+        ).json()
+        app_result = await client.post(
+            "/assistant/next-action",
+            json={"available_minutes": 30},
+        )
+        pairing = await _pair(client)
+        channel_result = await client.post(
+            "/integrations/channel/next-action",
+            json={"available_minutes": 30},
+            headers=_channel_headers(pairing, message_id="next-action-message-001"),
+        )
+
+    assert app_result.status_code == 200
+    assert channel_result.status_code == 200
+    assert channel_result.json()["recommendation"]["task_id"] == task["id"]
+    for field in (
+        "status",
+        "local_date",
+        "timezone",
+        "available_minutes",
+        "available_time_source",
+        "recommendation",
+        "alternatives",
+        "uncertainties",
+        "candidate_count",
+        "omitted_candidate_count",
+    ):
+        assert channel_result.json()[field] == app_result.json()[field]
+
+
+async def test_channel_next_action_requires_context_scope(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client, "Next action scope owner")
+        pairing = await _pair(client, scopes=["proposal:create"])
+        response = await client.post(
+            "/integrations/channel/next-action",
+            json={"available_minutes": 30},
+            headers=_channel_headers(pairing, message_id="next-action-scope-001"),
+        )
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "integration_scope_denied"
+
+
+async def test_channel_next_action_replay_rejects_changed_request(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client, "Next action replay owner")
+        pairing = await _pair(client)
+        headers = _channel_headers(pairing, message_id="next-action-replay-001")
+        first = await client.post(
+            "/integrations/channel/next-action",
+            json={"available_minutes": 30},
+            headers=headers,
+        )
+        replay = await client.post(
+            "/integrations/channel/next-action",
+            json={"available_minutes": 30},
+            headers=headers,
+        )
+        conflict = await client.post(
+            "/integrations/channel/next-action",
+            json={"available_minutes": 60},
+            headers=headers,
+        )
+
+    assert first.status_code == 200
+    assert replay.status_code == 200
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["code"] == "external_message_replay_conflict"
+    with database.session() as connection:
+        receipt = connection.execute(
+            "SELECT operation FROM integration_message_receipts"
+        ).fetchone()
+    assert receipt["operation"] == "next_action.read"
+
+
 async def test_channel_proposal_is_scoped_pending_and_replay_safe(database) -> None:
     app = create_app(database.path)
     transport = httpx.ASGITransport(app=app)

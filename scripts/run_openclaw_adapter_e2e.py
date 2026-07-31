@@ -30,7 +30,7 @@ from scripts.prepare_midterm_demo import prepare_demo  # noqa: E402
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Verify the OpenClaw adapter context, proposal, decision, execution, and undo flow."
+        description="Verify the OpenClaw adapter context, next-action, proposal, decision, execution, and undo flow."
     )
     parser.add_argument(
         "--node",

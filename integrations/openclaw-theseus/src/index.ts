@@ -12,6 +12,7 @@ import {
   undoTheseusWeeklyPlanAction,
   draftTheseusWeeklyPlanProposal,
   readTheseusContext,
+  readTheseusNextAction,
   type TheseusClientConfig,
 } from "./client.js";
 import { TrustedMessageBridge } from "./trusted-message-bridge.js";
@@ -36,6 +37,11 @@ interface ProposalToolParams {
   trustedMessageReference?: string;
 }
 
+interface NextActionToolParams {
+  availableMinutes?: number;
+  trustedMessageReference?: string;
+}
+
 interface ProposalDecisionToolParams {
   proposalId: number;
   expectedVersion: number;
@@ -52,10 +58,12 @@ interface ProposalUndoToolParams {
 }
 
 const proposalToolName = "theseus_weekly_plan_proposal";
+const nextActionToolName = "theseus_next_action";
 const proposalDecisionToolName = "theseus_weekly_plan_decision";
 const proposalExecutionToolName = "theseus_weekly_plan_execute";
 const proposalUndoToolName = "theseus_weekly_plan_undo";
-const trustedProposalToolNames = new Set([
+const trustedToolNames = new Set([
+  nextActionToolName,
   proposalToolName,
   proposalDecisionToolName,
   proposalExecutionToolName,
@@ -94,7 +102,7 @@ const pluginConfigSchema = buildJsonPluginConfigSchema({
 const plugin: OpenClawPluginDefinition = definePluginEntry({
   id: "theseus",
   name: "Theseus",
-  description: "Read Theseus context, draft and decide weekly-plan proposals, and execute or undo approved changes through scoped integration access.",
+  description: "Read Theseus context and deterministic next actions, or manage weekly-plan proposals through scoped integration access.",
   configSchema: pluginConfigSchema,
   register(api) {
     const config = requirePluginConfig(api.pluginConfig);
@@ -159,7 +167,7 @@ const plugin: OpenClawPluginDefinition = definePluginEntry({
     });
 
     api.on("before_tool_call", (event, context) => {
-      if (!trustedProposalToolNames.has(event.toolName)) return;
+      if (!trustedToolNames.has(event.toolName)) return;
       const runId = event.runId ?? context?.runId;
       if (!runId) {
         return {
@@ -215,6 +223,53 @@ const plugin: OpenClawPluginDefinition = definePluginEntry({
           await readTheseusContext(requireResolvedClientConfig(config), {weekStart, weekEnd}),
         );
       },
+      },
+      {optional: true},
+    );
+
+    api.registerTool(
+      {
+        name: nextActionToolName,
+        label: "Theseus Next Action",
+        description:
+          "Read one deterministic, evidence-backed next action plus alternatives and uncertainty. Preserve the returned recommendation and cite only its returned evidence when answering; do not invent ranking facts. This tool never changes user data.",
+        parameters: Type.Object(
+          {
+            availableMinutes: Type.Optional(
+              Type.Integer({
+                minimum: 5,
+                maximum: 720,
+                description: "Minutes the user explicitly says are available now.",
+              }),
+            ),
+            trustedMessageReference: Type.Optional(
+              Type.String({
+                description: "Internal runtime field. OpenClaw injects it; callers must not set it.",
+              }),
+            ),
+          },
+          {additionalProperties: false},
+        ),
+        async execute(_toolCallId, params: NextActionToolParams, signal) {
+          signal?.throwIfAborted();
+          const clientConfig = requireResolvedClientConfig(config);
+          const messageId = bridge.resolveProposalReference(
+            params.trustedMessageReference,
+            clientConfig.accessToken,
+          );
+          if (!messageId) {
+            throw new Error("Theseus next-action read requires a trusted runtime message reference");
+          }
+          return jsonResult(
+            await readTheseusNextAction(
+              clientConfig,
+              params.availableMinutes === undefined
+                ? {}
+                : {availableMinutes: params.availableMinutes},
+              {messageId},
+            ),
+          );
+        },
       },
       {optional: true},
     );

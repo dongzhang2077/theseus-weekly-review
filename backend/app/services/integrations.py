@@ -30,9 +30,12 @@ from ..schemas import (
     IntegrationPairCreate,
     IntegrationPairRead,
     IntegrationScope,
+    NextActionRead,
+    NextActionRequest,
 )
 from .agent_memory import ProposalLedgerService
 from .assistant import AssistantContextService, AssistantWeeklyPlanExecutionService, AssistantWeeklyPlanProposalService, AssistantWeeklyPlanUndoService
+from .next_action import NextActionService
 
 
 class IntegrationAccessDenied(Exception):
@@ -184,6 +187,49 @@ class IntegrationService:
                 access=access,
                 message_hash=message_hash,
                 operation="context.read",
+                request_hash=request_hash,
+                created_at=now,
+            )
+        self.repository.touch(access.credential_id, now)
+        return response
+
+    def recommend_next_action(
+        self,
+        *,
+        token: str,
+        channel_type: str,
+        external_identity: str,
+        external_message_id: str,
+        request: NextActionRequest,
+    ) -> NextActionRead:
+        access = self.authenticate(
+            token=token,
+            channel_type=channel_type,
+            external_identity=external_identity,
+            required_scope="context:read",
+        )
+        operation = "next_action.read"
+        message_hash = self._message_hash(access.credential_id, external_message_id)
+        request_hash = self._request_hash(operation, request.model_dump(mode="json"))
+        receipt = self._existing_receipt(
+            access.credential_id,
+            message_hash,
+            request_hash,
+        )
+        identity = AuthRepository(self.connection).get_by_user_id(access.user_id)
+        if identity is None:
+            raise IntegrationAccessDenied
+        response = NextActionService(
+            self.connection,
+            identity.account,
+            now=self._clock,
+        ).recommend(request)
+        now = self._now()
+        if receipt is None:
+            self._save_receipt(
+                access=access,
+                message_hash=message_hash,
+                operation=operation,
                 request_hash=request_hash,
                 created_at=now,
             )

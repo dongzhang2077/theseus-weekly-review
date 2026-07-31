@@ -24,9 +24,14 @@ test("declares the integration token as a manifest-owned SecretRef surface", asy
     plugin.configSchema.jsonSchema.properties.accessToken.anyOf.map((schema) => schema.type),
     ["string", "object"],
   );
+  assert(manifest.contracts.tools.includes("theseus_next_action"));
+  assert.deepEqual(manifest.toolMetadata.theseus_next_action, {
+    replaySafe: true,
+    optional: true,
+  });
 });
 
-test("registers optional context, proposal, decision, execution, and undo tools through the native OpenClaw SDK", () => {
+test("registers optional context, next-action, proposal, decision, execution, and undo tools through the native OpenClaw SDK", () => {
   const registrations = [];
   const hooks = new Map();
   plugin.register({
@@ -48,7 +53,7 @@ test("registers optional context, proposal, decision, execution, and undo tools 
 
   assert.deepEqual(
     registrations.map(({tool}) => tool.name),
-    ["theseus_context_read", "theseus_weekly_plan_proposal", "theseus_weekly_plan_decision", "theseus_weekly_plan_execute", "theseus_weekly_plan_undo"],
+    ["theseus_context_read", "theseus_next_action", "theseus_weekly_plan_proposal", "theseus_weekly_plan_decision", "theseus_weekly_plan_execute", "theseus_weekly_plan_undo"],
   );
   assert.equal(registrations[0].options.optional, true);
   assert.equal(typeof registrations[0].tool.execute, "function");
@@ -57,6 +62,7 @@ test("registers optional context, proposal, decision, execution, and undo tools 
   assert.equal(registrations[2].options.optional, true);
   assert.equal(registrations[3].options.optional, true);
   assert.equal(registrations[4].options.optional, true);
+  assert.equal(registrations[5].options.optional, true);
   assert.equal(typeof hooks.get("message_received"), "function");
   assert.equal(typeof hooks.get("before_agent_run"), "function");
   assert.equal(typeof hooks.get("before_tool_call"), "function");
@@ -83,7 +89,7 @@ test("registers discovery metadata with an unresolved SecretRef and fails closed
     on() {},
   });
 
-  assert.equal(registrations.length, 5);
+  assert.equal(registrations.length, 6);
   await assert.rejects(
     registrations[0].tool.execute(
       "discovery-call",
@@ -91,6 +97,58 @@ test("registers discovery metadata with an unresolved SecretRef and fails closed
     ),
     /credential is unavailable in this OpenClaw registration mode/,
   );
+});
+
+test("next action is fail-closed and receives only a host-trusted message reference", async () => {
+  const hooks = new Map();
+  plugin.register({
+    pluginConfig: {
+      baseUrl: "http://127.0.0.1:8000",
+      accessToken: "ths_int_test-token-value",
+      channelType: "telegram",
+      externalIdentity: "telegram-user-42",
+      trustedChannelId: "telegram",
+      trustedSenderId: "telegram-user-42",
+    },
+    registerTool() {},
+    on(name, handler) {
+      hooks.set(name, handler);
+    },
+  });
+
+  const beforeToolCall = hooks.get("before_tool_call");
+  assert.equal(
+    (await beforeToolCall({
+      toolName: "theseus_next_action",
+      runId: "next-action-run",
+      params: {availableMinutes: 25},
+    })).block,
+    true,
+  );
+
+  await hooks.get("message_received")(
+    {
+      runId: "next-action-run",
+      messageId: "telegram-message-43",
+      senderId: "telegram-user-42",
+    },
+    {
+      runId: "next-action-run",
+      channelId: "telegram",
+      senderId: "telegram-user-42",
+    },
+  );
+  const accepted = await beforeToolCall({
+    toolName: "theseus_next_action",
+    runId: "next-action-run",
+    params: {availableMinutes: 25, trustedMessageReference: "model-controlled"},
+  });
+
+  assert.equal(accepted.block, undefined);
+  assert.equal(accepted.params.availableMinutes, 25);
+  assert.equal(typeof accepted.params.trustedMessageReference, "string");
+  assert.notEqual(accepted.params.trustedMessageReference, "model-controlled");
+  assert.notEqual(accepted.params.trustedMessageReference, "telegram-message-43");
 });
 
 test("proposal uses only a matching trusted inbound message", async () => {
@@ -153,8 +211,8 @@ test("proposal uses only a matching trusted inbound message", async () => {
   assert.notEqual(accepted.params.trustedMessageReference, "external-message-1");
   assert.notEqual(accepted.params.trustedMessageReference, "model-controlled");
 
-  assert.equal(registrations[1].tool.name, "theseus_weekly_plan_proposal");
-  assert.equal(registrations[2].tool.name, "theseus_weekly_plan_decision");
+  assert.equal(registrations[2].tool.name, "theseus_weekly_plan_proposal");
+  assert.equal(registrations[3].tool.name, "theseus_weekly_plan_decision");
   const decisionAccepted = await beforeToolCall({
     toolName: "theseus_weekly_plan_decision",
     runId: "run-1",
@@ -268,7 +326,7 @@ test("proposal tool verifies a trusted reference created by another plugin insta
   });
 
   await assert.rejects(
-    registrations[1].execute(
+    registrations[2].execute(
       "cross-instance-call",
       accepted.params,
     ),

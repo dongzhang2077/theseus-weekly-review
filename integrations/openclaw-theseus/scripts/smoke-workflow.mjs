@@ -5,6 +5,7 @@ import {
   draftTheseusWeeklyPlanProposal,
   executeTheseusWeeklyPlanProposal,
   readTheseusContext,
+  readTheseusNextAction,
   undoTheseusWeeklyPlanAction,
 } from "../dist/client.js";
 
@@ -41,6 +42,15 @@ const prefix = process.env.THESEUS_EXTERNAL_MESSAGE_PREFIX ?? "openclaw-e2e";
 const context = await readTheseusContext(config, review, {
   messageId: `${prefix}-context`,
 });
+const nextAction = await readTheseusNextAction(
+  config,
+  {availableMinutes: 30},
+  {messageId: `${prefix}-next-action`},
+);
+assertRecord(nextAction, "next action");
+if (!("status" in nextAction) || !("uncertainties" in nextAction)) {
+  throw new Error("Next-action response did not expose status and uncertainty");
+}
 const proposal = await draftTheseusWeeklyPlanProposal(
   config,
   {
@@ -98,7 +108,7 @@ const contextVersion = context && typeof context === "object" && "context_versio
   : "unknown";
 console.log(JSON.stringify({
   status: "ok",
-  operations: ["context.read", "proposal.create", "proposal.approve", "action.execute", "action.undo"],
+  operations: ["context.read", "next_action.read", "proposal.create", "proposal.approve", "action.execute", "action.undo"],
   contextVersion,
 }));
 
