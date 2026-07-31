@@ -1,10 +1,12 @@
 # STORY-041 Evidence-Backed Time Visualizations
 
-- Status: Day/Week/Month implementation verified; product-owner browser acceptance pending
+- Status: Product-owner accepted
 - Owner: Dong Zhang
 - Branch: `feature/041-evidence-backed-time-visualizations`
 - Stacked base: STORY-040 commit `606de15`
 - Planning date: 2026-07-30 PDT
+- Acceptance date: 2026-07-30 PDT
+- Accepted commit: `c174821`
 
 ## Sprint Goal
 
@@ -218,7 +220,7 @@ Implementation checkpoint (2026-07-30 PDT):
 - parallel running Activities can be selected as foreground or ended
   independently from the Running Activities sheet;
 - the reusable Sheet layer now stays above bottom navigation, so evidence
-  records are not obscured.
+  records are not obscured;
 - Month uses 16 sanitized active dates in visual QA, preserves exact daily and
   whole-month record IDs, excludes Jul 31 as unavailable, and keeps its legend
   readable at both 320px and 390px.
@@ -254,11 +256,12 @@ The resulting capture has no overlapping label/value text. The production data
 path remains the authenticated API; the visual harness is explicitly a
 sanitized layout fixture and does not claim runtime persistence.
 
-The historical four-destination shell is intentionally still present, with
-`track` relabeled Today and made the default. Review/Signals Level 1 convergence
-and the final three-destination shell remain a later accepted slice. STORY-041
-must not be marked accepted or merged to main until product-owner browser
-review passes.
+Product-owner browser acceptance passed on 2026-07-30 PDT against persisted
+student-routine data. The historical four-destination shell is intentionally
+still present, with `track` relabeled Today and made the default.
+Review/Signals Level 1 convergence and the final three-destination shell remain
+a later slice. Acceptance does not authorize a PR or merge to `main`; the
+feature stays on its pushed branch until the later integration gate.
 
 ## Critical Path And Risks
 

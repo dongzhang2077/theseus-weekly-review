@@ -1089,8 +1089,7 @@ browsing history, and opens the protected full-screen Tracker. Tracker has one
 explicit Start/End control and a read-only timer; parallel Activities remain
 independently selectable and endable. All 169 frontend tests, TypeScript,
 production build, `git diff --check`, and sanitized 320px/390px Chromium visual
-QA pass. Product-owner browser acceptance is still pending, so STORY-041 is not
-accepted and no main merge or PR is authorized yet.
+QA pass.
 
 Month checkpoint (2026-07-30 PDT): the accepted Month surface is now included
 without a backend contract change. It uses a minimum of seven active dates,
@@ -1098,6 +1097,14 @@ fixed duration thresholds (`Low <2h`, `Medium 2–6h`, `High >=6h`), excludes
 account-local future dates, provides arrow-key calendar navigation, and opens
 the exact TimeLog IDs for a selected date or the whole month. Sparse months
 remain explicit rather than rendering a misleading heatmap.
+
+Product-owner acceptance (2026-07-30 PDT): Dong tested the authenticated App
+with persisted student-routine data and accepted the Day, Week, and Month
+surfaces. Date navigation, future-date exclusion, mobile layout, chart totals,
+and record-level evidence behavior passed the browser gate. STORY-041 is
+accepted at commit `c174821`. This acceptance does not authorize a PR or merge
+to `main`; the feature remains on its pushed branch until the later integration
+gate.
 
 Acceptance criteria:
 
