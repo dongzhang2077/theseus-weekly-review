@@ -23,16 +23,19 @@ import {
 } from "../track/timerModel";
 import { TimeDonut } from "./TimeDonut";
 import { TimeEvidenceSheet } from "./TimeEvidenceSheet";
+import { MonthHeatmap } from "./MonthHeatmap";
 import { WeekBars } from "./WeekBars";
 import {
   aggregateProjectTime,
+  aggregateTimeMonth,
   aggregateTimeWeek,
   type ProjectTimeBucket,
   type TimeDaySummary,
+  type TimeMonthDaySummary,
 } from "./timeAggregation";
 import { formatEvidenceDate, formatRecordedDuration } from "./timeFormat";
 
-type TodayMode = "day" | "week";
+type TodayMode = "day" | "week" | "month";
 
 interface EvidenceSelection {
   title: string;
@@ -85,12 +88,15 @@ export function TodayScreen({
   const [mode, setMode] = useState<TodayMode>("day");
   const [selectedDay, setSelectedDay] = useState(todayDate);
   const [selectedWeekStart, setSelectedWeekStart] = useState(() => startOfIsoWeek(todayDate));
+  const [selectedMonthStart, setSelectedMonthStart] = useState(() => startOfMonth(todayDate));
+  const [selectedMonthDay, setSelectedMonthDay] = useState<string | null>(null);
   const [trackerOpen, setTrackerOpen] = useState(false);
   const [runningOpen, setRunningOpen] = useState(false);
   const [evidence, setEvidence] = useState<EvidenceSelection | null>(null);
   const [pendingActivityId, setPendingActivityId] = useState<string | null>(null);
   const [focusError, setFocusError] = useState<string | null>(null);
   const currentWeekStart = startOfIsoWeek(todayDate);
+  const currentMonthStart = startOfMonth(todayDate);
   const focus = useMemo(
     () => chooseFocusActivity(activities, { preferredId: foregroundActivityId }),
     [activities, foregroundActivityId]
@@ -104,11 +110,23 @@ export function TodayScreen({
     () => aggregateTimeWeek(timeLogs, projects, selectedWeekStart, todayDate),
     [projects, selectedWeekStart, timeLogs, todayDate]
   );
+  const monthSummary = useMemo(
+    () => aggregateTimeMonth(timeLogs, projects, selectedMonthStart, todayDate),
+    [projects, selectedMonthStart, timeLogs, todayDate]
+  );
 
   useEffect(() => {
     if (selectedDay > todayDate) setSelectedDay(todayDate);
     if (selectedWeekStart > currentWeekStart) setSelectedWeekStart(currentWeekStart);
-  }, [currentWeekStart, selectedDay, selectedWeekStart, todayDate]);
+    if (selectedMonthStart > currentMonthStart) setSelectedMonthStart(currentMonthStart);
+  }, [
+    currentMonthStart,
+    currentWeekStart,
+    selectedDay,
+    selectedMonthStart,
+    selectedWeekStart,
+    todayDate,
+  ]);
 
   useEffect(() => {
     onTrackerOpenChange(trackerOpen);
@@ -134,6 +152,14 @@ export function TodayScreen({
   }
 
   function openDay(day: TimeDaySummary) {
+    openEvidence({
+      title: `${formatEvidenceDate(day.date, { weekday: true })} time records`,
+      recordIds: day.recordIds,
+    });
+  }
+
+  function openMonthDay(day: TimeMonthDaySummary) {
+    setSelectedMonthDay(day.date);
     openEvidence({
       title: `${formatEvidenceDate(day.date, { weekday: true })} time records`,
       recordIds: day.recordIds,
@@ -255,20 +281,28 @@ export function TodayScreen({
     );
   }
 
-  const summary = mode === "day" ? daySummary : weekSummary;
+  const summary = mode === "day"
+    ? daySummary
+    : mode === "week"
+      ? weekSummary
+      : monthSummary;
   const selectedRangeIsCurrent = mode === "day"
     ? selectedDay === todayDate
-    : selectedWeekStart === currentWeekStart;
+    : mode === "week"
+      ? selectedWeekStart === currentWeekStart
+      : selectedMonthStart === currentMonthStart;
   const periodLabel = mode === "day"
     ? formatEvidenceDate(selectedDay, { weekday: true })
-    : formatWeekRange(selectedWeekStart);
+    : mode === "week"
+      ? formatWeekRange(selectedWeekStart)
+      : formatMonth(selectedMonthStart);
 
   return (
     <section className="h-full overflow-y-auto bg-desk-paper pb-5 font-work text-desk-ink">
       <header className="sticky top-0 z-10 border-b border-desk-line bg-desk-raised/95 px-4 pb-3 pt-3 backdrop-blur-sm">
         <h1 className="text-center text-[17px] font-bold">Today</h1>
-        <div className="mt-3 grid grid-cols-2 rounded-xl bg-desk-sunk p-1" aria-label="Time range">
-          {(["day", "week"] as const).map((item) => (
+        <div className="mt-3 grid grid-cols-3 rounded-xl bg-desk-sunk p-1" aria-label="Time range">
+          {(["day", "week", "month"] as const).map((item) => (
             <button
               type="button"
               key={item}
@@ -280,7 +314,7 @@ export function TodayScreen({
               aria-pressed={mode === item}
               onClick={() => setMode(item)}
             >
-              {item === "day" ? "Day" : "Week"}
+              {item === "day" ? "Day" : item === "week" ? "Week" : "Month"}
             </button>
           ))}
         </div>
@@ -360,7 +394,11 @@ export function TodayScreen({
             aria-label={`Previous ${mode}`}
             onClick={() => {
               if (mode === "day") setSelectedDay((value) => addIsoDays(value, -1));
-              else setSelectedWeekStart((value) => addIsoDays(value, -7));
+              else if (mode === "week") setSelectedWeekStart((value) => addIsoDays(value, -7));
+              else {
+                setSelectedMonthStart((value) => addIsoMonths(value, -1));
+                setSelectedMonthDay(null);
+              }
             }}
           >
             <Icon name="chevronLeft" className="h-5 w-5" />
@@ -374,9 +412,11 @@ export function TodayScreen({
                 onClick={() => {
                   setSelectedDay(todayDate);
                   setSelectedWeekStart(currentWeekStart);
+                  setSelectedMonthStart(currentMonthStart);
+                  setSelectedMonthDay(null);
                 }}
               >
-                {mode === "day" ? "Today" : "This week"}
+                {mode === "day" ? "Today" : mode === "week" ? "This week" : "This month"}
               </button>
             ) : null}
           </div>
@@ -387,7 +427,11 @@ export function TodayScreen({
             disabled={selectedRangeIsCurrent}
             onClick={() => {
               if (mode === "day") setSelectedDay((value) => addIsoDays(value, 1));
-              else setSelectedWeekStart((value) => addIsoDays(value, 7));
+              else if (mode === "week") setSelectedWeekStart((value) => addIsoDays(value, 7));
+              else {
+                setSelectedMonthStart((value) => addIsoMonths(value, 1));
+                setSelectedMonthDay(null);
+              }
             }}
           >
             <Icon name="chevronRight" className="h-5 w-5" />
@@ -440,7 +484,7 @@ export function TodayScreen({
               <Icon name="chevronRight" className="h-5 w-5 shrink-0 text-desk-muted" />
             </button>
           </>
-        ) : (
+        ) : mode === "week" ? (
           <>
             <WeekBars summary={weekSummary} onOpenDay={openDay} />
             {weekSummary.buckets.length > 0 ? (
@@ -461,6 +505,18 @@ export function TodayScreen({
               />
             ) : null}
           </>
+        ) : (
+          <MonthHeatmap
+            summary={monthSummary}
+            selectedDate={selectedMonthDay}
+            onOpenDay={openMonthDay}
+            onOpenAll={() =>
+              openEvidence({
+                title: `${formatMonth(selectedMonthStart)} time records`,
+                recordIds: monthSummary.recordIds,
+              })
+            }
+          />
         )}
       </div>
 
@@ -553,6 +609,16 @@ function addIsoDays(value: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+function startOfMonth(value: string): string {
+  return `${value.slice(0, 7)}-01`;
+}
+
+function addIsoMonths(value: string, months: number): string {
+  const date = parseIsoDate(value);
+  date.setUTCMonth(date.getUTCMonth() + months, 1);
+  return date.toISOString().slice(0, 10);
+}
+
 function parseIsoDate(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day));
@@ -560,4 +626,13 @@ function parseIsoDate(value: string): Date {
 
 function formatWeekRange(weekStart: string): string {
   return `${formatEvidenceDate(weekStart)} – ${formatEvidenceDate(addIsoDays(weekStart, 6))}`;
+}
+
+function formatMonth(monthStart: string): string {
+  const [year, month] = monthStart.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
 }

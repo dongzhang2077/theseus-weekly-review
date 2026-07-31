@@ -3,8 +3,10 @@ import type { ApiTimeLogRead } from "../../shared/api/timeLogs";
 import type { PlanProject } from "../../shared/domain/plan";
 import {
   aggregateProjectTime,
+  aggregateTimeMonth,
   aggregateTimeWeek,
   collapseProjectBuckets,
+  monthIntensity,
 } from "./timeAggregation";
 
 const projects: PlanProject[] = [
@@ -109,6 +111,72 @@ describe("aggregateTimeWeek", () => {
       totalSeconds: 2_400,
       recordIds: [7],
     }));
+  });
+});
+
+describe("aggregateTimeMonth", () => {
+  it("builds a calendar month, excludes future dates, and retains exact evidence", () => {
+    const summary = aggregateTimeMonth([
+      timeLog({ id: 1, date: "2026-07-01", duration_seconds: 3_600 }),
+      timeLog({ id: 2, date: "2026-07-30", duration_seconds: 8_100 }),
+      timeLog({ id: 3, date: "2026-07-31", duration_seconds: 7_200 }),
+    ], projects, "2026-07-01", "2026-07-30");
+
+    expect(summary.range).toEqual({ start: "2026-07-01", end: "2026-07-31" });
+    expect(summary.days).toHaveLength(31);
+    expect(summary.days[0]).toEqual(expect.objectContaining({
+      date: "2026-07-01",
+      status: "recorded",
+      intensity: "low",
+      recordIds: [1],
+    }));
+    expect(summary.days[29]).toEqual(expect.objectContaining({
+      date: "2026-07-30",
+      status: "recorded",
+      intensity: "medium",
+      recordIds: [2],
+    }));
+    expect(summary.days[30]).toEqual(expect.objectContaining({
+      date: "2026-07-31",
+      status: "unavailable",
+      intensity: "none",
+      recordIds: [],
+    }));
+    expect(summary.totalSeconds).toBe(11_700);
+    expect(summary.recordIds).toEqual([1, 2]);
+    expect(summary.activeDayCount).toBe(2);
+    expect(summary.averageActiveDaySeconds).toBe(5_850);
+    expect(summary.hasEnoughDensity).toBe(false);
+  });
+
+  it("opens the heatmap density gate at seven active dates", () => {
+    const logs = Array.from({ length: 7 }, (_, index) =>
+      timeLog({
+        id: index + 1,
+        date: `2026-07-${String(index + 1).padStart(2, "0")}`,
+        duration_seconds: 21_600,
+      })
+    );
+
+    expect(
+      aggregateTimeMonth(logs, projects, "2026-07-01", "2026-07-30")
+        .hasEnoughDensity
+    ).toBe(true);
+  });
+
+  it("uses documented absolute intensity thresholds", () => {
+    expect(monthIntensity(0)).toBe("none");
+    expect(monthIntensity(1)).toBe("low");
+    expect(monthIntensity(7_199)).toBe("low");
+    expect(monthIntensity(7_200)).toBe("medium");
+    expect(monthIntensity(21_599)).toBe("medium");
+    expect(monthIntensity(21_600)).toBe("high");
+  });
+
+  it("requires the first day of a real calendar month", () => {
+    expect(() =>
+      aggregateTimeMonth([], projects, "2026-07-02", "2026-07-30")
+    ).toThrow("monthStart must be the first day of a calendar month");
   });
 });
 

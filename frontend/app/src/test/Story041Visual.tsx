@@ -21,6 +21,18 @@ const activitySeed: ActivityTimer[] = [
 ];
 
 const logSeed: ApiTimeLogRead[] = [
+  timeLog(381, "2026-07-06", 1, 10800, "Project workshop"),
+  timeLog(382, "2026-07-07", 2, 16200, "Coursework"),
+  timeLog(383, "2026-07-08", 3, 5400, "Exercise"),
+  timeLog(384, "2026-07-09", 1, 23400, "Implementation"),
+  timeLog(385, "2026-07-13", 2, 7200, "Course reading"),
+  timeLog(386, "2026-07-14", 1, 19800, "Backend work"),
+  timeLog(387, "2026-07-15", 3, 9000, "Recovery"),
+  timeLog(388, "2026-07-16", 2, 25200, "Assignment work"),
+  timeLog(389, "2026-07-20", 1, 3600, "Project planning"),
+  timeLog(390, "2026-07-21", 2, 12600, "Coursework"),
+  timeLog(391, "2026-07-22", 3, 21600, "Exercise and errands"),
+  timeLog(392, "2026-07-23", 1, 18000, "Implementation"),
   timeLog(401, "2026-07-27", 1, 5400, "Backend schema"),
   timeLog(402, "2026-07-27", 2, 2700, "Course reading"),
   timeLog(403, "2026-07-28", 2, 4200, "Research reading"),
@@ -42,6 +54,9 @@ function Story041Visual() {
     window.setTimeout(() => {
       if (view === "week") {
         findButton("Week")?.click();
+      }
+      if (view === "month") {
+        findButton("Month")?.click();
       }
       if (view === "tracker") {
         document

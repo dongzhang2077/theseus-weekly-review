@@ -1,6 +1,6 @@
 # STORY-041 Evidence-Backed Time Visualizations
 
-- Status: Implementation verified; product-owner browser acceptance pending
+- Status: Day/Week/Month implementation verified; product-owner browser acceptance pending
 - Owner: Dong Zhang
 - Branch: `feature/041-evidence-backed-time-visualizations`
 - Stacked base: STORY-040 commit `606de15`
@@ -8,18 +8,18 @@
 
 ## Sprint Goal
 
-Render one authenticated Today/Week time surface whose Project totals, daily
-bars, and evidence drawers reconcile exactly with persisted, non-deleted
-TimeLogs. The slice closes only when the same source records explain every
-visible total and the protected Focus/Tracker flow still has one Start/End
-control.
+Render one authenticated Day/Week/Month time surface whose Project totals,
+daily bars, calendar intensity, and evidence drawers reconcile exactly with
+persisted, non-deleted TimeLogs. The slice closes only when the same source
+records explain every visible total and the protected Focus/Tracker flow still
+has one Start/End control.
 
 ## Scope Boundary
 
 Included:
 
-- pure Project/day/week aggregation from authenticated TimeLog reads;
-- accepted Project donut and Monday-to-Sunday stacked bars;
+- pure Project/day/week/month aggregation from authenticated TimeLog reads;
+- accepted Project donut, Monday-to-Sunday stacked bars, and Month heatmap;
 - exact record IDs and record-level evidence detail;
 - populated, sparse, empty, loading, and error behavior for the time surface;
 - accessible summaries, names, keyboard operation, and mobile targets;
@@ -27,7 +27,6 @@ Included:
 
 Excluded:
 
-- Month heatmap until the density and threshold gate is accepted;
 - Review/Signals Level 1 convergence and Plan visual refinement;
 - backend schema or endpoint changes;
 - Assistant, OpenClaw, Calendar, voice, onboarding, and model calls;
@@ -44,6 +43,25 @@ duplicate aggregation in FastAPI routes.
 Chart totals use persisted TimeLogs only. Open FocusSession time remains visible
 in `Now` but is not mixed into persisted chart totals, preventing a completed
 session from being counted once as Focus and again as a TimeLog.
+
+## Month Density And Intensity Decision
+
+The Month extension uses the existing authenticated TimeLog read contract. A
+selected month must contain at least seven active dates before the heatmap is
+shown. Sparse months keep their exact total, active-day count, and average, but
+show the accepted `More days are needed` state instead of implying a pattern.
+
+Intensity is fixed across months:
+
+- `None`: zero recorded seconds;
+- `Low`: more than zero and less than two hours;
+- `Medium`: two hours to less than six hours;
+- `High`: six hours or more.
+
+Future account-local dates are unavailable. Each available calendar control
+retains its exact date and TimeLog IDs, and the whole-month data action retains
+the ordered union of those IDs. Written values, a visible threshold legend,
+bounded cell marks, and arrow-key movement reinforce the color scale.
 
 ## Tasks
 
@@ -201,12 +219,15 @@ Implementation checkpoint (2026-07-30 PDT):
   independently from the Running Activities sheet;
 - the reusable Sheet layer now stays above bottom navigation, so evidence
   records are not obscured.
+- Month uses 16 sanitized active dates in visual QA, preserves exact daily and
+  whole-month record IDs, excludes Jul 31 as unavailable, and keeps its legend
+  readable at both 320px and 390px.
 
 Verification passed:
 
 ```text
 npm test -- --run
-29 test files passed; 163 tests passed
+29 test files passed; 169 tests passed
 
 npm run build
 TypeScript passed; Vite production build passed
@@ -222,6 +243,8 @@ Reproducible sanitized visual QA is available through
 - `docs/demo/screenshots/today-day-390.png`
 - `docs/demo/screenshots/today-day-320.png`
 - `docs/demo/screenshots/today-week-390.png`
+- `docs/demo/screenshots/today-month-390.png`
+- `docs/demo/screenshots/today-month-320.png`
 - `docs/demo/screenshots/today-evidence-390.png`
 - `docs/demo/screenshots/today-running-390.png`
 - `docs/demo/screenshots/today-tracker-390.png`

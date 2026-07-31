@@ -828,10 +828,13 @@ Preserve the draft. Reload and verify server state before offering Retry.
 - data entry: an icon control named `View monthly recorded time data` opens a
   date-ordered semantic list.
 
-The absolute duration thresholds for Low, Medium, and High remain intentionally
-unfrozen. They must be documented and accepted against real date density before
-Month implementation begins. This does not block the Day/Week HTML prototype,
-and the Month prototype must label its sample thresholds as provisional.
+The React Month implementation freezes the first absolute duration thresholds:
+`None = 0`, `Low = more than 0 and less than 2 hours`, `Medium = 2 hours to
+less than 6 hours`, and `High = 6 hours or more`. The heatmap appears only when
+the selected month contains at least seven active dates; otherwise it shows the
+accepted sparse-data state. These thresholds are fixed across months so a
+change in color always represents a change in recorded duration rather than a
+different relative scale.
 
 ### Plan versus actual
 

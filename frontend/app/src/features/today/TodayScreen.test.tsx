@@ -129,6 +129,62 @@ describe("TodayScreen", () => {
     expect(within(evidence).queryByText("Monday build")).not.toBeInTheDocument();
   });
 
+  it("shows a truthful sparse Month state before the density gate", () => {
+    renderToday();
+
+    fireEvent.click(screen.getByRole("button", { name: "Month" }));
+
+    expect(screen.getByText("July 2026")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Recorded time intensity" }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "More days are needed" }))
+      .toBeInTheDocument();
+    expect(screen.getByText("Record time on 7 days to show a monthly pattern."))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next month" })).toBeDisabled();
+  });
+
+  it("navigates and opens exact Month evidence after the density gate", () => {
+    const monthLogs = Array.from({ length: 7 }, (_, index) =>
+      timeLog(
+        201 + index,
+        `2026-07-${String(20 + index).padStart(2, "0")}`,
+        index % 2 === 0 ? 1 : 2,
+        (index + 1) * 3_600,
+        `Month record ${index + 1}`
+      )
+    );
+    renderToday({ timeLogs: monthLogs });
+
+    fireEvent.click(screen.getByRole("button", { name: "Month" }));
+    expect(screen.getByLabelText("Monthly recorded time calendar")).toBeInTheDocument();
+    expect(screen.getByText("Low <2h")).toBeInTheDocument();
+    expect(screen.getByText("Med 2–6h")).toBeInTheDocument();
+    expect(screen.getByText("High 6h+")).toBeInTheDocument();
+
+    const july24 = screen.getByRole("button", {
+      name: /open fri, jul 24 time records, 5h 0m, medium intensity/i,
+    });
+    const july25 = screen.getByRole("button", {
+      name: /open sat, jul 25 time records, 6h 0m, high intensity/i,
+    });
+    july24.focus();
+    fireEvent.keyDown(july24, { key: "ArrowRight" });
+    expect(july25).toHaveFocus();
+
+    fireEvent.click(july24);
+    const evidence = screen.getByRole("dialog", { name: "Fri, Jul 24 time records" });
+    expect(within(evidence).getByText("Month record 5")).toBeInTheDocument();
+    expect(within(evidence).queryByText("Month record 4")).not.toBeInTheDocument();
+    expect(within(evidence).getByText("Record 205", { exact: false })).toBeInTheDocument();
+
+    fireEvent.click(within(evidence).getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Previous month" }));
+    expect(screen.getByText("June 2026")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "This month" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next month" })).not.toBeDisabled();
+  });
+
   it("opens the protected Tracker with one explicit Start control and a read-only timer", () => {
     renderToday();
 
@@ -167,12 +223,16 @@ describe("TodayScreen", () => {
   });
 });
 
-function renderToday(options: { fetchImpl?: FetchLike; activities?: ActivityTimer[] } = {}) {
+function renderToday(options: {
+  fetchImpl?: FetchLike;
+  activities?: ActivityTimer[];
+  timeLogs?: ApiTimeLogRead[];
+} = {}) {
   const fetchImpl = options.fetchImpl ?? vi.fn<FetchLike>();
 
   function Harness() {
     const [activities, setActivities] = useState(options.activities ?? baseActivities);
-    const [timeLogs, setTimeLogs] = useState(logs);
+    const [timeLogs, setTimeLogs] = useState(options.timeLogs ?? logs);
     const [foregroundActivityId, setForegroundActivityId] = useState<string | null>(null);
     const [sessionDrafts, setSessionDrafts] = useState<Record<string, FocusSessionDraft>>({});
 

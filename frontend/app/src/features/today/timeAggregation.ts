@@ -32,6 +32,23 @@ export interface TimeWeekSummary extends TimeRangeSummary {
   days: TimeDaySummary[];
 }
 
+export type MonthIntensity = "none" | "low" | "medium" | "high";
+
+export interface TimeMonthDaySummary extends TimeDaySummary {
+  intensity: MonthIntensity;
+}
+
+export interface TimeMonthSummary extends TimeRangeSummary {
+  days: TimeMonthDaySummary[];
+  activeDayCount: number;
+  averageActiveDaySeconds: number;
+  hasEnoughDensity: boolean;
+}
+
+export const MONTH_MINIMUM_ACTIVE_DAYS = 7;
+export const MONTH_LOW_MAX_SECONDS = 2 * 60 * 60;
+export const MONTH_MEDIUM_MAX_SECONDS = 6 * 60 * 60;
+
 export function aggregateProjectTime(
   logs: ApiTimeLogRead[],
   projects: PlanProject[],
@@ -121,6 +138,67 @@ export function aggregateTimeWeek(
     buckets,
     days,
   };
+}
+
+export function aggregateTimeMonth(
+  logs: ApiTimeLogRead[],
+  projects: PlanProject[],
+  monthStart: string,
+  accountToday: string
+): TimeMonthSummary {
+  assertIsoDate(monthStart, "monthStart");
+  assertIsoDate(accountToday, "accountToday");
+  if (!monthStart.endsWith("-01")) {
+    throw new RangeError("monthStart must be the first day of a calendar month");
+  }
+  const nextMonthStart = addIsoMonths(monthStart, 1);
+  const monthEnd = addIsoDays(nextMonthStart, -1);
+  const dayCount = Number(monthEnd.slice(-2));
+  const days = Array.from({ length: dayCount }, (_, index): TimeMonthDaySummary => {
+    const date = addIsoDays(monthStart, index);
+    if (date > accountToday) {
+      return {
+        date,
+        status: "unavailable",
+        intensity: "none",
+        range: { start: date, end: date },
+        totalSeconds: 0,
+        recordIds: [],
+        buckets: [],
+      };
+    }
+    const summary = aggregateProjectTime(logs, projects, { start: date, end: date });
+    return {
+      ...summary,
+      date,
+      status: summary.totalSeconds > 0 ? "recorded" : "empty",
+      intensity: monthIntensity(summary.totalSeconds),
+    };
+  });
+  const availableDays = days.filter((day) => day.status !== "unavailable");
+  const activeDays = availableDays.filter((day) => day.status === "recorded");
+  const totalSeconds = activeDays.reduce((total, day) => total + day.totalSeconds, 0);
+  const recordIds = activeDays.flatMap((day) => day.recordIds);
+
+  return {
+    range: { start: monthStart, end: monthEnd },
+    totalSeconds,
+    recordIds,
+    buckets: combineBuckets(activeDays.flatMap((day) => day.buckets), totalSeconds),
+    days,
+    activeDayCount: activeDays.length,
+    averageActiveDaySeconds: activeDays.length > 0
+      ? Math.round(totalSeconds / activeDays.length)
+      : 0,
+    hasEnoughDensity: activeDays.length >= MONTH_MINIMUM_ACTIVE_DAYS,
+  };
+}
+
+export function monthIntensity(seconds: number): MonthIntensity {
+  if (seconds <= 0) return "none";
+  if (seconds < MONTH_LOW_MAX_SECONDS) return "low";
+  if (seconds < MONTH_MEDIUM_MAX_SECONDS) return "medium";
+  return "high";
 }
 
 export function collapseProjectBuckets(
@@ -256,4 +334,9 @@ function addIsoDays(value: string, days: number): string {
   const [year, month, day] = value.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day + days));
   return date.toISOString().slice(0, 10);
+}
+
+function addIsoMonths(value: string, months: number): string {
+  const [year, month] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1 + months, 1)).toISOString().slice(0, 10);
 }

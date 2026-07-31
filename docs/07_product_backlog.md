@@ -1074,23 +1074,30 @@ scales so that I can notice imbalance and choose what to inspect.
 
 Priority: P1 after STORY-040
 
-Ready checkpoint (2026-07-30 PDT): STORY-040 is accepted. Dong owns the first
-React slice. It is limited to authenticated TimeLog aggregation, the accepted
-Project donut, seven-day stacked bars, accessible summaries, and exact
-record-level drill-down. The Month heatmap remains deferred until a later
-density gate, and Insights/Plan convergence remains outside this slice.
+Ready checkpoint (2026-07-30 PDT): STORY-040 is accepted. Dong owns the React
+slice. It covers authenticated TimeLog aggregation, the accepted Project donut,
+seven-day stacked bars, the density-gated Month heatmap, accessible summaries,
+and exact record-level drill-down. Insights/Plan convergence remains outside
+this slice.
 
 Implementation checkpoint (2026-07-30 PDT): the bounded React slice is
 implemented and locally verified on
 `feature/041-evidence-backed-time-visualizations`. The authenticated Today
-surface now reconciles Day/Week totals and drill-down IDs from persisted
-TimeLogs, excludes current-week future dates, preserves live Focus while
+surface now reconciles Day/Week/Month totals and drill-down IDs from persisted
+TimeLogs, excludes current-range future dates, preserves live Focus while
 browsing history, and opens the protected full-screen Tracker. Tracker has one
 explicit Start/End control and a read-only timer; parallel Activities remain
-independently selectable and endable. All 163 frontend tests, TypeScript,
+independently selectable and endable. All 169 frontend tests, TypeScript,
 production build, `git diff --check`, and sanitized 320px/390px Chromium visual
 QA pass. Product-owner browser acceptance is still pending, so STORY-041 is not
 accepted and no main merge or PR is authorized yet.
+
+Month checkpoint (2026-07-30 PDT): the accepted Month surface is now included
+without a backend contract change. It uses a minimum of seven active dates,
+fixed duration thresholds (`Low <2h`, `Medium 2–6h`, `High >=6h`), excludes
+account-local future dates, provides arrow-key calendar navigation, and opens
+the exact TimeLog IDs for a selected date or the whole month. Sparse months
+remain explicit rather than rendering a misleading heatmap.
 
 Acceptance criteria:
 
