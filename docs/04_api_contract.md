@@ -1448,8 +1448,9 @@ result when provider configuration or transport fails.
 
 ### 13.6 Recommend A Deterministic Next Action
 
-Implementation status: STORY-043 is implemented on its feature branch pending
-product-owner acceptance.
+Implementation status: STORY-043 was product-owner accepted on 2026-07-31 PDT
+after automated contract, regression, plugin, disposable-adapter verification,
+and a successful trusted Telegram conversation test.
 
 ```text
 POST /assistant/next-action

@@ -1300,8 +1300,16 @@ Calendar remains visibly unavailable until STORY-045. Verification passed 28
 focused API/service/integration tests, 249 full Python tests, Python compilation,
 the deterministic sample Review, the OpenClaw 0.1.7 plugin suite, and a
 disposable HTTP adapter workflow covering `next_action.read` alongside context,
-proposal, decision, execution, and Undo. Product-owner conversation acceptance
-and any PR or merge to `main` remain pending.
+proposal, decision, execution, and Undo.
+
+Product-owner acceptance (2026-07-31 PDT): after the verified 0.1.7 plugin was
+loaded into the local OpenClaw Gateway, the product owner sent a natural-language
+Telegram request through the paired account and confirmed that the result was
+good. This accepts the shared deterministic recommendation behavior at commit
+`6a9cf00`, including returned evidence, alternatives, uncertainty, and the
+documented Calendar limitation. STORY-043 is accepted on its feature branch;
+Issue #86 remains the delivery record, and no PR or merge to `main` is
+authorized yet.
 
 ### STORY-044 Add the in-App text assistant
 
