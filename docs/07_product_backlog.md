@@ -1109,6 +1109,50 @@ Insights. All 174 frontend tests, TypeScript, the production build,
 `git diff --check`, and sanitized 320px/390px Level 1 plus 390px drawer visual
 QA pass. Product-owner browser acceptance remains pending.
 
+### STORY-040C Converge the Plan workspace
+
+As a daily user, I want a compact target-week Plan workspace so that capacity,
+one proposed adjustment, blocks, and Tasks are understandable without reading
+the full proposal diff.
+
+Priority: P1 after STORY-040B
+
+Ready checkpoint (2026-07-30 PDT): Dong owns the React slice on
+`feature/040c-plan-workspace-convergence`. It reuses the existing WeeklyPlan,
+Task, proposal, conflict, save, and Undo behavior. No API, schema, Assistant,
+Calendar, or plan-generation rule change is included.
+
+Acceptance criteria:
+
+- Plan defaults to the next account-local Monday-to-Sunday target week and
+  supports Previous, Next, date selection, and a conditional Next week reset;
+- target-week navigation, Edit, and duplicate Apply are disabled while a save
+  or Undo is in flight, and changing weeks cannot retain an Undo snapshot from
+  another week;
+- Level 1 shows compact planned, capacity, load, and slack evidence; proposal
+  reason and complete before/after evidence remain in Level 2;
+- missing capacity keeps blocks and Tasks inspectable but exposes Set capacity
+  and disables Apply;
+- Plan blocks and Tasks use one compact collection, and a plan block still
+  hands off to Today Focus;
+- loading, no-plan, load error, save, conflict, Undo progress, success, and
+  failure states retain an explicit recovery action where one exists;
+- focused Plan tests, the full frontend suite, TypeScript, production build,
+  `git diff --check`, and sanitized 320px/390px visual QA pass before
+  product-owner acceptance.
+
+Implementation checkpoint (2026-07-30 PDT): the bounded Plan React slice is
+implemented on `feature/040c-plan-workspace-convergence`. Plan now opens on the
+next account-local week, browses arbitrary Monday-to-Sunday target weeks, and
+clears week-specific Undo state before navigation. Level 1 retains a compact
+capacity visual, one adjustment, and a combined Plan blocks / Tasks collection;
+proposal reason and the complete diff remain in Level 2. Missing capacity and
+conflict prevent Apply, while save/Undo operations lock duplicate writes and
+week navigation. Confirmed writes now report `Plan saved and verified`. All
+179 frontend tests, TypeScript, the production build, `git diff --check`, and
+sanitized 320px/390px plus missing-capacity visual QA pass. Product-owner
+browser acceptance remains pending.
+
 ### STORY-041 Add evidence-backed time visualizations
 
 As a daily user, I want to see time distribution and change across useful time

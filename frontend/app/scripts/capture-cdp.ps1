@@ -68,7 +68,7 @@ $null = Invoke-Cdp -Method "Emulation.setDeviceMetricsOverride" -Params @{
 }
 $null = Invoke-Cdp -Method "Page.enable"
 $null = Invoke-Cdp -Method "Page.navigate" -Params @{ url = $Url }
-Start-Sleep -Milliseconds 900
+Start-Sleep -Milliseconds 1800
 
 if ($ClickLabel) {
   $labelJson = $ClickLabel | ConvertTo-Json -Compress

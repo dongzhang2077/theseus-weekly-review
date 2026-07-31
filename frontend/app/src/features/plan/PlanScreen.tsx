@@ -25,7 +25,12 @@ import {
   createUpcomingPlanSeed,
   dismissPlanSuggestion,
   formatPlanWeek,
+  planSeedForTarget,
+  planTargetWeekForDate,
+  planWeekContainingDate,
+  shiftPlanWeek,
   withPlanSuggestion,
+  type PlanDateRange,
   type PlanDraft,
   type PlanItem,
   type PlanMetrics,
@@ -54,6 +59,7 @@ interface UndoSnapshot {
 interface PlanScreenProps {
   planData: AppWeekViewModel["plan"];
   reviewSource: AppWeekSource;
+  accountToday?: string;
   apiBaseUrl?: string;
   entryRequest: {
     id: number;
@@ -77,8 +83,8 @@ export function PlanScreen({
   apiBaseUrl,
   planData,
   reviewSource,
+  accountToday,
   entryRequest,
-  onReview,
   onFocusItem,
   onDetailOpenChange,
   fetchImpl
@@ -87,8 +93,16 @@ export function PlanScreen({
   const initialSeed = hasLiveApi && reviewSource !== "api"
     ? createUpcomingPlanSeed()
     : planData;
+  const defaultTargetWeek = accountToday
+    ? planTargetWeekForDate(accountToday)
+    : initialSeed.targetWeek;
+  const [targetWeek, setTargetWeek] = useState<PlanDateRange>(() => ({
+    ...defaultTargetWeek
+  }));
   const [workspace, setWorkspace] = useState<PlanWorkspace>(() => {
-    const initialWorkspace = createPlanWorkspace(initialSeed);
+    const initialWorkspace = createPlanWorkspace(
+      planSeedForTarget(initialSeed, defaultTargetWeek)
+    );
     return entryRequest?.suggestion
       ? withPlanSuggestion(initialWorkspace, entryRequest.suggestion)
       : initialWorkspace;
@@ -103,6 +117,12 @@ export function PlanScreen({
   const [reload, setReload] = useState(0);
   const metrics = useMemo(() => calculatePlanMetrics(workspace.draft), [workspace.draft]);
   const proposal = useMemo(() => buildPlanProposal(workspace), [workspace]);
+  const writeLocked =
+    operation.phase === "saving" || operation.phase === "undoing";
+  const applyLocked =
+    writeLocked ||
+    operation.phase === "conflict" ||
+    metrics.capacityMinutes <= 0;
   const projectNames = useMemo(
     () => new Map(workspace.projects.map((project) => [project.id, project.title])),
     [workspace.projects]
@@ -114,9 +134,10 @@ export function PlanScreen({
   ).length;
 
   useEffect(() => {
-    const seed = hasLiveApi && reviewSource !== "api"
+    const baseSeed = hasLiveApi && reviewSource !== "api"
       ? createUpcomingPlanSeed()
       : planData;
+    const seed = planSeedForTarget(baseSeed, targetWeek);
     if (!hasLiveApi) {
       const nextWorkspace = createPlanWorkspace(seed);
       setWorkspace(entryRequest?.suggestion
@@ -148,7 +169,15 @@ export function PlanScreen({
     return () => {
       ignore = true;
     };
-  }, [apiBaseUrl, fetchImpl, hasLiveApi, planData, reload, reviewSource]);
+  }, [
+    apiBaseUrl,
+    fetchImpl,
+    hasLiveApi,
+    planData,
+    reload,
+    reviewSource,
+    targetWeek
+  ]);
 
   useEffect(() => {
     if (!hasLiveApi) {
@@ -187,7 +216,7 @@ export function PlanScreen({
   useEffect(() => () => onDetailOpenChange?.(false), [onDetailOpenChange]);
 
   async function applySuggestion() {
-    if (!proposal || operation.phase === "saving" || operation.phase === "undoing") return;
+    if (!proposal || applyLocked) return;
     const snapshot: UndoSnapshot = {
       before: workspace.persistedPlan ? copyPlan(workspace.persistedPlan) : null,
       baseline: copyPlan(workspace.draft),
@@ -226,7 +255,12 @@ export function PlanScreen({
       suggestionStatus: "applied"
     }));
     setUndoSnapshot(snapshot);
-    setOperation({ phase: "saved", action: "apply", message: "Plan saved", detail: null });
+    setOperation({
+      phase: "saved",
+      action: "apply",
+      message: "Plan saved and verified",
+      detail: null
+    });
     setDetail(null);
   }
 
@@ -265,7 +299,12 @@ export function PlanScreen({
       persistedPlan: result.data as PlanDraft
     }));
     setUndoSnapshot(snapshot);
-    setOperation({ phase: "saved", action: "manual", message: "Plan updated", detail: null });
+    setOperation({
+      phase: "saved",
+      action: "manual",
+      message: "Plan saved and verified",
+      detail: null
+    });
     setDetail(null);
     return true;
   }
@@ -333,18 +372,64 @@ export function PlanScreen({
     else if (operation.action === "apply") void applySuggestion();
   }
 
+  function changeTargetWeek(nextWeek: PlanDateRange) {
+    if (writeLocked) return;
+    setDetail(null);
+    setOperation(idleOperation);
+    setUndoSnapshot(null);
+    setTargetWeek({ ...nextWeek });
+  }
+
   return (
     <section className="relative min-h-full overflow-y-auto bg-desk-paper pb-6 font-work text-desk-ink">
-      <header className="grid h-[52px] grid-cols-[44px_1fr_44px] items-center border-b border-desk-line bg-desk-raised/90 px-3">
-        <span aria-hidden="true" />
-        <h1 className="m-0 truncate text-center text-[17px] font-bold">{formatPlanWeek(workspace.draft.week)}</h1>
-        <IconButton
-          className="col-start-3"
-          label={workspace.persistedPlan ? "Edit plan" : "New plan"}
-          icon={workspace.persistedPlan ? "fileText" : "plus"}
-          disabled={loadPhase !== "ready" || operation.phase === "saving" || operation.phase === "undoing"}
-          onClick={() => setDetail("edit")}
-        />
+      <header className="sticky top-0 z-10 border-b border-desk-line bg-desk-raised/95 px-2 py-1.5 backdrop-blur-sm">
+        <div className="grid grid-cols-[44px_minmax(0,1fr)_44px_44px] items-center">
+          <IconButton
+            label="Previous target week"
+            icon="chevronLeft"
+            disabled={writeLocked}
+            onClick={() => changeTargetWeek(shiftPlanWeek(targetWeek, -1))}
+          />
+          <label className="relative flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-paper px-1 text-sm font-bold focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-desk-ink">
+            <span className="truncate">{formatPlanWeek(targetWeek)}</span>
+            <Icon name="calendar" className="size-4 shrink-0 text-desk-muted" />
+            <input
+              className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed"
+              type="date"
+              aria-label="Choose target week"
+              value={targetWeek.start}
+              disabled={writeLocked}
+              onChange={(event) => {
+                const selected = planWeekContainingDate(event.target.value);
+                if (selected) changeTargetWeek(selected);
+              }}
+            />
+          </label>
+          <IconButton
+            label="Next target week"
+            icon="chevronRight"
+            disabled={writeLocked}
+            onClick={() => changeTargetWeek(shiftPlanWeek(targetWeek, 1))}
+          />
+          <IconButton
+            label={workspace.persistedPlan ? "Edit plan" : "New plan"}
+            icon={workspace.persistedPlan ? "fileText" : "plus"}
+            disabled={loadPhase !== "ready" || writeLocked}
+            onClick={() => setDetail("edit")}
+          />
+        </div>
+        {targetWeek.start !== defaultTargetWeek.start ? (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              className="min-h-7 rounded-full px-3 text-xs font-semibold text-desk-accent hover:bg-desk-accent-soft focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-desk-ink disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={writeLocked}
+              onClick={() => changeTargetWeek(defaultTargetWeek)}
+            >
+              Next week
+            </button>
+          </div>
+        ) : null}
       </header>
 
       {loadPhase === "loading" ? (
@@ -365,31 +450,60 @@ export function PlanScreen({
 
       {loadPhase === "ready" ? (
         <div className="mx-auto grid w-full gap-4 px-4 py-4">
-          <button
-            className={`rounded-paper border px-3 py-3 text-left transition-colors duration-150 ${balanceSurfaceClass(metrics.status)}`}
-            type="button"
-            aria-label={`Week balance: ${balanceLabel(metrics.status)}`}
-            onClick={() => setDetail("slack")}
-          >
-            <span className="flex items-center justify-between gap-3">
-              <span className="flex items-baseline gap-2">
-                <small className="text-xs font-bold uppercase tracking-wide text-desk-muted">Balance</small>
-                <strong className="text-sm">{balanceLabel(metrics.status)}</strong>
+          {metrics.capacityMinutes <= 0 ? (
+            <section className="rounded-paper border border-desk-warn/40 bg-desk-warn-soft/45 px-4 py-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="m-0 text-sm font-bold">Capacity needed</h2>
+                  <p className="m-0 mt-1 text-xs text-desk-muted">
+                    {formatMinutes(metrics.plannedMinutes)} planned
+                  </p>
+                </div>
+                <button
+                  className="min-h-10 rounded-paper border border-desk-warn/30 bg-desk-raised px-3 text-sm font-bold text-desk-warn"
+                  type="button"
+                  onClick={() => setDetail("edit")}
+                >
+                  Set capacity
+                </button>
+              </div>
+            </section>
+          ) : (
+            <button
+              className={`rounded-paper border px-4 py-3 text-left transition-colors duration-150 ${balanceSurfaceClass(metrics.status)}`}
+              type="button"
+              aria-label={`Week balance: ${balanceLabel(metrics.status)}`}
+              onClick={() => setDetail("slack")}
+            >
+              <span className="flex items-start justify-between gap-4">
+                <span>
+                  <strong className="block text-xl tabular-nums">
+                    {formatMinutes(metrics.plannedMinutes)}
+                  </strong>
+                  <small className="text-xs text-desk-muted">planned</small>
+                </span>
+                <span className="text-right">
+                  <strong className="block text-xl tabular-nums">
+                    {formatMinutes(metrics.capacityMinutes)}
+                  </strong>
+                  <small className="text-xs text-desk-muted">capacity</small>
+                </span>
               </span>
-              <Icon name="chevronRight" className="size-4 text-desk-muted" />
-            </span>
-            <span className="mt-2 grid grid-cols-3 divide-x divide-desk-line">
-              <Metric label="Planned" value={formatMinutes(metrics.plannedMinutes)} />
-              <Metric label="Capacity" value={formatMinutesOrDash(metrics.capacityMinutes)} />
-              <Metric label="Slack" value={formatNullableMinutes(metrics.slackMinutes)} />
-            </span>
-            <span className="mt-2 block h-1 overflow-hidden rounded-full bg-desk-sunk" aria-hidden="true">
-              <span
-                className={`block h-full rounded-full transition-[width] duration-200 ${balanceFillClass(metrics.status)}`}
-                style={{ width: `${loadPercent(metrics)}%` }}
-              />
-            </span>
-          </button>
+              <span className="mt-3 block h-2 overflow-hidden rounded-full bg-desk-sunk" aria-hidden="true">
+                <span
+                  className={`block h-full rounded-full transition-[width] duration-200 ${balanceFillClass(metrics.status)}`}
+                  style={{ width: `${loadPercent(metrics)}%` }}
+                />
+              </span>
+              <span className="mt-2 flex items-center justify-between gap-3 text-xs">
+                <strong>{formatNullableMinutes(metrics.slackMinutes)} protected slack</strong>
+                <span className="flex items-center gap-1 text-desk-muted">
+                  {balanceLabel(metrics.status)}
+                  <Icon name="chevronRight" className="size-4" />
+                </span>
+              </span>
+            </button>
+          )}
 
           {operation.phase !== "idle" ? (
             <div
@@ -427,19 +541,13 @@ export function PlanScreen({
                 <small className="mt-1 block font-semibold text-desk-muted">
                   {proposal.suggestion.projectTitle ?? "Flexible block"} · {formatSignedMinutes(proposal.suggestion.deltaMinutes)}
                 </small>
-                <p className="mt-2 line-clamp-2 text-sm leading-5 text-desk-muted">{proposal.suggestion.reason}</p>
-                <span className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-paper bg-desk-sunk px-3 py-2 text-center text-xs">
-                  <span><small className="block text-desk-muted">Before</small><strong>{formatMinutes(proposal.beforeMetrics.plannedMinutes)}</strong></span>
-                  <Icon name="chevronRight" className="size-4 text-desk-subtle" />
-                  <span><small className="block text-desk-muted">After</small><strong>{formatMinutes(proposal.afterMetrics.plannedMinutes)}</strong></span>
-                </span>
               </button>
               <div className="flex justify-end border-t border-desk-line px-3 py-2">
                 <button
                   className="min-h-10 rounded-paper border border-desk-accent/25 bg-desk-accent-soft px-5 text-sm font-bold text-desk-accent disabled:cursor-not-allowed disabled:opacity-50"
                   type="button"
                   aria-label="Apply adjustment"
-                  disabled={operation.phase === "saving" || operation.phase === "undoing"}
+                  disabled={applyLocked}
                   onClick={() => void applySuggestion()}
                 >
                   {operation.phase === "saving" ? "Saving" : "Apply"}
@@ -458,60 +566,42 @@ export function PlanScreen({
               <span className="flex-1"><strong className="block text-sm">Suggestion dismissed</strong><small className="text-desk-muted">Restore when useful</small></span>
               <Icon name="chevronRight" className="size-4 text-desk-muted" />
             </button>
-          ) : workspace.persistedPlan ? (
-            <section className="flex min-h-14 items-center gap-3 rounded-paper border border-desk-line bg-desk-raised px-3">
-              <Icon name="check" className="size-5 text-desk-accent" />
-              <span className="min-w-0 flex-1"><strong className="block text-sm">No adjustment</strong><small className="text-desk-muted">Plan is ready</small></span>
-              <button className="min-h-9 rounded-paper border border-desk-line bg-transparent px-3 text-sm font-bold text-desk-muted" type="button" onClick={() => setDetail("edit")}>Edit</button>
-            </section>
-          ) : (
+          ) : !workspace.persistedPlan ? (
             <section className="rounded-paper border border-desk-line bg-desk-raised p-4">
-              <h2 className="m-0 text-base font-bold">No plan yet</h2>
-              <p className="mt-1 text-sm text-desk-muted">Set capacity and blocks for this week.</p>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button className="min-h-10 rounded-paper border border-desk-accent/25 bg-desk-accent-soft px-3 text-sm font-bold text-desk-accent" type="button" onClick={() => setDetail("edit")}>New</button>
-                <button className="min-h-10 rounded-paper border border-desk-line bg-transparent px-3 text-sm font-bold text-desk-muted" type="button" onClick={onReview}>Review</button>
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="m-0 text-base font-bold">No plan yet</h2>
+                <button className="min-h-10 rounded-paper border border-desk-accent/25 bg-desk-accent-soft px-4 text-sm font-bold text-desk-accent" type="button" onClick={() => setDetail("edit")}>New</button>
               </div>
             </section>
-          )}
-
-          {workspace.draft.items.length > 0 ? (
-            <button
-              className="grid min-h-14 w-full grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 rounded-paper border border-desk-line bg-desk-raised px-3 text-left transition-colors hover:bg-desk-sunk"
-              type="button"
-              aria-label="Open plan blocks"
-              onClick={() => setDetail("focus")}
-            >
-              <span className="grid size-9 place-items-center rounded-full bg-desk-sunk text-desk-muted"><Icon name="layers" className="size-5" /></span>
-              <span className="min-w-0">
-                <strong className="block text-sm">Plan blocks</strong>
-                <small className="block text-desk-muted">{workspace.draft.items.length} blocks · {formatMinutes(metrics.plannedMinutes)}</small>
-              </span>
-              <Icon name="chevronRight" className="size-4 text-desk-muted" />
-            </button>
           ) : null}
 
-          <button
-            className="grid min-h-14 w-full grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 rounded-paper border border-desk-line bg-desk-raised px-3 text-left transition-colors hover:bg-desk-sunk"
-            type="button"
-            aria-label="Open tasks"
-            onClick={() => setDetail("tasks")}
+          <section
+            className="overflow-hidden rounded-paper border border-desk-line bg-desk-raised shadow-paper"
+            aria-label="Plan content"
           >
-            <span className="grid size-9 place-items-center rounded-full bg-desk-sunk text-desk-muted">
-              <Icon name="target" className="size-5" />
-            </span>
-            <span className="min-w-0">
-              <strong className="block text-sm">Tasks</strong>
-              <small className="block text-desk-muted">
-                {taskLoadPhase === "loading"
+            {workspace.draft.items.length > 0 ? (
+              <PlanCollectionRow
+                label="Plan blocks"
+                meta={`${workspace.draft.items.length} · ${formatMinutes(metrics.plannedMinutes)}`}
+                icon="layers"
+                ariaLabel="Open plan blocks"
+                onClick={() => setDetail("focus")}
+              />
+            ) : null}
+            <PlanCollectionRow
+              label="Tasks"
+              meta={
+                taskLoadPhase === "loading"
                   ? "Loading"
                   : taskLoadPhase === "error"
                     ? "Unavailable"
-                    : `${activeTaskCount} active`}
-              </small>
-            </span>
-            <Icon name="chevronRight" className="size-4 text-desk-muted" />
-          </button>
+                    : `${activeTaskCount} active`
+              }
+              icon="target"
+              ariaLabel="Open tasks"
+              onClick={() => setDetail("tasks")}
+            />
+          </section>
         </div>
       ) : null}
 
@@ -523,6 +613,7 @@ export function PlanScreen({
           <SuggestionDetail
             workspace={workspace}
             operation={operation}
+            applyDisabled={applyLocked}
             onApply={() => void applySuggestion()}
             onDismiss={() => setWorkspace((current) => dismissPlanSuggestion(current))}
             onRestore={() => setWorkspace((current) => ({ ...current, suggestionStatus: "available" }))}
@@ -557,12 +648,33 @@ export function PlanScreen({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function PlanCollectionRow({
+  label,
+  meta,
+  icon,
+  ariaLabel,
+  onClick
+}: {
+  label: string;
+  meta: string;
+  icon: "layers" | "target";
+  ariaLabel: string;
+  onClick: () => void;
+}) {
   return (
-    <span className="px-2 first:pl-0 last:pr-0">
-      <small className="block text-xs text-desk-muted">{label}</small>
-      <strong className="mt-1 block tabular-nums text-base">{value}</strong>
-    </span>
+    <button
+      className="grid min-h-14 w-full grid-cols-[32px_minmax(0,1fr)_auto_auto] items-center gap-3 border-0 border-b border-desk-line bg-transparent px-4 text-left last:border-b-0 hover:bg-desk-sunk focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-desk-ink"
+      type="button"
+      aria-label={ariaLabel}
+      onClick={onClick}
+    >
+      <span className="grid size-8 place-items-center rounded-full bg-desk-sunk text-desk-muted">
+        <Icon name={icon} className="size-4" />
+      </span>
+      <strong className="min-w-0 text-sm">{label}</strong>
+      <span className="text-sm tabular-nums text-desk-muted">{meta}</span>
+      <Icon name="chevronRight" className="size-4 text-desk-subtle" />
+    </button>
   );
 }
 
@@ -783,6 +895,7 @@ function PlanEditor({
 function SuggestionDetail({
   workspace,
   operation,
+  applyDisabled,
   onApply,
   onDismiss,
   onRestore,
@@ -791,6 +904,7 @@ function SuggestionDetail({
 }: {
   workspace: PlanWorkspace;
   operation: OperationState;
+  applyDisabled: boolean;
   onApply: () => void;
   onDismiss: () => void;
   onRestore: () => void;
@@ -860,7 +974,7 @@ function SuggestionDetail({
         <button
           className="min-h-11 rounded-paper border-0 bg-desk-accent px-4 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
           type="button"
-          disabled={operation.phase === "saving" || operation.phase === "undoing"}
+          disabled={applyDisabled}
           onClick={onApply}
         >
           {operation.phase === "saving" ? "Saving" : "Apply"}
@@ -1001,7 +1115,7 @@ function operationFailure(
     : {
         phase: "error",
         action,
-        message: action === "undo" ? "Plan could not be restored" : "Plan could not be saved",
+        message: action === "undo" ? "Plan could not be restored" : "Plan was not saved",
         detail
       };
 }

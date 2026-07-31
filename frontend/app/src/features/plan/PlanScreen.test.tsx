@@ -62,7 +62,7 @@ describe("PlanScreen", () => {
       "Resume and applications · +1h"
     );
     expect(screen.getByRole("button", { name: "Apply adjustment" })).toHaveTextContent("Apply");
-    expect(screen.getByRole("button", { name: "Open plan blocks" })).toHaveTextContent("3 blocks · 11h");
+    expect(screen.getByRole("button", { name: "Open plan blocks" })).toHaveTextContent("3 · 11h");
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
 
@@ -113,6 +113,83 @@ describe("PlanScreen", () => {
     expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
   });
 
+  it("defaults to the account-local next week and safely resets after browsing", async () => {
+    renderPlan({ accountToday: "2026-07-30" });
+
+    expect(screen.getByText("Aug 3 - Aug 9")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next week" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous target week" }));
+    expect(await screen.findByText("Jul 27 - Aug 2")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
+    expect(await screen.findByText("Aug 3 - Aug 9")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Choose target week"), {
+      target: { value: "2026-08-12" }
+    });
+    expect(await screen.findByText("Aug 10 - Aug 16")).toBeInTheDocument();
+  });
+
+  it("clears a saved-week Undo snapshot before opening another target week", async () => {
+    renderPlan();
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply adjustment" }));
+    expect(await screen.findByRole("button", { name: "Undo" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next target week" }));
+    expect(await screen.findByText("Jun 22 - Jun 28")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
+  });
+
+  it("keeps plan content inspectable but blocks Apply until capacity exists", () => {
+    renderPlan({
+      planData: {
+        ...demoWeek.plan,
+        sourcePlan: {
+          ...demoWeek.plan.sourcePlan,
+          capacityMinutes: 0
+        }
+      }
+    });
+
+    expect(screen.getByText("Capacity needed")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Set capacity" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply adjustment" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Open plan blocks" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Open tasks" })).toBeEnabled();
+  });
+
+  it("locks week navigation and duplicate Apply while a write is in flight", async () => {
+    let finishPost: ((value: ReturnType<typeof ok>) => void) | undefined;
+    const fetchImpl: FetchLike = async (input, init) => {
+      if (init.method === "GET" && input.endsWith("/weekly-plans")) return ok([reviewedPlan]);
+      if (init.method === "GET" && input.endsWith("/projects")) return ok(projects);
+      if (init.method === "GET" && input.includes("/tasks")) return ok([]);
+      if (init.method === "POST") {
+        return await new Promise((resolve) => {
+          finishPost = resolve;
+        });
+      }
+      return failed(500);
+    };
+    renderPlan({
+      apiBaseUrl: "http://127.0.0.1:8000",
+      reviewSource: "api",
+      fetchImpl
+    });
+
+    const apply = await screen.findByRole("button", { name: "Apply adjustment" });
+    fireEvent.click(apply);
+    expect(screen.getByRole("button", { name: "Previous target week" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next target week" })).toBeDisabled();
+    expect(screen.getByLabelText("Choose target week")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "New plan" })).toBeDisabled();
+    expect(apply).toBeDisabled();
+
+    finishPost?.(ok(targetPlan, 201));
+    expect(await screen.findByText("Plan saved and verified")).toBeInTheDocument();
+  });
+
   it("persists a new target-week plan and deletes it on Undo", async () => {
     const calls: Array<{ input: string; init: RequestInit }> = [];
     const fetchImpl: FetchLike = async (input, init) => {
@@ -141,7 +218,7 @@ describe("PlanScreen", () => {
         expect.objectContaining({ project_id: 3, planned_minutes: 180 })
       ])
     });
-    expect(await screen.findByText("Plan saved")).toBeInTheDocument();
+    expect(await screen.findByText("Plan saved and verified")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     await waitFor(() => expect(calls.some((call) => call.init.method === "DELETE")).toBe(true));
@@ -164,6 +241,7 @@ describe("PlanScreen", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Plan changed elsewhere");
     expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply adjustment" })).toBeDisabled();
     expect(screen.queryByText("Plan saved")).not.toBeInTheDocument();
   });
 
@@ -229,7 +307,7 @@ describe("PlanScreen", () => {
     fireEvent.click(within(screen.getByRole("dialog", { name: "Edit plan" })).getByRole("button", { name: "Save plan" }));
 
     await waitFor(() => expect(calls.some((call) => call.init.method === "POST")).toBe(true));
-    expect(await screen.findByRole("status")).toHaveTextContent("Plan updated");
+    expect(await screen.findByRole("status")).toHaveTextContent("Plan saved and verified");
     expect(screen.getByRole("button", { name: "Edit plan" })).toBeInTheDocument();
   });
 

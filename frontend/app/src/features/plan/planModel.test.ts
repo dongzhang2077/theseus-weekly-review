@@ -6,6 +6,10 @@ import {
   calculatePlanMetrics,
   createPlanWorkspace,
   createUpcomingPlanSeed,
+  planSeedForTarget,
+  planTargetWeekForDate,
+  planWeekContainingDate,
+  shiftPlanWeek,
   withPlanSuggestion
 } from "./planModel";
 
@@ -93,5 +97,26 @@ describe("planModel", () => {
   it("derives the next Monday week without fixture dates", () => {
     const seed = createUpcomingPlanSeed(new Date("2026-07-15T12:00:00Z"));
     expect(seed.targetWeek).toEqual({ start: "2026-07-20", end: "2026-07-26" });
+  });
+
+  it("derives and shifts account-local target weeks without changing the source snapshot", () => {
+    const target = planTargetWeekForDate("2026-07-30");
+    expect(target).toEqual({ start: "2026-08-03", end: "2026-08-09" });
+    expect(planWeekContainingDate("2026-08-12")).toEqual({
+      start: "2026-08-10",
+      end: "2026-08-16"
+    });
+    expect(shiftPlanWeek(target, -1)).toEqual({
+      start: "2026-07-27",
+      end: "2026-08-02"
+    });
+
+    const retargeted = planSeedForTarget(demoWeek.plan, target);
+    expect(retargeted.reviewWeek).toEqual({
+      start: "2026-07-27",
+      end: "2026-08-02"
+    });
+    expect(retargeted.targetWeek).toEqual(target);
+    expect(retargeted.sourcePlan).toBe(demoWeek.plan.sourcePlan);
   });
 });

@@ -470,6 +470,7 @@ export function App() {
           fetchImpl={authClient.fetch}
           planData={appWeek.plan}
           reviewSource={loadedWeek.source}
+          accountToday={trackTodayDate}
           entryRequest={planEntryRequest}
           onReview={() => setActiveTab("insights")}
           onFocusItem={focusPlanItem}

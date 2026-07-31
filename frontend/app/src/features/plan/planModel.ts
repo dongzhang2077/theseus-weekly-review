@@ -108,6 +108,41 @@ export function createUpcomingPlanSeed(reference: Date = new Date()): PlanSeed {
   };
 }
 
+export function planTargetWeekForDate(value: string): PlanDateRange {
+  return nextMondayWeek(new Date(`${value}T12:00:00Z`));
+}
+
+export function planWeekContainingDate(value: string): PlanDateRange | null {
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return null;
+  const day = date.getUTCDay();
+  date.setUTCDate(date.getUTCDate() - (day === 0 ? 6 : day - 1));
+  const start = date.toISOString().slice(0, 10);
+  date.setUTCDate(date.getUTCDate() + 6);
+  return { start, end: date.toISOString().slice(0, 10) };
+}
+
+export function shiftPlanWeek(
+  week: PlanDateRange,
+  offsetWeeks: number
+): PlanDateRange {
+  return {
+    start: shiftIsoDate(week.start, offsetWeeks * 7),
+    end: shiftIsoDate(week.end, offsetWeeks * 7)
+  };
+}
+
+export function planSeedForTarget(
+  seed: PlanSeed,
+  targetWeek: PlanDateRange
+): PlanSeed {
+  return {
+    ...seed,
+    reviewWeek: shiftPlanWeek(targetWeek, -1),
+    targetWeek: { ...targetWeek }
+  };
+}
+
 export function calculatePlanMetrics(plan: PlanDraft): PlanMetrics {
   const plannedMinutes = plan.items.reduce(
     (total, item) => total + item.plannedMinutes,
