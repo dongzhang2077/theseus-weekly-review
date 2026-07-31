@@ -47,7 +47,7 @@ export function TimeDonut({ summary, onOpenBucket, onOpenAll }: TimeDonutProps) 
           <p className="sr-only">
             {`Recorded time totals ${formatRecordedDuration(summary.totalSeconds)} across ${summary.buckets.length} projects or categories.`}
           </p>
-          <div className="mt-4 grid grid-cols-[8.75rem_minmax(0,1fr)] items-center gap-4">
+          <div className="mt-4 grid grid-cols-1 items-center justify-items-center gap-3 min-[360px]:grid-cols-[8.75rem_minmax(0,1fr)] min-[360px]:justify-items-stretch min-[360px]:gap-4">
             <div className="relative h-36 w-36" aria-hidden="true">
               <svg className="h-full w-full -rotate-90" viewBox="0 0 42 42">
                 <circle
@@ -84,7 +84,7 @@ export function TimeDonut({ summary, onOpenBucket, onOpenAll }: TimeDonutProps) 
               </div>
             </div>
 
-            <div className="min-w-0 space-y-1">
+            <div className="w-full min-w-0 space-y-1">
               {buckets.map((bucket) => (
                 <button
                   type="button"

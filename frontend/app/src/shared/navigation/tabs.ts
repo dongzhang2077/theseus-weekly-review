@@ -11,11 +11,11 @@ export interface TabItem {
 export const tabs: TabItem[] = [
   { id: "review", label: "Review", icon: "book" },
   { id: "signals", label: "Signals", icon: "activity" },
-  { id: "track", label: "Focus", icon: "timer" },
+  { id: "track", label: "Today", icon: "timer" },
   { id: "plan", label: "Plan", icon: "calendar" }
 ];
 
 export function resolveInitialTab(search: string): AppTab {
   const requested = new URLSearchParams(search).get("tab");
-  return tabs.some((tab) => tab.id === requested) ? requested as AppTab : "review";
+  return tabs.some((tab) => tab.id === requested) ? requested as AppTab : "track";
 }

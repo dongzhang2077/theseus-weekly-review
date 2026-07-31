@@ -9,8 +9,8 @@ describe("resolveInitialTab", () => {
     }
   );
 
-  it("falls back to Review for missing or unknown tabs", () => {
-    expect(resolveInitialTab("")).toBe("review");
-    expect(resolveInitialTab("?tab=settings")).toBe("review");
+  it("falls back to Today for missing or unknown tabs", () => {
+    expect(resolveInitialTab("")).toBe("track");
+    expect(resolveInitialTab("?tab=settings")).toBe("track");
   });
 });

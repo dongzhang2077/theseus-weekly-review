@@ -18,7 +18,7 @@ describe("AppShell", () => {
       </AppShell>
     );
 
-    ["Review", "Signals", "Focus", "Plan"].forEach((label) => {
+    ["Review", "Signals", "Today", "Plan"].forEach((label) => {
       expect(screen.getByRole("button", { name: label })).toBeDisabled();
     });
     const account = screen.getByRole("button", { name: /Open account/ });
@@ -55,7 +55,7 @@ describe("AppShell", () => {
       </AppShell>
     );
 
-    ["Review", "Signals", "Focus", "Plan"].forEach((label) => {
+    ["Review", "Signals", "Today", "Plan"].forEach((label) => {
       expect(screen.getByRole("button", { name: label })).toHaveAttribute("title", label);
       expect(screen.queryByText(label, { selector: "nav span" })).not.toBeInTheDocument();
     });

@@ -68,6 +68,9 @@ interface TrackScreenProps {
   onSessionDraftChange?: (activityId: string, draft: FocusSessionDraft | null) => void;
   onResultModalChange?: (open: boolean) => void;
   onSessionSaved?: () => void;
+  onBack?: () => void;
+  foregroundActivityId?: string | null;
+  onForegroundActivityChange?: (activityId: string | null) => void;
 }
 
 export function TrackScreen({
@@ -84,7 +87,10 @@ export function TrackScreen({
   sessionDrafts: controlledSessionDrafts,
   onSessionDraftChange,
   onResultModalChange,
-  onSessionSaved
+  onSessionSaved,
+  onBack,
+  foregroundActivityId: controlledForegroundActivityId,
+  onForegroundActivityChange
 }: TrackScreenProps) {
   const [localActivities, setLocalActivities] = useState(track.activities);
   const [activeSheet, setActiveSheet] = useState<TrackSheet | null>(null);
@@ -100,7 +106,7 @@ export function TrackScreen({
     "idle" | "saving" | "error" | "conflict"
   >("idle");
   const [activitySaveError, setActivitySaveError] = useState<string | null>(null);
-  const [manualFocusId, setManualFocusId] = useState<string | null>(null);
+  const [localForegroundActivityId, setLocalForegroundActivityId] = useState<string | null>(null);
   const [recommendationNotice, setRecommendationNotice] = useState<string | null>(null);
   const [localSessionDrafts, setLocalSessionDrafts] = useState<Record<string, FocusSessionDraft>>({});
   const [pendingSession, setPendingSession] = useState<ActivityTimer | null>(null);
@@ -127,10 +133,11 @@ export function TrackScreen({
   const historyKeyRef = useRef<{ signature: string; key: string } | null>(null);
 
   const activities = controlledActivities ?? localActivities;
+  const foregroundActivityId = controlledForegroundActivityId ?? localForegroundActivityId;
   const todayDate = controlledTodayDate ?? calendarDate(timeZone);
   const focus = useMemo(
-    () => chooseFocusActivity(activities, { preferredId: manualFocusId }),
-    [activities, manualFocusId]
+    () => chooseFocusActivity(activities, { preferredId: foregroundActivityId }),
+    [activities, foregroundActivityId]
   );
   const detailActivity = detail
     ? activities.find((activity) => activity.id === detail.id) ?? detail
@@ -164,6 +171,14 @@ export function TrackScreen({
       return;
     }
     setLocalActivities(update);
+  }
+
+  function selectForegroundActivity(activityId: string | null) {
+    if (onForegroundActivityChange) {
+      onForegroundActivityChange(activityId);
+      return;
+    }
+    setLocalForegroundActivityId(activityId);
   }
 
   function openHistoryLog(timeLog: ApiTimeLogRead) {
@@ -363,7 +378,7 @@ export function TrackScreen({
 
   function onToggleActivity(activity: ActivityTimer) {
     if (backgroundLocked) return;
-    setManualFocusId(activity.id);
+    selectForegroundActivity(activity.id);
     if (activity.running) {
       onEnd(activity.id);
       return;
@@ -405,7 +420,7 @@ export function TrackScreen({
       updateActivities((current) =>
         current.map((item) => item.id === activity.id ? target : item)
       );
-      setManualFocusId(target.id);
+      selectForegroundActivity(target.id);
     }
 
     const key = startKeysRef.current.get(target.id)
@@ -662,7 +677,7 @@ export function TrackScreen({
             : item
         );
       });
-      setManualFocusId(saved.id);
+      selectForegroundActivity(saved.id);
       setActivityFormMode("new");
       setEditingActivityId(null);
       setEditingViewId(null);
@@ -693,7 +708,7 @@ export function TrackScreen({
     };
 
     updateActivities((current) => [...current, activity]);
-    setManualFocusId(activity.id);
+    selectForegroundActivity(activity.id);
     setNewName("");
     setNewDescription("");
     setActiveSheet(null);
@@ -706,13 +721,15 @@ export function TrackScreen({
         <button
           className="col-start-1 grid size-10 place-items-center rounded-full border-0 bg-transparent text-desk-muted hover:bg-desk-sunk disabled:cursor-not-allowed disabled:text-desk-subtle"
           type="button"
-          aria-label="Choose activity"
+          aria-label={onBack ? "Back to Today" : "Choose activity"}
           disabled={recommendationLocked || backgroundLocked}
-          onClick={() => setActiveSheet("activities")}
+          onClick={onBack ?? (() => setActiveSheet("activities"))}
         >
-          <Icon name="layers" className="size-5" />
+          <Icon name={onBack ? "chevronLeft" : "layers"} className="size-5" />
         </button>
-        <h1 className="col-start-2 m-0 text-center text-[17px] font-bold">Today</h1>
+        <h1 className="col-start-2 m-0 text-center text-[17px] font-bold">
+          {onBack ? "Focus" : "Today"}
+        </h1>
         <IconButton
           className="col-start-3"
           label="Activity detail"
@@ -731,6 +748,7 @@ export function TrackScreen({
           notice={recommendationNotice}
           timerLocked={backgroundLocked}
           onToggle={() => onToggleActivity(focus)}
+          onChooseActivity={() => setActiveSheet("activities")}
           onOpenToday={() => {
             setSelectedTimeLog(null);
             setActiveSheet("history");
@@ -1213,7 +1231,7 @@ export function TrackScreen({
                   label="Session setup"
                   icon="target"
                   onClick={() => {
-                    setManualFocusId(detailActivity.id);
+                    selectForegroundActivity(detailActivity.id);
                     setDetail(null);
                     setActiveSheet("setup");
                   }}

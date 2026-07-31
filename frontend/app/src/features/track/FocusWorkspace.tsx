@@ -10,6 +10,7 @@ interface FocusWorkspaceProps {
   notice: string | null;
   timerLocked: boolean;
   onToggle: () => void;
+  onChooseActivity: () => void;
   onOpenToday: () => void;
 }
 
@@ -21,6 +22,7 @@ export function FocusWorkspace({
   notice,
   timerLocked,
   onToggle,
+  onChooseActivity,
   onOpenToday
 }: FocusWorkspaceProps) {
   const actionLabel = focus.running
@@ -50,9 +52,9 @@ export function FocusWorkspace({
         className="grid min-h-[58px] w-full max-w-[292px] grid-cols-[40px_minmax(0,1fr)] items-center gap-3 rounded-[18px] border px-3 py-2 text-left shadow-[0_4px_14px_rgb(76_62_38/0.05)] transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
         style={{ borderColor: focus.color, backgroundColor: softColor }}
         type="button"
-        aria-label={actionLabel}
+        aria-label="Change focus activity"
         disabled={timerLocked}
-        onClick={onToggle}
+        onClick={onChooseActivity}
       >
         <span
           className="grid size-9 place-items-center rounded-full border border-desk-line bg-desk-raised/75"
@@ -69,12 +71,10 @@ export function FocusWorkspace({
         </span>
       </button>
 
-      <button
-        className="flex min-h-[132px] w-full max-w-[340px] flex-col items-center justify-center gap-3 border-0 bg-transparent transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-        type="button"
-        aria-label={actionLabel}
-        disabled={timerLocked}
-        onClick={onToggle}
+      <div
+        className="flex min-h-[132px] w-full max-w-[340px] flex-col items-center justify-center gap-3"
+        role="timer"
+        aria-label={`Current focus duration ${timerText}`}
       >
         <span
           className={`h-1.5 rounded-full transition-[width,background-color] duration-200 ${
@@ -86,7 +86,7 @@ export function FocusWorkspace({
         <span className="tabular-nums text-[60px] font-bold leading-[1.05] tracking-[-0.035em] text-desk-ink min-[390px]:text-[68px]">
           {timerText}
         </span>
-      </button>
+      </div>
 
       <button
         className="grid size-[76px] place-items-center rounded-full border shadow-[0_7px_20px_rgb(76_62_38/0.08)] transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
