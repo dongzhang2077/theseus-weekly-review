@@ -135,7 +135,7 @@ export function SignalsScreen({
   );
 }
 
-function PrioritySignalCard({
+export function PrioritySignalCard({
   issue,
   onAction,
   onDetails
@@ -182,7 +182,7 @@ function PrioritySignalCard({
   );
 }
 
-function SignalIssueRow({ issue, onDetails }: { issue: AppSignalEvidence; onDetails: () => void }) {
+export function SignalIssueRow({ issue, onDetails }: { issue: AppSignalEvidence; onDetails: () => void }) {
   return (
     <button
       className="grid min-h-16 w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 border-0 border-b border-desk-line bg-transparent px-3 py-3 text-left text-desk-ink last:border-b-0 hover:bg-desk-sunk focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-desk-accent"
@@ -206,7 +206,7 @@ function SignalIssueRow({ issue, onDetails }: { issue: AppSignalEvidence; onDeta
   );
 }
 
-function SignalSummaryPage({
+export function SignalSummaryPage({
   evidence,
   weekLabel,
   onBack,
@@ -282,7 +282,7 @@ function SignalContextRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SignalEvidencePage({
+export function SignalEvidencePage({
   evidence,
   weekLabel,
   onBack

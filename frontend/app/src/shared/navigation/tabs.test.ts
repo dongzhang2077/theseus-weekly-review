@@ -2,10 +2,17 @@ import { describe, expect, it } from "vitest";
 import { resolveInitialTab } from "./tabs";
 
 describe("resolveInitialTab", () => {
-  it.each(["review", "signals", "track", "plan"] as const)(
+  it.each(["track", "insights", "plan"] as const)(
     "opens the %s tab for a deterministic demo link",
     (tab) => {
       expect(resolveInitialTab(`?tab=${tab}`)).toBe(tab);
+    }
+  );
+
+  it.each(["review", "signals"] as const)(
+    "maps the legacy %s link to Insights",
+    (tab) => {
+      expect(resolveInitialTab(`?tab=${tab}`)).toBe("insights");
     }
   );
 

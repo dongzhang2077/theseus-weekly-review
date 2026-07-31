@@ -1067,6 +1067,48 @@ Acceptance criteria:
 - mobile, desktop, sparse, empty, loading, error, and accessibility states are
   represented.
 
+### STORY-040B Converge Insights and primary navigation
+
+As a daily user, I want one Insights destination instead of separate Review and
+Signals tabs so that weekly evidence has a clear hierarchy without repeated
+summaries.
+
+Priority: P1 after the accepted STORY-040 prototype and STORY-041 Today surface
+
+Ready checkpoint (2026-07-30 PDT): Dong owns the React slice on
+`feature/040b-insights-navigation-convergence`. It depends on the accepted
+STORY-040 information architecture and the accepted STORY-041 Today navigation
+target. The slice changes only primary navigation and Insights Level 1; Plan
+visual refinement, Assistant, Calendar, and voice remain outside its boundary.
+
+Acceptance criteria:
+
+- primary navigation contains only Today, Insights, and Plan, defaults to
+  Today, and maps legacy Review or Signals links to Insights;
+- Insights presents one week status, one priority, and separate Wins, Other
+  issues, Steady checks, and Weekly review collections;
+- a priority is not repeated in Other issues, while Review findings, Signal
+  evidence, source values, and actions remain distinct and inspectable below
+  Level 1;
+- historical week navigation supports Previous, Next, date selection, and a
+  direct This week reset without browsing future weeks;
+- no-review weeks distinguish missing evidence from recorded evidence awaiting
+  review generation, and loading or error recovery remains explicit;
+- focused navigation and Insights tests, the full frontend suite, TypeScript,
+  production build, `git diff --check`, and sanitized 320px/390px visual QA
+  pass before product-owner acceptance.
+
+Implementation checkpoint (2026-07-30 PDT): the bounded React slice is
+implemented on `feature/040b-insights-navigation-convergence`. Primary
+navigation now contains Today, Insights, and Plan; authenticated entry keeps
+Today as the default while Insights begins at the account-local current week.
+The merged Level 1 shows one status and one priority, then routes Wins, Other
+issues, Steady checks, and Weekly review into their existing distinct Review
+or Signal evidence paths. Legacy Review and Signals query links converge on
+Insights. All 174 frontend tests, TypeScript, the production build,
+`git diff --check`, and sanitized 320px/390px Level 1 plus 390px drawer visual
+QA pass. Product-owner browser acceptance remains pending.
+
 ### STORY-041 Add evidence-backed time visualizations
 
 As a daily user, I want to see time distribution and change across useful time
