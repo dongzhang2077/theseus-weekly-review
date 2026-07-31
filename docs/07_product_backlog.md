@@ -1047,6 +1047,15 @@ verified, and Tracker captures now exist. STORY-040 remains `In Progress` and
 React remains blocked until the product owner accepts this corrected screenshot
 and interaction evidence.
 
+Prototype acceptance checkpoint (2026-07-30 PDT): after the corrected evidence
+and verification were delivered, the product owner directed development to
+continue. The app-sized Day, Week, Insights, Plan, Tracker, Running Activities,
+stale, conflict, verified, 320px, 390px, and centered desktop-QA artifacts are
+accepted as the React reference. STORY-040 is accepted. Production work now
+moves to the dependent STORY-041 slice; this acceptance does not authorize a
+main-branch merge or broaden STORY-041 into Month, Insights, Plan, Assistant,
+Calendar, or voice work.
+
 Acceptance criteria:
 
 - the information architecture specifies a daily timeline, seven-day stacked
@@ -1064,6 +1073,12 @@ As a daily user, I want to see time distribution and change across useful time
 scales so that I can notice imbalance and choose what to inspect.
 
 Priority: P1 after STORY-040
+
+Ready checkpoint (2026-07-30 PDT): STORY-040 is accepted. Dong owns the first
+React slice. It is limited to authenticated TimeLog aggregation, the accepted
+Project donut, seven-day stacked bars, accessible summaries, and exact
+record-level drill-down. The Month heatmap remains deferred until a later
+density gate, and Insights/Plan convergence remains outside this slice.
 
 Acceptance criteria:
 

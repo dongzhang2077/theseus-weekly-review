@@ -160,9 +160,11 @@ The first visual slice is accepted only when:
 - mobile and desktop screenshots, keyboard behavior, accessible names, focused
   frontend tests, TypeScript, and the production build pass.
 
-The current STORY-040 wireframe proposal is maintained in
-[`design/daily-workspace-wireframes-v2.md`](design/daily-workspace-wireframes-v2.md).
-It must pass product-owner review before the HTML prototype begins.
+The accepted STORY-040 wireframe and HTML reference are maintained in
+[`design/daily-workspace-wireframes-v2.md`](design/daily-workspace-wireframes-v2.md)
+and `frontend/daily-workspace-prototype/`. Product-owner screenshot and
+interaction acceptance passed on 2026-07-30 PDT; the first bounded production
+slice proceeds under STORY-041.
 
 ## 5. Direction B: Local-First Conversational Assistant
 

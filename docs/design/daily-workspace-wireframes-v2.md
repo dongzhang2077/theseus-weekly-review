@@ -1,6 +1,6 @@
 # Theseus Daily Workspace v2 Wireframes
 
-- Status: accepted for responsive HTML prototype
+- Status: accepted for React implementation
 - Story: STORY-040
 - Wireframe date: 2026-07-30
 - Revision: portrait-first product clarification recorded during HTML review
@@ -977,5 +977,14 @@ HTML correction evidence recorded on 2026-07-30 PDT:
   `browser-verify.html` exercises Chromium overflow, focus trap, nested Escape,
   and trigger-focus return.
 
-This evidence is a correction candidate, not React authorization. The separate
-screenshot and interaction acceptance gate remains open for the product owner.
+At the correction checkpoint, this evidence remained a candidate rather than
+React authorization; the separate screenshot and interaction gate was still
+open for the product owner.
+
+Product-owner acceptance was recorded on 2026-07-30 PDT when development was
+directed to continue after delivery of the corrected artifacts and verification.
+The Day, Week, Insights, Plan, Tracker, and represented state screenshots are
+now the React reference. Production implementation remains sliced: STORY-041
+owns only the first authenticated donut and seven-day chart slice, while Month,
+Insights/Plan convergence, Assistant, Calendar, and voice retain their own
+later gates.
