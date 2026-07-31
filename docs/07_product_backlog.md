@@ -1080,6 +1080,18 @@ Project donut, seven-day stacked bars, accessible summaries, and exact
 record-level drill-down. The Month heatmap remains deferred until a later
 density gate, and Insights/Plan convergence remains outside this slice.
 
+Implementation checkpoint (2026-07-30 PDT): the bounded React slice is
+implemented and locally verified on
+`feature/041-evidence-backed-time-visualizations`. The authenticated Today
+surface now reconciles Day/Week totals and drill-down IDs from persisted
+TimeLogs, excludes current-week future dates, preserves live Focus while
+browsing history, and opens the protected full-screen Tracker. Tracker has one
+explicit Start/End control and a read-only timer; parallel Activities remain
+independently selectable and endable. All 163 frontend tests, TypeScript,
+production build, `git diff --check`, and sanitized 320px/390px Chromium visual
+QA pass. Product-owner browser acceptance is still pending, so STORY-041 is not
+accepted and no main merge or PR is authorized yet.
+
 Acceptance criteria:
 
 - the first React slice implements the accepted donut and seven-day visual

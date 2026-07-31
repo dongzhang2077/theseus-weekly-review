@@ -1,6 +1,6 @@
 # STORY-041 Evidence-Backed Time Visualizations
 
-- Status: Ready; implementation started
+- Status: Implementation verified; product-owner browser acceptance pending
 - Owner: Dong Zhang
 - Branch: `feature/041-evidence-backed-time-visualizations`
 - Stacked base: STORY-040 commit `606de15`
@@ -182,6 +182,60 @@ git diff --check
 
 Demo evidence: one authenticated persisted TimeLog set drives Day, Week, and
 the exact evidence records without a fixture-only fallback claim.
+
+## Verification Checkpoint
+
+Implementation checkpoint (2026-07-30 PDT):
+
+- the authenticated App now defaults to Today and supplies the production
+  surface with `AuthClient.fetch` TimeLogs, Projects, Focus state, and the
+  account timezone;
+- Day and Week totals share the same exact, non-deleted TimeLog records, and
+  every legend/day entry opens its own retained record IDs;
+- future dates in the current week remain unavailable and are excluded from
+  totals;
+- Current Focus stays live while historical Day/Week ranges change;
+- the full-screen Tracker keeps its existing durable FocusSession flow with a
+  read-only timer and one explicit Start/End control;
+- parallel running Activities can be selected as foreground or ended
+  independently from the Running Activities sheet;
+- the reusable Sheet layer now stays above bottom navigation, so evidence
+  records are not obscured.
+
+Verification passed:
+
+```text
+npm test -- --run
+29 test files passed; 163 tests passed
+
+npm run build
+TypeScript passed; Vite production build passed
+
+git diff --check
+passed
+```
+
+Reproducible sanitized visual QA is available through
+`frontend/app/story-041-visual.html` and
+`frontend/app/story-041-capture.html`. Captures:
+
+- `docs/demo/screenshots/today-day-390.png`
+- `docs/demo/screenshots/today-day-320.png`
+- `docs/demo/screenshots/today-week-390.png`
+- `docs/demo/screenshots/today-evidence-390.png`
+- `docs/demo/screenshots/today-running-390.png`
+- `docs/demo/screenshots/today-tracker-390.png`
+
+The 320px gate required a responsive stacked donut/legend layout below 360px.
+The resulting capture has no overlapping label/value text. The production data
+path remains the authenticated API; the visual harness is explicitly a
+sanitized layout fixture and does not claim runtime persistence.
+
+The historical four-destination shell is intentionally still present, with
+`track` relabeled Today and made the default. Review/Signals Level 1 convergence
+and the final three-destination shell remain a later accepted slice. STORY-041
+must not be marked accepted or merged to main until product-owner browser
+review passes.
 
 ## Critical Path And Risks
 
