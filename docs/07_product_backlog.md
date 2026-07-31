@@ -1255,6 +1255,14 @@ available. All 15 Gateway tests and all 234 backend tests pass; Python
 compilation, deterministic sample review, and `git diff --check` pass.
 Product-owner API acceptance remains pending.
 
+Product-owner acceptance (2026-07-31 PDT): direct automated verification
+passed without requiring the product owner to copy an access token. All 15
+Gateway privacy/API tests, all 179 frontend tests, and the frontend production
+build passed; the live backend exposed both Gateway routes and the local App
+remained healthy. The product owner accepted STORY-042 at commit `80622e0` and
+authorized STORY-043. This acceptance does not authorize a PR or merge to
+`main`.
+
 ### STORY-043 Add deterministic next-action recommendation
 
 As a user, I want a trustworthy answer to what I should do now so that current
