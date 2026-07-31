@@ -21,6 +21,7 @@
   --radius: 18px;
   --radius-sm: 12px;
   --nav-height: 70px;
+  --prototype-width: 430px;
   color-scheme: light;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
@@ -59,7 +60,7 @@ button {
 button:focus-visible,
 select:focus-visible,
 [tabindex]:focus-visible {
-  outline: 3px solid rgb(111 143 107 / 32%);
+  outline: 3px solid var(--green-deep);
   outline-offset: 2px;
 }
 
@@ -84,7 +85,7 @@ svg {
 }
 
 .app-shell {
-  width: min(100%, 430px);
+  width: min(100%, var(--prototype-width));
   min-height: 100vh;
   background: var(--paper);
 }
@@ -167,7 +168,7 @@ main {
   font-weight: 670;
 }
 
-.mode-tabs button[aria-selected="true"] {
+.mode-tabs button[aria-pressed="true"] {
   color: var(--green-deep);
   background: var(--paper-strong);
   box-shadow: 0 1px 5px rgb(88 70 45 / 10%);
@@ -221,9 +222,9 @@ main {
 
 .focus-name {
   width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
   font-size: 1.05rem;
   font-weight: 720;
   letter-spacing: -0.015em;
@@ -379,6 +380,15 @@ main {
   position: relative;
 }
 
+.donut-chart-button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
 .donut {
   width: min(58vw, 210px);
   height: min(58vw, 210px);
@@ -395,15 +405,7 @@ main {
 }
 
 .donut-segment {
-  cursor: pointer;
-  transition: opacity 120ms ease, stroke-width 120ms ease;
-}
-
-.donut-segment:hover,
-.donut-segment:focus {
-  opacity: 0.78;
-  stroke-width: 20;
-  outline: none;
+  pointer-events: none;
 }
 
 .segment-theseus { stroke: var(--green); }
@@ -437,7 +439,7 @@ main {
 }
 
 .legend-row {
-  min-height: 26px;
+  min-height: 44px;
   gap: 10px;
   font-size: 0.82rem;
 }
@@ -450,6 +452,7 @@ main {
   background: transparent;
   text-align: left;
   cursor: pointer;
+  min-height: 44px;
 }
 
 .legend-row strong {
@@ -551,9 +554,10 @@ main {
   margin-top: 18px;
   padding: 14px 4px 0;
   display: grid;
-  grid-template-columns: repeat(7, minmax(24px, 1fr));
+  grid-template-columns: repeat(7, minmax(44px, 1fr));
   align-items: end;
-  gap: 6px;
+  gap: 3px;
+  overflow-x: auto;
   border-bottom: 1px solid var(--line-strong);
   background: repeating-linear-gradient(to top, transparent 0 54px, var(--line) 55px 56px);
 }
@@ -569,17 +573,50 @@ main {
   position: relative;
 }
 
-.day-bar button {
-  width: min(100%, 34px);
-  min-height: 3px;
+.day-bar-button {
+  width: 100%;
+  min-height: 190px;
   padding: 0;
   border: 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: transparent;
   cursor: pointer;
+}
+
+.bar-stack {
+  width: min(100%, 34px);
+  max-height: 184px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  border-radius: 6px 6px 2px 2px;
+}
+
+.bar-stack i {
+  display: block;
+  width: 100%;
+  flex: 0 0 auto;
 }
 
 .day-bar .bar-green { background: var(--green); }
 .day-bar .bar-blue { background: var(--blue); }
 .day-bar .bar-amber { background: var(--amber); }
+
+.day-bar.is-unavailable {
+  justify-content: flex-end;
+}
+
+.future-mark {
+  width: min(100%, 34px);
+  height: 190px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  background: repeating-linear-gradient(135deg, transparent 0 5px, rgb(211 199 183 / 24%) 5px 7px);
+}
 
 .day-bar span {
   position: absolute;
@@ -642,9 +679,9 @@ main {
 }
 
 .heatmap .heat-high {
-  background: var(--green);
+  background: var(--green-deep);
   color: white;
-  border-color: var(--green);
+  border-color: var(--green-deep);
 }
 
 .heatmap .heat-selected {
@@ -684,7 +721,7 @@ main {
 
 .heat-legend .low { background: #dfe8da; }
 .heat-legend .medium { background: #bcd0b7; }
-.heat-legend .high { background: var(--green); }
+.heat-legend .high { background: var(--green-deep); }
 
 .notice {
   margin-top: 13px;
@@ -784,7 +821,7 @@ main {
 .primary-action {
   padding: 0 16px;
   border: 1px solid var(--green-deep);
-  background: var(--green);
+  background: var(--green-deep);
   color: white;
 }
 
@@ -1130,9 +1167,10 @@ main {
 
 .drawer {
   position: fixed;
-  right: 0;
+  right: auto;
   bottom: 0;
   left: 0;
+  width: min(100%, var(--prototype-width));
   max-height: min(86vh, 780px);
   z-index: 70;
   overflow: hidden;
@@ -1165,7 +1203,7 @@ main {
 .drawer.is-tracker {
   top: 0;
   right: auto;
-  width: min(100%, 430px);
+  width: min(100%, var(--prototype-width));
   max-height: none;
   border-width: 0;
   border-radius: 0;
@@ -1238,7 +1276,7 @@ main {
   font-weight: 650;
 }
 
-.tracker-timer-button {
+.tracker-timer-display {
   min-height: 150px;
   margin-top: 18px;
   display: flex;
@@ -1246,12 +1284,9 @@ main {
   align-items: center;
   justify-content: center;
   gap: 13px;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
 }
 
-.tracker-timer-button strong {
+.tracker-timer-display strong {
   font-size: clamp(3.2rem, 16vw, 4.25rem);
   line-height: 1;
   letter-spacing: -0.055em;
@@ -1354,6 +1389,60 @@ main {
   background: var(--rose-soft);
 }
 
+.running-row {
+  width: 100%;
+  max-width: 100%;
+  min-height: 70px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px;
+  align-items: stretch;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.running-select {
+  min-width: 0;
+  padding: 10px 4px;
+  display: block;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.running-select[aria-pressed="true"],
+.activity-picker-row[aria-pressed="true"] {
+  background: var(--green-soft);
+}
+
+.running-select span,
+.running-select strong {
+  min-width: 0;
+}
+
+.running-select > strong,
+.running-select > .meta {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.running-select > .meta {
+  margin-top: 3px;
+}
+
+.running-end {
+  min-height: 44px;
+  padding: 0 9px;
+  align-self: center;
+  border: 1px solid #d9aaa4;
+  border-radius: 10px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
 .toast {
   position: fixed;
   right: 18px;
@@ -1378,7 +1467,7 @@ main {
   }
 
   .app-shell {
-    width: 430px;
+    width: var(--prototype-width);
     min-height: calc(100vh - 44px);
     margin: 0 auto;
     overflow: hidden;

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Theseus prototype browser verification</title>
+  </head>
+  <body>
+    <pre id="result">waiting</pre>
+    <iframe id="prototype" title="Prototype under test" src="./?width=320#today" width="320" height="844"></iframe>
+    <script>
+      const frame = document.querySelector("#prototype");
+      const result = document.querySelector("#result");
+
+      function assert(condition, message) {
+        if (!condition) throw new Error(message);
+      }
+
+      frame.addEventListener("load", () => {
+        try {
+          const appWindow = frame.contentWindow;
+          const appDocument = frame.contentDocument;
+          const key = (name, options = {}) => {
+            const event = new appWindow.KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true, ...options });
+            return { event, dispatched: appDocument.activeElement.dispatchEvent(event) };
+          };
+
+          assert(appDocument.documentElement.scrollWidth <= 320, "The 320px Day viewport has horizontal overflow");
+          appDocument.querySelector("#running-control").click();
+          assert(appDocument.activeElement.id === "drawer-back", "Opening a drawer did not move focus to its Back control");
+          const tabResult = key("Tab", { shiftKey: true });
+          assert(appDocument.activeElement.hasAttribute("data-choose-activity"), `Shift+Tab key=${tabResult.event.key} shift=${tabResult.event.shiftKey} dispatched=${tabResult.dispatched} focused ${appDocument.activeElement.outerHTML}`);
+          appDocument.activeElement.click();
+          assert(appDocument.querySelector("#drawer-title").textContent === "Choose an Activity", "The nested Activity picker did not open");
+
+          key("Escape");
+          assert(appDocument.querySelector("#drawer-title").textContent === "Running", "Escape did not return from the nested picker to Running");
+          key("Escape");
+          assert(appDocument.querySelector("#drawer").hidden, "Escape did not close the root drawer");
+          assert(appDocument.activeElement.id === "running-control", "Closing the drawer did not restore focus to its trigger");
+
+          result.textContent = JSON.stringify({
+            status: "ok",
+            engine: navigator.userAgent,
+            checks: ["320px-no-horizontal-overflow", "drawer-focus-entry", "focus-trap-wrap", "nested-escape", "focus-return"],
+          });
+          document.documentElement.dataset.browserQa = "passed";
+        } catch (error) {
+          result.textContent = JSON.stringify({ status: "failed", message: error.message });
+          document.documentElement.dataset.browserQa = "failed";
+        }
+      }, { once: true });
+    </script>
+  </body>
+</html>

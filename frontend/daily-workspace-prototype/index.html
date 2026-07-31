@@ -68,10 +68,10 @@
 
         <main id="workspace" tabindex="-1">
           <section class="destination is-active" id="view-today">
-            <div class="mode-tabs" role="tablist" aria-label="Time range">
-              <button type="button" role="tab" aria-selected="true" data-mode="day">Day</button>
-              <button type="button" role="tab" aria-selected="false" data-mode="week">Week</button>
-              <button type="button" role="tab" aria-selected="false" data-mode="month">Month</button>
+            <div class="mode-tabs" role="group" aria-label="Time range">
+              <button type="button" aria-pressed="true" data-mode="day">Day</button>
+              <button type="button" aria-pressed="false" data-mode="week">Week</button>
+              <button type="button" aria-pressed="false" data-mode="month">Month</button>
             </div>
 
             <section class="focus-band" aria-labelledby="focus-heading">

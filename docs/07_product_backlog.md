@@ -1033,6 +1033,20 @@ running access, Today total, and correctable history. Tracker is absorbed into
 Today navigation, not reduced to the compact summary row or restored as a fourth
 tab.
 
+HTML interaction correction checkpoint (2026-07-30 PDT): external review found
+that chart targets shared static detail, the current week included future
+fixtures, concurrent Focus actions were not stateful, and the Tracker timer
+surface duplicated its End action. The corrected prototype now binds every
+visual target to its selected date or period, category, and sanitized source
+record IDs; excludes Jul 31-Aug 2 from the Jul 27-Aug 2 current-week total;
+models foreground selection, running-state labels, independent End actions,
+and safe fallback selection; and leaves the timer display read-only. Chart
+semantics, touch targets, contrast, focus treatment, and long Activity wrapping
+were also corrected. Exact portrait, desktop-QA, drawer, stale, conflict,
+verified, and Tracker captures now exist. STORY-040 remains `In Progress` and
+React remains blocked until the product owner accepts this corrected screenshot
+and interaction evidence.
+
 Acceptance criteria:
 
 - the information architecture specifies a daily timeline, seven-day stacked

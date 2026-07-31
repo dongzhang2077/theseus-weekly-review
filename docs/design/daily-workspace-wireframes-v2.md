@@ -960,3 +960,22 @@ Manual review:
 - inspect mobile and desktop reading order;
 - confirm there is no Level 4 flow, decorative metric, fake data, or inactive
   assistant control.
+
+HTML correction evidence recorded on 2026-07-30 PDT:
+
+- chart targets carry the selected date or period, Project category where
+  relevant, exact duration, and sanitized source record IDs into detail;
+- current-week totals stop at the current account-timezone date and render
+  future dates as unavailable;
+- Running Activities is derived from one prototype state, permits foreground
+  selection without starting or ending a timer, and selects a remaining
+  running Activity after foreground End;
+- the full-screen Tracker exposes one Start/End control and a read-only timer;
+- exact 320px, 390x844, and 1440x900 captures plus the required drawer and
+  state captures are retained beside the prototype;
+- `verify.mjs` covers evidence and Focus behavior, while
+  `browser-verify.html` exercises Chromium overflow, focus trap, nested Escape,
+  and trigger-focus return.
+
+This evidence is a correction candidate, not React authorization. The separate
+screenshot and interaction acceptance gate remains open for the product owner.

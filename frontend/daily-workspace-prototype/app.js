@@ -5,10 +5,15 @@
     destination: "today",
     mode: "day",
     periodOffset: { day: 0, week: 0, month: 0 },
-    insightsOffset: -6,
+    insightsOffset: -1,
     planOffset: 0,
-    focusRunning: true,
-    runningCount: 2,
+    foregroundId: "backend",
+    activityOrder: 3,
+    activities: [
+      { id: "backend", name: "Backend schema and migration review", project: "Theseus", running: true, clock: "18:42", today: "2h 10m", startedOrder: 2 },
+      { id: "course", name: "Coursework literature review notes", project: "Coursework", running: true, clock: "07:15", today: "1h 25m", startedOrder: 1 },
+      { id: "walk", name: "Walk", project: "Recovery", running: false, clock: "00:00", today: "1h 00m", startedOrder: 0 },
+    ],
     preview: { today: "normal", insights: "normal", plan: "normal" },
   };
 
@@ -58,6 +63,13 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   const icon = (name) => `<svg aria-hidden="true"><use href="#icon-${name}" /></svg>`;
+  const evidenceAttributes = ({ date = "", category = "", recordIds = [], duration = "", period = "" }) => [
+    date ? `data-evidence-date="${date}"` : "",
+    category ? `data-evidence-category="${category}"` : "",
+    recordIds.length ? `data-record-ids="${recordIds.join(",")}"` : "",
+    duration ? `data-evidence-duration="${duration}"` : "",
+    period ? `data-evidence-period="${period}"` : "",
+  ].filter(Boolean).join(" ");
 
   const todayContent = $("#today-content");
   const insightsContent = $("#insights-content");
@@ -69,8 +81,45 @@
   const drawerBody = $("#drawer-body");
   const toast = $("#toast");
   let lastFocused = null;
-  let drawerReturnView = null;
+  const drawerStack = [];
+  let drawerContext = {};
   let toastTimer = null;
+
+  function activityById(id) {
+    return state.activities.find((activity) => activity.id === id) || null;
+  }
+
+  function runningActivities() {
+    return state.activities
+      .filter((activity) => activity.running)
+      .sort((left, right) => right.startedOrder - left.startedOrder);
+  }
+
+  function foregroundActivity() {
+    return activityById(state.foregroundId)
+      || runningActivities()[0]
+      || state.activities[0]
+      || null;
+  }
+
+  function selectFallbackForeground() {
+    const nextRunning = runningActivities()[0];
+    if (nextRunning) state.foregroundId = nextRunning.id;
+  }
+
+  function toggleForegroundActivity() {
+    const activity = foregroundActivity();
+    if (!activity) return null;
+    if (activity.running) {
+      activity.running = false;
+      selectFallbackForeground();
+    } else {
+      activity.running = true;
+      activity.startedOrder = state.activityOrder++;
+      activity.clock = "00:00";
+    }
+    return activity;
+  }
 
   function setDestination(destination, focusWorkspace = true) {
     state.destination = destination;
@@ -90,6 +139,7 @@
     });
     $("#screen-title").textContent = titles[destination][0];
     $("#header-context").textContent = titles[destination][1];
+    $(".app-frame").scrollTop = 0;
     updateStateSelect();
     renderActiveDestination();
     closePrototypePanel();
@@ -137,19 +187,22 @@
       return;
     }
 
-    running.hidden = state.runningCount < 2;
-    running.textContent = `${state.runningCount} running`;
-    if (state.focusRunning) {
-      identity.innerHTML = `<span class="focus-name">Backend schema</span><span class="focus-meta">Theseus · Focus</span>`;
-      timer.textContent = "18:42";
+    const foreground = foregroundActivity();
+    const runningCount = runningActivities().length;
+    if (!foreground) return;
+    running.hidden = runningCount < 2;
+    running.textContent = `${runningCount} running`;
+    if (foreground.running) {
+      identity.innerHTML = `<span class="focus-name">${foreground.name}</span><span class="focus-meta">${foreground.project} · Focus</span>`;
+      timer.textContent = foreground.clock;
       action.innerHTML = icon("stop");
-      action.setAttribute("aria-label", "End Backend schema");
+      action.setAttribute("aria-label", `End ${foreground.name}`);
       action.disabled = false;
     } else {
-      identity.innerHTML = `<span class="focus-name">Backend schema</span><span class="focus-meta">Ready to focus</span>`;
+      identity.innerHTML = `<span class="focus-name">${foreground.name}</span><span class="focus-meta">${foreground.project} · Ready</span>`;
       timer.textContent = "—";
       action.innerHTML = icon("play");
-      action.setAttribute("aria-label", "Start Backend schema");
+      action.setAttribute("aria-label", `Start ${foreground.name}`);
       action.disabled = false;
     }
   }
@@ -204,34 +257,40 @@
 
   function dayView() {
     const historical = state.periodOffset.day < 0;
+    const selectedDate = historical ? "2026-07-23" : "2026-07-30";
     const timelineTitle = historical ? "Thu, Jul 23 timeline" : "Today timeline";
+    const projectEvidence = {
+      Theseus: historical ? ["TL-20260723-01"] : ["TL-20260730-01"],
+      Coursework: historical ? ["TL-20260723-02"] : ["TL-20260730-02"],
+      Recovery: historical ? ["TL-20260723-03"] : ["TL-20260730-03"],
+    };
     return `
       <section class="panel" aria-labelledby="distribution-title">
         <div class="panel-heading">
           <h2 id="distribution-title">Time by project</h2>
-          <button class="icon-button data-button" type="button" data-open="distribution" aria-label="View time distribution data">${icon("list")}</button>
+          <button class="icon-button data-button" type="button" data-open="distribution" ${evidenceAttributes({ date: selectedDate, recordIds: Object.values(projectEvidence).flat(), duration: "4h 35m" })} aria-label="View time distribution data">${icon("list")}</button>
         </div>
-        <div class="donut-wrap">
-          <svg class="donut" viewBox="0 0 120 120" role="img" aria-labelledby="donut-title donut-description">
-            <title id="donut-title">Time by project</title>
-            <desc id="donut-description">Four hours thirty-five minutes total. Theseus 47 percent, Coursework 31 percent, Recovery 22 percent.</desc>
+        <button class="donut-chart-button" type="button" data-open="distribution" ${evidenceAttributes({ date: selectedDate, recordIds: Object.values(projectEvidence).flat(), duration: "4h 35m" })} aria-label="View all time distribution data for ${timelineTitle.replace(" timeline", "")}">
+          <span class="donut-wrap">
+          <svg class="donut" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
             <circle class="donut-track" cx="60" cy="60" r="44" />
-            <circle class="donut-segment segment-theseus" data-open="theseus-records" tabindex="0" role="button" aria-label="Theseus, 2 hours 10 minutes, 47 percent" cx="60" cy="60" r="44" pathLength="100" stroke-dasharray="47 53" stroke-dashoffset="0" />
-            <circle class="donut-segment segment-course" data-open="course-records" tabindex="0" role="button" aria-label="Coursework, 1 hour 25 minutes, 31 percent" cx="60" cy="60" r="44" pathLength="100" stroke-dasharray="31 69" stroke-dashoffset="-47" />
-            <circle class="donut-segment segment-recovery" data-open="recovery-records" tabindex="0" role="button" aria-label="Recovery, 1 hour, 22 percent" cx="60" cy="60" r="44" pathLength="100" stroke-dasharray="22 78" stroke-dashoffset="-78" />
+            <circle class="donut-segment segment-theseus" cx="60" cy="60" r="44" pathLength="100" stroke-dasharray="47 53" stroke-dashoffset="0" />
+            <circle class="donut-segment segment-course" cx="60" cy="60" r="44" pathLength="100" stroke-dasharray="31 69" stroke-dashoffset="-47" />
+            <circle class="donut-segment segment-recovery" cx="60" cy="60" r="44" pathLength="100" stroke-dasharray="22 78" stroke-dashoffset="-78" />
           </svg>
           <div class="donut-total"><strong>4h 35m</strong><span>recorded</span></div>
-        </div>
+          </span>
+        </button>
         <div class="legend" aria-label="Time distribution legend">
-          ${legendRow("Theseus", "2h 10m", "47%", "theseus", "theseus-records")}
-          ${legendRow("Coursework", "1h 25m", "31%", "course", "course-records")}
-          ${legendRow("Recovery", "1h 00m", "22%", "recovery", "recovery-records")}
+          ${legendRow("Theseus", "2h 10m", "47%", "theseus", "project-evidence", evidenceAttributes({ date: selectedDate, category: "Theseus", recordIds: projectEvidence.Theseus, duration: "2h 10m" }))}
+          ${legendRow("Coursework", "1h 25m", "31%", "course", "project-evidence", evidenceAttributes({ date: selectedDate, category: "Coursework", recordIds: projectEvidence.Coursework, duration: "1h 25m" }))}
+          ${legendRow("Recovery", "1h 00m", "22%", "recovery", "project-evidence", evidenceAttributes({ date: selectedDate, category: "Recovery", recordIds: projectEvidence.Recovery, duration: "1h 00m" }))}
         </div>
       </section>
       <section class="panel" aria-labelledby="timeline-title">
         <div class="panel-heading">
           <h2 id="timeline-title">${timelineTitle}</h2>
-          <button class="icon-button data-button" type="button" data-open="day-history" aria-label="Open ${timelineTitle.toLowerCase()}">${icon("arrow")}</button>
+          <button class="icon-button data-button" type="button" data-open="day-history" ${evidenceAttributes({ date: selectedDate, recordIds: Object.values(projectEvidence).flat(), duration: "4h 35m" })} aria-label="Open ${timelineTitle.toLowerCase()}">${icon("arrow")}</button>
         </div>
         <div class="timeline" aria-label="Selected day timeline preview">
           <time>09:00</time><div class="timeline-band">Backend schema · 2h 10m</div>
@@ -241,36 +300,50 @@
       </section>`;
   }
 
-  function legendRow(label, duration, percent, className, openName) {
-    return `<div class="legend-row"><span class="swatch ${className}" aria-hidden="true"></span><button type="button" data-open="${openName}">${label}</button><strong>${duration}</strong><small>${percent}</small></div>`;
+  function legendRow(label, duration, percent, className, openName, attributes = "") {
+    return `<div class="legend-row"><span class="swatch ${className}" aria-hidden="true"></span><button type="button" data-open="${openName}" ${attributes}>${label}</button><strong>${duration}</strong><small>${percent}</small></div>`;
   }
 
   function weekView() {
-    const bars = [
-      [42, 24, 18, "Mon, 3h 20m"],
-      [58, 39, 20, "Tue, 4h 40m"],
-      [34, 28, 13, "Wed, 2h 40m"],
-      [60, 34, 22, "Thu, 4h 30m"],
-      [51, 44, 18, "Fri, 4h 35m"],
-      [28, 31, 18, "Sat, 2h 45m"],
-      [20, 25, 12, "Sun, 2h 10m"],
+    const historical = state.periodOffset.week < 0;
+    const currentDays = [
+      ["2026-07-27", "M", "Mon", 200, [100, 60, 40]],
+      ["2026-07-28", "T", "Tue", 280, [130, 90, 60]],
+      ["2026-07-29", "W", "Wed", 160, [70, 55, 35]],
+      ["2026-07-30", "T", "Thu", 270, [120, 90, 60]],
+      ["2026-07-31", "F", "Fri", null, []],
+      ["2026-08-01", "S", "Sat", null, []],
+      ["2026-08-02", "S", "Sun", null, []],
     ];
-    const dayNames = ["M", "T", "W", "T", "F", "S", "S"];
+    const historicalDays = [
+      ["2026-06-08", "M", "Mon", 200, [100, 60, 40]],
+      ["2026-06-09", "T", "Tue", 280, [130, 90, 60]],
+      ["2026-06-10", "W", "Wed", 160, [70, 55, 35]],
+      ["2026-06-11", "T", "Thu", 270, [120, 90, 60]],
+      ["2026-06-12", "F", "Fri", 275, [125, 95, 55]],
+      ["2026-06-13", "S", "Sat", 165, [70, 55, 40]],
+      ["2026-06-14", "S", "Sun", 130, [55, 45, 30]],
+    ];
+    const days = historical ? historicalDays : currentDays;
+    const weekPeriod = historical ? "2026-06-08/2026-06-14" : "2026-07-27/2026-08-02";
+    const total = historical ? "24h 40m" : "15h 10m";
+    const allRecordIds = days.flatMap((day) => day[3] === null ? [] : weekRecordIds(day[0]));
+    const legendValues = historical
+      ? [["Theseus", "11h 10m", "45%", "theseus"], ["Coursework", "8h 10m", "33%", "course"], ["Recovery", "5h 20m", "22%", "recovery"]]
+      : [["Theseus", "7h 00m", "46%", "theseus"], ["Coursework", "4h 55m", "32%", "course"], ["Recovery", "3h 15m", "21%", "recovery"]];
     return `
       <section class="panel panel-wide" aria-labelledby="week-chart-title">
         <div class="panel-heading">
           <h2 id="week-chart-title">Recorded time by day</h2>
-          <button class="icon-button data-button" type="button" data-open="week-data" aria-label="View daily recorded time data">${icon("list")}</button>
+          <button class="icon-button data-button" type="button" data-open="week-data" ${evidenceAttributes({ period: weekPeriod, recordIds: allRecordIds, duration: total })} aria-label="View daily recorded time data">${icon("list")}</button>
         </div>
-        <div class="summary-row"><strong>24h 40m</strong><span>selected week</span></div>
-        <div class="week-chart" role="img" aria-label="Stacked bars for seven recorded days. Exact values are available in the data view.">
-          ${bars.map((bar, index) => `<div class="day-bar"><button class="bar-amber" style="height:${bar[2]}px" data-open="week-day" aria-label="${bar[3]}, Recovery segment"></button><button class="bar-blue" style="height:${bar[1]}px" data-open="week-day" aria-label="${bar[3]}, Coursework segment"></button><button class="bar-green" style="height:${bar[0]}px" data-open="week-day" aria-label="${bar[3]}, Theseus segment"></button><span>${dayNames[index]}</span></div>`).join("")}
+        <div class="summary-row"><strong>${total}</strong><span>${historical ? "selected week" : "through Thu, Jul 30"}</span></div>
+        <div class="week-chart" role="group" aria-label="Recorded time by day. Open a day for its exact Project values and records.">
+          ${days.map((day) => weekDayButton(day)).join("")}
         </div>
         <div class="week-chart-space"></div>
         <div class="legend" aria-label="Chart legend">
-          ${legendRow("Theseus", "10h 30m", "43%", "theseus", "week-data")}
-          ${legendRow("Coursework", "8h 10m", "33%", "course", "week-data")}
-          ${legendRow("Recovery", "6h 00m", "24%", "recovery", "week-data")}
+          ${legendValues.map(([label, duration, percent, className]) => legendRow(label, duration, percent, className, "week-category", evidenceAttributes({ period: weekPeriod, category: label, recordIds: days.flatMap((day) => day[3] === null ? [] : [weekRecordIds(day[0])[["Theseus", "Coursework", "Recovery"].indexOf(label)]]), duration }))).join("")}
         </div>
       </section>
       <section class="panel panel-flush" aria-labelledby="variance-title">
@@ -280,30 +353,64 @@
       </section>`;
   }
 
+  function weekRecordIds(date) {
+    const compactDate = date.replaceAll("-", "");
+    return [`TL-${compactDate}-T`, `TL-${compactDate}-C`, `TL-${compactDate}-R`];
+  }
+
+  function weekDayButton(day) {
+    const [date, shortDay, longDay, totalMinutes, segments] = day;
+    if (totalMinutes === null) {
+      return `<div class="day-bar is-unavailable" aria-label="${longDay}, future date unavailable"><span class="future-mark" aria-hidden="true"></span><span>${shortDay}</span></div>`;
+    }
+    const [theseus, coursework, recovery] = segments;
+    const duration = minutesLabel(totalMinutes);
+    return `<div class="day-bar"><button class="day-bar-button" type="button" data-open="week-evidence" ${evidenceAttributes({ date, recordIds: weekRecordIds(date), duration })} aria-label="${longDay}, ${duration}. Open exact Project values and records"><span class="bar-stack" aria-hidden="true"><i class="bar-amber" style="height:${Math.max(12, recovery / 2)}px"></i><i class="bar-blue" style="height:${Math.max(12, coursework / 2)}px"></i><i class="bar-green" style="height:${Math.max(12, theseus / 2)}px"></i></span></button><span>${shortDay}</span></div>`;
+  }
+
+  function minutesLabel(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return `${hours ? `${hours}h ` : ""}${remainder ? `${remainder}m` : ""}`.trim();
+  }
+
   function monthView() {
-    const levels = [0, 1, 2, 1, 0, 2, 3, 1, 0, 2, 0, 0, 1, 2, 3, 2, 1, 0, 0, 2, 2, 1, 3, 2, 1, 0, 0, 2, 1, 3, -1];
-    const cells = [`<span class="heatmap-blank" aria-hidden="true"></span>`, `<span class="heatmap-blank" aria-hidden="true"></span>`]
+    const historical = state.periodOffset.month < 0;
+    const levels = historical
+      ? [1, 2, 0, 1, 2, 3, 0, 1, 2, 1, 0, 2, 0, 0, 2, 3, 1, 2, 1, 0, 0, 1, 2, 3, 1, 0, 0, 3, 1, 2]
+      : [0, 1, 2, 1, 0, 2, 3, 1, 0, 2, 0, 0, 1, 2, 3, 2, 1, 0, 0, 2, 2, 1, 3, 2, 1, 0, 0, 3, 1, 3, -1];
+    const monthName = historical ? "June" : "July";
+    const monthPrefix = historical ? "2026-06" : "2026-07";
+    const monthPeriod = historical ? "2026-06-01/2026-06-30" : "2026-07-01/2026-07-31";
+    const monthTotal = historical ? "48h 20m" : "57h 36m";
+    const activeSummary = historical ? "16 active days · 3h 01m average" : "18 active days · 3h 12m average";
+    const leadingBlanks = historical ? [] : [`<span class="heatmap-blank" aria-hidden="true"></span>`, `<span class="heatmap-blank" aria-hidden="true"></span>`];
+    const cells = leadingBlanks
       .concat(levels.map((level, index) => {
         const day = index + 1;
-        if (level < 0) return `<button class="heat-future" type="button" disabled aria-label="July ${day}, future date unavailable">${day}</button>`;
+        const date = `${monthPrefix}-${String(day).padStart(2, "0")}`;
+        if (level < 0) return `<button class="heat-future" type="button" disabled aria-label="${monthName} ${day}, future date unavailable">${day}</button>`;
         const names = ["none", "low", "medium", "high"];
         const minutes = [0, 45, 150, 285][level];
-        return `<button class="heat-${names[level]} ${day === 28 ? "heat-selected" : ""}" type="button" data-open="month-day" aria-label="July ${day}, ${minutes} recorded minutes, ${names[level]} intensity">${day}</button>`;
+        const ids = minutes ? [`TL-${date.replaceAll("-", "")}-M1`] : [];
+        return `<button class="heat-${names[level]} ${day === 28 ? "heat-selected" : ""}" type="button" data-open="month-evidence" ${evidenceAttributes({ date, recordIds: ids, duration: minutesLabel(minutes) || "0m" })} data-evidence-intensity="${names[level]}" aria-label="${monthName} ${day}, ${minutes} recorded minutes, ${names[level]} intensity">${day}</button>`;
       }));
+    const allMonthIds = levels.flatMap((level, index) => level > 0 ? [`TL-${monthPrefix.replace("-", "")}${String(index + 1).padStart(2, "0")}-M1`] : []);
+    const selectedDate = `${monthPrefix}-28`;
     return `
       <section class="panel panel-wide" aria-labelledby="month-title">
         <div class="panel-heading">
           <h2 id="month-title">Recorded time intensity</h2>
-          <button class="icon-button data-button" type="button" data-open="month-data" aria-label="View monthly recorded time data">${icon("list")}</button>
+          <button class="icon-button data-button" type="button" data-open="month-data" ${evidenceAttributes({ period: monthPeriod, recordIds: allMonthIds, duration: monthTotal })} aria-label="View monthly recorded time data">${icon("list")}</button>
         </div>
-        <div class="summary-row"><strong>57h 36m</strong><span>18 active days · 3h 12m average</span></div>
+        <div class="summary-row"><strong>${monthTotal}</strong><span>${activeSummary}</span></div>
         <div class="heatmap-weekdays" aria-hidden="true"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
         <div class="heatmap">${cells.join("")}</div>
         <div class="heat-legend" aria-label="Provisional intensity legend"><span><i></i>None</span><span><i class="low"></i>Low</span><span><i class="medium"></i>Medium</span><span><i class="high"></i>High</span></div>
         <div class="notice">Prototype thresholds are provisional. Freeze absolute duration thresholds before Month implementation.</div>
       </section>
       <section class="panel panel-flush">
-        ${compactRow("Selected · Jul 28", "4h 45m recorded", "month-day")}
+        ${compactRow(`Selected · ${monthName.slice(0, 3)} 28`, "4h 45m recorded", "month-evidence", evidenceAttributes({ date: selectedDate, recordIds: [`TL-${selectedDate.replaceAll("-", "")}-M1`], duration: "4h 45m" }))}
       </section>`;
   }
 
@@ -311,12 +418,16 @@
     if (state.mode === "month") {
       return stateSurface("today", "More days are needed", "Recorded 25m on one date. A monthly pattern is not shown.", "Open records", "data-open='day-history'");
     }
-    return `<section class="panel"><div class="panel-heading"><h2>Time by project</h2><button class="icon-button data-button" type="button" data-open="distribution" aria-label="View time distribution data">${icon("list")}</button></div><div class="donut-wrap"><svg class="donut" viewBox="0 0 120 120" role="img" aria-label="25 minutes total, one category"><circle class="donut-track" cx="60" cy="60" r="44"/><circle class="donut-segment segment-theseus" cx="60" cy="60" r="44" pathLength="100" stroke-dasharray="100 0"/></svg><div class="donut-total"><strong>25m</strong><span>recorded</span></div></div>${legendRow("Theseus", "25m", "100%", "theseus", "theseus-records")}</section>`;
+    const selectedDate = state.periodOffset.day < 0 ? "2026-07-23" : "2026-07-30";
+    const attributes = evidenceAttributes({ date: selectedDate, category: "Theseus", recordIds: [`TL-${selectedDate.replaceAll("-", "")}-01`], duration: "25m" });
+    return `<section class="panel"><div class="panel-heading"><h2>Time by project</h2><button class="icon-button data-button" type="button" data-open="distribution" ${attributes} aria-label="View time distribution data">${icon("list")}</button></div><button class="donut-chart-button" type="button" data-open="project-evidence" ${attributes} aria-label="Theseus, 25 minutes, 100 percent"><span class="donut-wrap"><svg class="donut" viewBox="0 0 120 120" aria-hidden="true" focusable="false"><circle class="donut-track" cx="60" cy="60" r="44"/><circle class="donut-segment segment-theseus" cx="60" cy="60" r="44" pathLength="100" stroke-dasharray="100 0"/></svg><span class="donut-total"><strong>25m</strong><span>recorded</span></span></span></button>${legendRow("Theseus", "25m", "100%", "theseus", "project-evidence", attributes)}</section>`;
   }
 
   function renderInsights() {
     updateInsightsRange();
     const preview = state.preview.insights;
+    const period = selectedInsightsPeriod();
+    const reviewAttributes = evidenceAttributes({ period: period.iso, recordIds: [period.reviewId] });
     if (preview === "loading") {
       insightsContent.innerHTML = skeletonState("Loading Insights");
       return;
@@ -330,11 +441,11 @@
       return;
     }
     if (preview === "stale") {
-      insightsContent.innerHTML = stateSurface("refresh", "Review out of date", "Recorded time changed after this review.", "Regenerate", "data-generate-review", "View previous", "data-open='previous-review'");
+      insightsContent.innerHTML = stateSurface("refresh", "Review out of date", "Recorded time changed after this review.", "Regenerate", "data-generate-review", "View previous", `data-open="previous-review" ${reviewAttributes}`);
       return;
     }
     if (preview === "error") {
-      insightsContent.innerHTML = stateSurface("warning", "Insights could not load", "Last verified review: Jun 14, 18:05.", "Retry", "data-retry-insights", "Last verified", "data-open='previous-review'");
+      insightsContent.innerHTML = stateSurface("warning", "Insights could not load", `Last verified review: ${period.label}.`, "Retry", "data-retry-insights", "Last verified", `data-open="previous-review" ${reviewAttributes}`);
       return;
     }
     const steady = preview === "steady";
@@ -346,29 +457,35 @@
             <div class="count-pair"><div><strong>2</strong><span>wins</span></div><div><strong>${steady ? "0" : "1"}</strong><span>risks</span></div></div>
           </div>
         </section>
-        ${steady ? steadyPanel() : priorityPanel()}
+        ${steady ? steadyPanel(reviewAttributes) : priorityPanel()}
         <section class="panel panel-flush compact-list" aria-label="Review summaries">
           ${compactRow("Wins", "2", "wins")}
           ${steady ? "" : compactRow("Other issues", "1", "issues")}
           ${compactRow("Steady checks", "3", "steady")}
-          ${compactRow("Weekly review", "Jun 8 – Jun 14", "review")}
+          ${compactRow("Weekly review", period.label, "review", reviewAttributes)}
         </section>
       </div>`;
   }
 
   function updateInsightsRange() {
     const current = state.insightsOffset === 0;
-    $("#insights-period-label").textContent = current ? "Jul 27 – Aug 2" : state.insightsOffset < -1 ? "Jun 8 – Jun 14" : "Jul 20 – Jul 26";
+    $("#insights-period-label").textContent = selectedInsightsPeriod().label;
     $("#insights-reset").hidden = current;
     $("[data-insights-period='next']").disabled = current;
+  }
+
+  function selectedInsightsPeriod() {
+    if (state.insightsOffset === 0) return { label: "Jul 27 – Aug 2", iso: "2026-07-27/2026-08-02", reviewId: "WR-20260727" };
+    if (state.insightsOffset <= -2) return { label: "Jun 1 – Jun 7", iso: "2026-06-01/2026-06-07", reviewId: "WR-20260601" };
+    return { label: "Jun 8 – Jun 14", iso: "2026-06-08/2026-06-14", reviewId: "WR-20260608" };
   }
 
   function priorityPanel() {
     return `<section class="panel priority-panel"><p class="section-kicker">Priority</p><h2 class="priority-title">Resume project</h2><div class="metric-row"><strong>0m actual / 60m planned</strong><span class="tag">Dormant</span></div><button class="primary-action" type="button" data-adjust-plan>Adjust ${icon("arrow")}</button></section>`;
   }
 
-  function steadyPanel() {
-    return `<section class="panel priority-panel"><p class="section-kicker">Verified</p><h2 class="priority-title">No attention signal</h2><div class="metric-row"><strong>3 checks steady</strong><span class="tag">Current</span></div><button class="secondary-action" type="button" data-open="review">Open review</button></section>`;
+  function steadyPanel(reviewAttributes) {
+    return `<section class="panel priority-panel"><p class="section-kicker">Verified</p><h2 class="priority-title">No attention signal</h2><div class="metric-row"><strong>3 checks steady</strong><span class="tag">Current</span></div><button class="secondary-action" type="button" data-open="review" ${reviewAttributes}>Open review</button></section>`;
   }
 
   function renderPlan() {
@@ -442,8 +559,8 @@
     return `<div class="state-inline ${className}"><div class="state-heading"><strong>${title}</strong>${action}</div><p>${message}</p></div>`;
   }
 
-  function compactRow(title, meta, openName) {
-    return `<button class="row-button" type="button" data-open="${openName}"><span><strong>${title}</strong><span class="meta">${meta}</span></span>${icon("chevron-right")}</button>`;
+  function compactRow(title, meta, openName, attributes = "") {
+    return `<button class="row-button" type="button" data-open="${openName}" ${attributes}><span><strong>${title}</strong><span class="meta">${meta}</span></span>${icon("chevron-right")}</button>`;
   }
 
   function stateSurface(iconName, title, message, actionLabel, actionAttribute, secondaryLabel = "", secondaryAttribute = "") {
@@ -454,10 +571,15 @@
     return `<section class="panel" aria-label="${label}" aria-busy="true"><div class="skeleton skeleton-line short"></div><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-chart"></div></section>`;
   }
 
-  function openDrawer(name, trigger, returnView = null) {
-    if (drawer.hidden) lastFocused = trigger || document.activeElement;
-    drawerReturnView = returnView;
-    const views = drawerViews(name);
+  function openDrawer(name, trigger, pushCurrent = false, context = {}) {
+    if (drawer.hidden) {
+      lastFocused = trigger || document.activeElement;
+      drawerStack.length = 0;
+    } else if (pushCurrent && drawer.dataset.view) {
+      drawerStack.push({ name: drawer.dataset.view, context: drawerContext });
+    }
+    drawerContext = context;
+    const views = drawerViews(name, context);
     drawerTitle.textContent = views.title;
     drawerBody.innerHTML = views.body;
     drawer.dataset.view = name;
@@ -470,42 +592,46 @@
 
   function closeDrawer() {
     if (drawer.hidden) return;
-    if (drawerReturnView) {
-      const returnView = drawerReturnView;
-      drawerReturnView = null;
-      openDrawer(returnView, null);
+    if (drawerStack.length) {
+      const previous = drawerStack.pop();
+      openDrawer(previous.name, null, false, previous.context);
       return;
     }
     drawer.hidden = true;
     overlay.hidden = true;
     drawer.classList.remove("is-tracker");
     delete drawer.dataset.view;
+    drawerStack.length = 0;
+    drawerContext = {};
     document.body.style.overflow = "";
     if (lastFocused && typeof lastFocused.focus === "function") lastFocused.focus();
   }
 
-  function drawerViews(name) {
-    const selectedDay = state.periodOffset.day < 0 ? "Thu, Jul 23" : "Thu, Jul 30";
-    const records = `<h3 class="drawer-section-title">${selectedDay}</h3>${drawerRow("Backend schema", "Theseus · 09:00–11:10", "2h 10m")}${drawerRow("Course reading", "Coursework · 11:30–12:55", "1h 25m")}${drawerRow("Walk", "Recovery · 14:10–15:10", "1h")}`;
+  function drawerViews(name, context = {}) {
+    const selectedDate = context.evidenceDate || (state.periodOffset.day < 0 ? "2026-07-23" : "2026-07-30");
+    const selectedDay = readableDate(selectedDate);
+    const periodLabel = readablePeriod(context.evidencePeriod || "");
+    const evidenceLabel = context.evidencePeriod ? periodLabel : selectedDay;
+    const records = evidenceRows(context, evidenceLabel);
+    const foreground = foregroundActivity();
     const map = {
-      distribution: ["Time by project", `${drawerRow("Theseus", "47% of recorded time", "2h 10m")}${drawerRow("Coursework", "31% of recorded time", "1h 25m")}${drawerRow("Recovery", "22% of recorded time", "1h")}`],
-      "theseus-records": ["Theseus records", drawerRow("Backend schema", `${selectedDay} · 09:00–11:10`, "2h 10m")],
-      "course-records": ["Coursework records", drawerRow("Course reading", `${selectedDay} · 11:30–12:55`, "1h 25m")],
-      "recovery-records": ["Recovery records", drawerRow("Walk", `${selectedDay} · 14:10–15:10`, "1h")],
+      distribution: ["Time by project", records],
+      "project-evidence": [`${context.evidenceCategory || "Project"} records`, records],
       "day-history": [selectedDay + " history", records],
-      "week-data": ["Daily recorded time", ["Mon|3h 20m", "Tue|4h 40m", "Wed|2h 40m", "Thu|4h 30m", "Fri|4h 35m", "Sat|2h 45m", "Sun|2h 10m"].map((item) => { const [day, value] = item.split("|"); return drawerRow(day, "Theseus · Coursework · Recovery", value); }).join("")],
-      "week-day": ["Day records", records],
+      "week-data": ["Daily recorded time", weekDataRows(context.evidencePeriod)],
+      "week-evidence": [`${selectedDay} records`, records],
+      "week-category": [`${context.evidenceCategory || "Project"} · ${periodLabel}`, records],
       variance: ["Plan / actual", `${drawerRow("Theseus", "6h planned", "−1h")}${drawerRow("Coursework", "4h planned", "+2h")}`],
-      "month-data": ["July recorded time", `${drawerRow("Total", "18 active days", "57h 36m")}${drawerRow("Jul 28", "High · provisional threshold", "4h 45m")}${drawerRow("Jul 29", "Low · provisional threshold", "45m")}`],
-      "month-day": ["Jul 28 records", records],
-      activity: ["Backend schema", `${drawerRow("Project", "Authenticated Activity", "Theseus")}${drawerRow("Status", "Foreground selection", state.focusRunning ? "Running" : "Ready")}${drawerRow("Recorded today", "Selected Activity", "2h 10m")}`],
+      "month-data": [`${periodLabel} recorded time`, `${drawerRow("Total", `${(context.recordIds || "").split(",").filter(Boolean).length} source records`, context.evidenceDuration || "—")}${records}`],
+      "month-evidence": [`${selectedDay} records`, records],
+      activity: [foreground?.name || "Activity", `${drawerRow("Project", "Authenticated Activity", foreground?.project || "—")}${drawerRow("Status", "Foreground selection", foreground?.running ? "Running" : "Ready")}${drawerRow("Recorded today", "Selected Activity", foreground?.today || "—")}`],
       account: ["Account", `${drawerRow("Profile", "Local account", "Dong")}${drawerRow("Timezone", "Period boundary", "America/Los_Angeles")}${drawerRow("Integrations", "OpenClaw · Telegram", "Active")}`],
-      activities: ["Choose an Activity", `<button class="row-button" type="button" data-select-activity><span><strong>Backend schema</strong><span class="meta">Theseus · Ready</span></span>${icon("arrow")}</button><button class="row-button" type="button" data-select-activity><span><strong>Coursework reading</strong><span class="meta">Coursework · Ready</span></span>${icon("arrow")}</button>`],
+      activities: ["Choose an Activity", activityPickerRows()],
       wins: ["Wins", `${drawerRow("Theseus moved forward", "Verified by recorded project time", "2h 10m")}${drawerRow("Recovery protected", "Three recovery sessions", "3h")}`],
       issues: ["Other issues", drawerRow("Coursework drift", "6h actual / 4h planned", "+2h")],
       steady: ["Steady checks", `${drawerRow("Protected slack", "Threshold satisfied", "6h")}${drawerRow("Restore balance", "Threshold satisfied", "Current")}${drawerRow("Plan load", "Within capacity", "67%")}`],
-      review: ["Weekly review", `<h3 class="drawer-section-title">Jun 8 – Jun 14</h3>${drawerRow("Win", "Theseus work remained consistent", "Verified")}${drawerRow("Insight", "Resume project has no recorded time", "Inspect")}${drawerRow("Next step", "Protect one restart block", "Preview")}`],
-      "previous-review": ["Previous review", `<div class="state-inline is-warning"><strong>Out of date</strong><p>Recorded time changed after this review.</p></div>${drawerRow("Generated", "Jun 14 at 18:05", "Previous")}${drawerRow("Priority", "Resume project", "Inspect")}`],
+      review: ["Weekly review", `<h3 class="drawer-section-title">${periodLabel}</h3>${drawerRow("Source review", "Inspectable Review record", (context.recordIds || "—").replaceAll(",", ", "))}${drawerRow("Win", "Theseus work remained consistent", "Verified")}${drawerRow("Insight", "Resume project has no recorded time", "Inspect")}${drawerRow("Next step", "Protect one restart block", "Preview")}`],
+      "previous-review": ["Previous review", `<div class="state-inline is-warning"><strong>Out of date</strong><p>Recorded time changed after this review.</p></div>${drawerRow("Period", "Previous verified Review", periodLabel)}${drawerRow("Source review", "Inspectable Review record", context.recordIds || "—")}${drawerRow("Priority", "Resume project", "Inspect")}`],
       proposal: ["Adjustment preview", `${drawerRow("Evidence", "Resume project · 0m actual", "Inspect")}${drawerRow("Before", "11h planned · 7h slack", "Current")}${drawerRow("After", "12h planned · 6h slack", "+1h")}<div class="proposal-actions"><button class="primary-action" type="button" data-apply>Apply</button></div>`],
       "plan-blocks": ["Plan blocks", `${drawerRow("Theseus", "Mon / Wed / Fri", "6h")}${drawerRow("Coursework", "Tue / Thu", "4h")}${drawerRow("Resume project", "Tue morning", "2h")}`],
       tasks: ["Tasks", `${drawerRow("Schema contract", "Theseus · In progress", "Current")}${drawerRow("Review notes", "Coursework · Open", "Next")}${drawerRow("Resume outline", "Resume · Open", "Next")}${drawerRow("Weekly reflection", "Theseus · Open", "Later")}`],
@@ -517,47 +643,87 @@
   }
 
   function trackerDrawer() {
-    const runningMeta = state.focusRunning
-      ? `Theseus · Focus${state.runningCount > 1 ? ` · ${state.runningCount} running` : ""}`
-      : "Theseus · Ready";
-    const actionLabel = state.focusRunning ? "End Backend schema" : "Start Backend schema";
+    const foreground = foregroundActivity();
+    const runningCount = runningActivities().length;
+    if (!foreground) return { title: "Focus", body: stateSurface("today", "No Activity available", "Create an Activity before starting Focus.", "New Activity", "data-create-activity") };
+    const runningMeta = foreground.running
+      ? `${foreground.project} · Focus${runningCount > 1 ? ` · ${runningCount} running` : ""}`
+      : `${foreground.project} · Ready`;
+    const actionLabel = foreground.running ? `End ${foreground.name}` : `Start ${foreground.name}`;
+    const todayEvidence = evidenceAttributes({ date: "2026-07-30", recordIds: ["TL-20260730-01", "TL-20260730-02", "TL-20260730-03"], duration: "4h 35m" });
     return {
       title: "Focus",
       body: `<div class="tracker-workspace">
         <button class="tracker-activity" type="button" data-open="activities" aria-label="Choose Activity">
           <span class="tracker-activity-mark" aria-hidden="true">${icon("today")}</span>
-          <span><strong>Backend schema</strong><small>${runningMeta}</small></span>
+          <span><strong>${foreground.name}</strong><small>${runningMeta}</small></span>
           ${icon("chevron-right")}
         </button>
-        <button class="tracker-timer-button" type="button" data-tracker-toggle aria-label="${actionLabel}">
+        <div class="tracker-timer-display" role="timer" aria-label="Current Focus duration ${foreground.running ? foreground.clock : "zero"}">
           <span class="tracker-run-mark" aria-hidden="true"></span>
-          <strong>${state.focusRunning ? "00:18:42" : "00:00:00"}</strong>
-        </button>
+          <strong>${foreground.running ? `00:${foreground.clock}` : "00:00:00"}</strong>
+        </div>
         <button class="tracker-focus-control" type="button" data-tracker-toggle aria-label="${actionLabel}">
-          ${icon(state.focusRunning ? "stop" : "play")}
+          ${icon(foreground.running ? "stop" : "play")}
         </button>
-        <button class="tracker-total" type="button" data-open="day-history" aria-label="Open Today history, 4 hours 35 minutes">
+        <button class="tracker-total" type="button" data-open="day-history" ${todayEvidence} aria-label="Open Today history, 4 hours 35 minutes">
           <span class="swatch" aria-hidden="true"></span><span>Today total</span><strong>4h 35m</strong>${icon("chevron-right")}
         </button>
         <div class="tracker-links">
-          <button class="row-button" type="button" data-open="running"><span><strong>Running Activities</strong><span class="meta">${state.runningCount} active</span></span>${icon("chevron-right")}</button>
-          <button class="row-button" type="button" data-open="day-history"><span><strong>Today history</strong><span class="meta">3 records · correctable</span></span>${icon("chevron-right")}</button>
+          <button class="row-button" type="button" data-open="running"><span><strong>Running Activities</strong><span class="meta">${runningCount} active</span></span>${icon("chevron-right")}</button>
+          <button class="row-button" type="button" data-open="day-history" ${todayEvidence}><span><strong>Today history</strong><span class="meta">3 records · correctable</span></span>${icon("chevron-right")}</button>
         </div>
       </div>`,
     };
   }
 
   function runningDrawer() {
-    const rows = [
-      `<div class="list-row"><span><strong>Backend schema</strong><span class="meta">Theseus · foreground</span></span><strong>18:42</strong><button class="icon-button running-end" type="button" data-end-running="backend" aria-label="End Backend schema">${icon("stop")}</button></div>`,
-      `<div class="list-row"><span><strong>Coursework reading</strong><span class="meta">Coursework</span></span><strong>07:15</strong><button class="icon-button running-end" type="button" data-end-running="course" aria-label="End Coursework reading">${icon("stop")}</button></div>`,
-      `<button class="row-button" type="button" data-choose-activity><span><strong>Choose another Activity</strong><span class="meta">Start remains a separate action</span></span>${icon("plus")}</button>`,
-    ];
-    return { title: "Running", body: rows.join("") };
+    const running = runningActivities();
+    const rows = running.map((activity) => `<div class="running-row"><button class="running-select" type="button" data-select-running="${activity.id}" aria-pressed="${activity.id === state.foregroundId}"><strong>${activity.name}</strong><span class="meta">${activity.project} · ${activity.clock}${activity.id === state.foregroundId ? " · foreground" : ""}</span></button><button class="running-end" type="button" data-end-running="${activity.id}" aria-label="End ${activity.name}">End</button></div>`);
+    rows.push(`<button class="row-button" type="button" data-choose-activity><span><strong>Choose another Activity</strong><span class="meta">Selection does not start it</span></span>${icon("plus")}</button>`);
+    return { title: "Running", body: running.length ? rows.join("") : `<div class="state-inline"><strong>No running Activities</strong><p>Choose an Activity before starting Focus.</p></div>${rows.at(-1)}` };
   }
 
   function drawerRow(title, meta, value) {
     return `<div class="list-row"><span><strong>${title}</strong><span class="meta">${meta}</span></span><strong>${value}</strong></div>`;
+  }
+
+  function activityPickerRows() {
+    return state.activities.map((activity) => {
+      const selected = activity.id === state.foregroundId;
+      const status = activity.running ? `Running · ${activity.clock}` : "Ready";
+      return `<button class="row-button activity-picker-row" type="button" data-select-activity="${activity.id}" aria-pressed="${selected}"><span><strong>${activity.name}</strong><span class="meta">${activity.project} · ${status}</span></span>${selected ? icon("check") : icon("arrow")}</button>`;
+    }).join("") + `<button class="row-button" type="button" data-create-activity><span><strong>New Activity</strong><span class="meta">Create before starting</span></span>${icon("plus")}</button>`;
+  }
+
+  function evidenceRows(context, readableDateLabel) {
+    const ids = (context.recordIds || "").split(",").filter(Boolean);
+    if (!ids.length) {
+      return `<div class="state-inline"><strong>No recorded evidence</strong><p>${readableDateLabel} has no matching TimeLog records.</p></div>`;
+    }
+    const category = context.evidenceCategory || "TimeLog";
+    const duration = context.evidenceDuration || "Source";
+    return `<h3 class="drawer-section-title">${readableDateLabel}</h3>${ids.map((id, index) => drawerRow(index === 0 ? category : `${category} record`, `Source record · ${id}`, ids.length === 1 ? duration : "Inspect")).join("")}`;
+  }
+
+  function weekDataRows(period) {
+    const historical = period === "2026-06-08/2026-06-14";
+    const rows = historical
+      ? [["2026-06-08", "3h 20m"], ["2026-06-09", "4h 40m"], ["2026-06-10", "2h 40m"], ["2026-06-11", "4h 30m"], ["2026-06-12", "4h 35m"], ["2026-06-13", "2h 45m"], ["2026-06-14", "2h 10m"]]
+      : [["2026-07-27", "3h 20m"], ["2026-07-28", "4h 40m"], ["2026-07-29", "2h 40m"], ["2026-07-30", "4h 30m"], ["2026-07-31", "Unavailable"], ["2026-08-01", "Unavailable"], ["2026-08-02", "Unavailable"]];
+    return rows.map(([date, value]) => drawerRow(readableDate(date), value === "Unavailable" ? "Future date · excluded" : weekRecordIds(date).join(" · "), value)).join("");
+  }
+
+  function readableDate(isoDate) {
+    const [year, month, day] = isoDate.split("-").map(Number);
+    if (!year || !month || !day) return isoDate || "Selected evidence";
+    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, day)));
+  }
+
+  function readablePeriod(period) {
+    if (!period || !period.includes("/")) return "Selected period";
+    const [start, end] = period.split("/");
+    return `${readableDate(start)} – ${readableDate(end)}`;
   }
 
   function showToast(message) {
@@ -612,7 +778,7 @@
     const mode = event.target.closest("[data-mode]");
     if (mode) {
       state.mode = mode.dataset.mode;
-      $$("[data-mode]").forEach((button) => button.setAttribute("aria-selected", String(button === mode)));
+      $$("[data-mode]").forEach((button) => button.setAttribute("aria-pressed", String(button === mode)));
       renderToday();
       return;
     }
@@ -641,17 +807,23 @@
 
     const open = event.target.closest("[data-open]");
     if (open) {
-      const returnView = drawer.dataset.view === "tracker" ? "tracker" : null;
-      openDrawer(open.dataset.open, open, returnView);
+      const context = {
+        evidenceDate: open.dataset.evidenceDate || "",
+        evidenceCategory: open.dataset.evidenceCategory || "",
+        evidenceDuration: open.dataset.evidenceDuration || "",
+        evidencePeriod: open.dataset.evidencePeriod || "",
+        evidenceIntensity: open.dataset.evidenceIntensity || "",
+        recordIds: open.dataset.recordIds || "",
+      };
+      openDrawer(open.dataset.open, open, !drawer.hidden, context);
       return;
     }
 
     if (event.target.closest("[data-tracker-toggle]")) {
-      state.focusRunning = !state.focusRunning;
-      state.runningCount = state.focusRunning ? Math.max(2, state.runningCount + 1) : Math.max(1, state.runningCount - 1);
+      const changed = toggleForegroundActivity();
       renderFocus();
-      openDrawer("tracker", null);
-      showToast(state.focusRunning ? "Backend schema started." : "Backend schema ended. Other Activities keep running.");
+      openDrawer("tracker", null, false);
+      showToast(changed?.running ? `${changed.name} started.` : `${changed?.name || "Activity"} ended. Foreground updated safely.`);
       return;
     }
 
@@ -687,24 +859,32 @@
     if (event.target.closest("[data-retry-today]")) { state.preview.today = "normal"; updateStateSelect(); renderToday(); return; }
     if (event.target.closest("[data-retry-insights]")) { state.preview.insights = "normal"; updateStateSelect(); renderInsights(); return; }
     if (event.target.closest("[data-retry-plan]")) { state.preview.plan = "normal"; updateStateSelect(); renderPlan(); return; }
-    if (event.target.closest("[data-start-focus]")) { state.focusRunning = true; state.preview.today = "normal"; updateStateSelect(); renderToday(); showToast("Focus started in prototype."); return; }
+    if (event.target.closest("[data-start-focus]")) { const changed = toggleForegroundActivity(); state.preview.today = "normal"; updateStateSelect(); renderToday(); showToast(changed?.running ? "Focus started in prototype." : "Focus ended in prototype."); return; }
     if (event.target.closest("[data-new-plan]")) { state.preview.plan = "normal"; updateStateSelect(); renderPlan(); return; }
     if (event.target.closest("[data-set-capacity]")) { state.preview.plan = "normal"; updateStateSelect(); renderPlan(); showToast("Sample capacity restored."); return; }
     if (event.target.closest("[data-undo-history]")) { state.preview.today = "normal"; updateStateSelect(); renderToday(); showToast("Correction undone in prototype."); return; }
-    if (event.target.closest("[data-select-activity]")) { state.preview.today = "normal"; state.focusRunning = false; updateStateSelect(); renderToday(); closeDrawer(); showToast("Backend schema selected. Start remains a separate action."); return; }
+    const selectedActivity = event.target.closest("[data-select-activity]");
+    if (selectedActivity) { state.foregroundId = selectedActivity.dataset.selectActivity; state.preview.today = "normal"; updateStateSelect(); renderToday(); closeDrawer(); showToast("Activity selected. Its running state did not change."); return; }
+
+    const selectedRunning = event.target.closest("[data-select-running]");
+    if (selectedRunning) { state.foregroundId = selectedRunning.dataset.selectRunning; renderFocus(); closeDrawer(); showToast("Foreground Activity changed. Other timers keep running."); return; }
 
     const endRunning = event.target.closest("[data-end-running]");
     if (endRunning) {
-      state.runningCount = Math.max(0, state.runningCount - 1);
-      if (endRunning.dataset.endRunning === "backend") state.focusRunning = false;
-      closeDrawer();
+      const activity = activityById(endRunning.dataset.endRunning);
+      if (activity) activity.running = false;
+      if (activity?.id === state.foregroundId) selectFallbackForeground();
       renderFocus();
-      showToast("Only the selected Activity ended.");
+      openDrawer("running", null, false);
+      showToast(`${activity?.name || "Selected Activity"} ended. Other timers keep running.`);
       return;
     }
     if (event.target.closest("[data-choose-activity]")) {
-      closeDrawer();
-      showToast("Activity picker would open here.");
+      openDrawer("activities", event.target.closest("[data-choose-activity]"), true);
+      return;
+    }
+    if (event.target.closest("[data-create-activity]")) {
+      showToast("Activity creation remains a separate persisted flow.");
     }
   });
 
@@ -713,11 +893,9 @@
       openDrawer("activities", $("#focus-action"));
       return;
     }
-    state.focusRunning = !state.focusRunning;
-    if (!state.focusRunning) state.runningCount = Math.max(1, state.runningCount - 1);
-    else state.runningCount = Math.max(2, state.runningCount + 1);
+    const changed = toggleForegroundActivity();
     renderFocus();
-    showToast(state.focusRunning ? "Backend schema started." : "Backend schema ended. Other Activities keep running.");
+    showToast(changed?.running ? `${changed.name} started.` : `${changed?.name || "Activity"} ended. Foreground updated safely.`);
   });
 
   $("#running-control").addEventListener("click", (event) => openDrawer("running", event.currentTarget));
@@ -747,7 +925,7 @@
       else closePrototypePanel();
     }
     if (!drawer.hidden && event.key === "Tab") {
-      const focusable = $$('button:not([disabled]), [href], select:not([disabled]), [tabindex]:not([tabindex="-1"])', drawer);
+      const focusable = $$('button:not([disabled]), a[href], select:not([disabled]), [tabindex]:not([tabindex="-1"])', drawer);
       if (!focusable.length) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -756,18 +934,28 @@
     }
   });
 
-  document.addEventListener("keydown", (event) => {
-    const chartTarget = event.target.closest(".donut-segment[data-open]");
-    if (chartTarget && (event.key === "Enter" || event.key === " ")) {
-      event.preventDefault();
-      openDrawer(chartTarget.dataset.open, chartTarget);
-    }
-  });
+  const prototypeWidth = Number(new URLSearchParams(window.location.search).get("width"));
+  if (prototypeWidth >= 280 && prototypeWidth <= 430) {
+    document.documentElement.style.setProperty("--prototype-width", `${prototypeWidth}px`);
+  }
 
   const initialDestination = window.location.hash.slice(1);
   if (initialDestination === "tracker") {
     setDestination("today", false);
     openDrawer("tracker", null);
+  } else if (initialDestination === "week") {
+    state.mode = "week";
+    $$("[data-mode]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.mode === "week")));
+    setDestination("today", false);
+  } else if (initialDestination === "running") {
+    setDestination("today", false);
+    openDrawer("running", null);
+  } else if (initialDestination === "insights-stale") {
+    state.preview.insights = "stale";
+    setDestination("insights", false);
+  } else if (initialDestination === "plan-conflict" || initialDestination === "plan-verified") {
+    state.preview.plan = initialDestination.endsWith("conflict") ? "conflict" : "verified";
+    setDestination("plan", false);
   } else if (["today", "insights", "plan"].includes(initialDestination)) {
     setDestination(initialDestination, false);
   } else {
