@@ -30,8 +30,6 @@ type TheseusPluginConfig = Omit<TheseusClientConfig, "accessToken"> & {
 };
 
 interface ProposalToolParams {
-  reviewWeekStart: string;
-  reviewWeekEnd: string;
   targetWeekStart: string;
   targetWeekEnd: string;
   trustedMessageReference?: string;
@@ -280,11 +278,9 @@ const plugin: OpenClawPluginDefinition = definePluginEntry({
         name: proposalToolName,
         label: "Theseus Weekly Plan Proposal",
         description:
-          "Draft a pending weekly-plan proposal only when the user explicitly asks to create, draft, prepare, or change a weekly plan. First read the reviewed week and target week with Theseus tools; never use shell, Bash, exec, or date to validate a successful Theseus date window. This tool never approves or executes changes.",
+          "Draft a pending weekly-plan proposal only when the user explicitly asks to create, draft, prepare, or change a weekly plan. Supply only the requested seven-day target window; the adapter derives the immediately preceding reviewed week deterministically. Never use shell, Bash, exec, or date to validate a successful Theseus date window. If this tool fails, report that no proposal was created and do not invent or display a model-authored plan labelled as a proposal. This tool never approves or executes changes.",
         parameters: Type.Object(
           {
-            reviewWeekStart: Type.String({ format: "date", description: "Reviewed week start in YYYY-MM-DD format." }),
-            reviewWeekEnd: Type.String({ format: "date", description: "Reviewed week end in YYYY-MM-DD format." }),
             targetWeekStart: Type.String({ format: "date", description: "Target week start in YYYY-MM-DD format." }),
             targetWeekEnd: Type.String({ format: "date", description: "Target week end in YYYY-MM-DD format." }),
             trustedMessageReference: Type.Optional(
@@ -305,12 +301,16 @@ const plugin: OpenClawPluginDefinition = definePluginEntry({
           if (!messageId) {
             throw new Error("Theseus proposal creation requires a trusted runtime message reference");
           }
+          const reviewedWeek = deriveReviewedWeek(
+            params.targetWeekStart,
+            params.targetWeekEnd,
+          );
           return jsonResult(
             await draftTheseusWeeklyPlanProposal(
               clientConfig,
               {
-                reviewWeekStart: params.reviewWeekStart,
-                reviewWeekEnd: params.reviewWeekEnd,
+                reviewWeekStart: reviewedWeek.start,
+                reviewWeekEnd: reviewedWeek.end,
                 targetWeekStart: params.targetWeekStart,
                 targetWeekEnd: params.targetWeekEnd,
               },
@@ -461,6 +461,37 @@ function isSecretReference(value: unknown): value is OpenClawSecretReference {
     typeof candidate.id === "string" &&
     candidate.id.length > 0
   );
+}
+
+function deriveReviewedWeek(
+  targetWeekStart: string,
+  targetWeekEnd: string,
+): {start: string; end: string} {
+  const start = parseIsoDate(targetWeekStart, "targetWeekStart");
+  const end = parseIsoDate(targetWeekEnd, "targetWeekEnd");
+  const dayMilliseconds = 24 * 60 * 60 * 1000;
+  if ((end.getTime() - start.getTime()) / dayMilliseconds !== 6) {
+    throw new Error("Theseus target week must contain exactly seven days");
+  }
+  return {
+    start: formatIsoDate(new Date(start.getTime() - 7 * dayMilliseconds)),
+    end: formatIsoDate(new Date(start.getTime() - dayMilliseconds)),
+  };
+}
+
+function parseIsoDate(value: string, field: string): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`Theseus ${field} must use YYYY-MM-DD`);
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || formatIsoDate(parsed) !== value) {
+    throw new Error(`Theseus ${field} must be a real calendar date`);
+  }
+  return parsed;
+}
+
+function formatIsoDate(value: Date): string {
+  return value.toISOString().slice(0, 10);
 }
 
 function hasTrustedSource(

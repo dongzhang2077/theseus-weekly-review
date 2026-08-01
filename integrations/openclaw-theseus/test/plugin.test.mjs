@@ -66,6 +66,9 @@ test("registers optional context, next-action, proposal, decision, execution, an
   assert.match(registrations[1].tool.description, /not a future-week planner/);
   assert.equal(registrations[2].options.optional, true);
   assert.match(registrations[2].tool.description, /only when the user explicitly asks/);
+  assert.match(registrations[2].tool.description, /derives the immediately preceding reviewed week deterministically/);
+  assert.match(registrations[2].tool.description, /do not invent or display a model-authored plan/);
+  assert.deepEqual(registrations[2].tool.parameters.required, ["targetWeekStart", "targetWeekEnd"]);
   assert.equal(registrations[3].options.optional, true);
   assert.equal(registrations[4].options.optional, true);
   assert.equal(registrations[5].options.optional, true);
@@ -102,6 +105,72 @@ test("registers discovery metadata with an unresolved SecretRef and fails closed
       {weekStart: "2026-06-08", weekEnd: "2026-06-14"},
     ),
     /credential is unavailable in this OpenClaw registration mode/,
+  );
+});
+
+test("proposal derives the reviewed week from the seven-day target window", async () => {
+  const registrations = [];
+  const hooks = new Map();
+  plugin.register({
+    pluginConfig: {
+      baseUrl: "http://127.0.0.1:8000",
+      accessToken: "ths_int_test-token-value",
+      channelType: "telegram",
+      externalIdentity: "telegram-user-42",
+      trustedChannelId: "telegram",
+      trustedSenderId: "telegram-user-42",
+    },
+    registerTool(tool) {
+      registrations.push(tool);
+    },
+    on(name, handler) {
+      hooks.set(name, handler);
+    },
+  });
+
+  await hooks.get("before_agent_run")(
+    {
+      channelId: "telegram",
+      senderId: "telegram-user-42",
+      senderIsOwner: true,
+    },
+    {runId: "proposal-date-run", channelId: "telegram", senderId: "telegram-user-42"},
+  );
+  const accepted = await hooks.get("before_tool_call")(
+    {
+      toolName: "theseus_weekly_plan_proposal",
+      params: {targetWeekStart: "2026-08-03", targetWeekEnd: "2026-08-09"},
+    },
+    {runId: "proposal-date-run", toolName: "theseus_weekly_plan_proposal"},
+  );
+
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (_url, init) => {
+    requestBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({id: 17, status: "pending"}), {
+      status: 201,
+      headers: {"content-type": "application/json"},
+    });
+  };
+  try {
+    await registrations[2].execute("proposal-date-call", accepted.params);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.deepEqual(requestBody, {
+    review_week_start: "2026-07-27",
+    review_week_end: "2026-08-02",
+    target_week_start: "2026-08-03",
+    target_week_end: "2026-08-09",
+  });
+  await assert.rejects(
+    registrations[2].execute("invalid-target-call", {
+      ...accepted.params,
+      targetWeekEnd: "2026-08-10",
+    }),
+    /target week must contain exactly seven days/,
   );
 });
 
@@ -178,8 +247,6 @@ test("proposal uses only a matching trusted inbound message", async () => {
   });
 
   const proposalParams = {
-    reviewWeekStart: "2026-07-20",
-    reviewWeekEnd: "2026-07-26",
     targetWeekStart: "2026-07-27",
     targetWeekEnd: "2026-08-02",
   };
@@ -267,8 +334,6 @@ test("proposal accepts the host run ID from before_tool_call context", async () 
     {
       toolName: "theseus_weekly_plan_proposal",
       params: {
-        reviewWeekStart: "2026-06-08",
-        reviewWeekEnd: "2026-06-14",
         targetWeekStart: "2026-06-15",
         targetWeekEnd: "2026-06-21",
       },
@@ -324,8 +389,6 @@ test("proposal tool verifies a trusted reference created by another plugin insta
     toolName: "theseus_weekly_plan_proposal",
     runId: "runtime-run-cross-instance",
     params: {
-      reviewWeekStart: "2026-06-08",
-      reviewWeekEnd: "2026-06-14",
       targetWeekStart: "2026-06-15",
       targetWeekEnd: "2026-06-21",
     },
@@ -363,8 +426,6 @@ test("proposal bridges an owner-authorized channel run inside the tool runtime",
   const beforeAgentRun = hooks.get("before_agent_run");
   const beforeToolCall = hooks.get("before_tool_call");
   const proposalParams = {
-    reviewWeekStart: "2026-06-08",
-    reviewWeekEnd: "2026-06-14",
     targetWeekStart: "2026-06-15",
     targetWeekEnd: "2026-06-21",
   };
@@ -435,8 +496,6 @@ test("proposal uses a single host session fallback when message_received has no 
   const beforeToolCall = hooks.get("before_tool_call");
   const endAgent = hooks.get("agent_end");
   const proposalParams = {
-    reviewWeekStart: "2026-06-08",
-    reviewWeekEnd: "2026-06-14",
     targetWeekStart: "2026-06-15",
     targetWeekEnd: "2026-06-21",
   };

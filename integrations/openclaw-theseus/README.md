@@ -128,6 +128,11 @@ the filesystem, or a shell.
   is not a future-week planning endpoint.
 - Creating a pending proposal is not approval or execution. Keep those steps
   explicit and separate.
+- The proposal tool accepts only a seven-day target window. It derives the
+  immediately preceding reviewed window locally, preventing model-supplied
+  off-by-one review dates.
+- If proposal creation fails, state that nothing was created. Never substitute
+  a model-authored plan labelled as a Theseus proposal.
 
 ## Real API smoke check
 
