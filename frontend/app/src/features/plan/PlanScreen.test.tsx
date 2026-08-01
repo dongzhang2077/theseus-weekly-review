@@ -290,6 +290,19 @@ describe("PlanScreen", () => {
     expect(screen.getByRole("button", { name: "Week balance: Balanced" })).toHaveTextContent("11h 45m");
   });
 
+  it("updates weekly capacity through the number stepper without crashing", () => {
+    renderPlan();
+
+    fireEvent.click(screen.getByRole("button", { name: "New plan" }));
+    const editor = screen.getByRole("dialog", { name: "Edit plan" });
+    const capacity = within(editor).getByLabelText("Weekly capacity hours");
+
+    fireEvent.change(capacity, { target: { value: "30.5" } });
+
+    expect(capacity).toHaveValue(30.5);
+    expect(within(editor).getByText("19h 30m")).toBeInTheDocument();
+  });
+
   it("creates a new target-week plan through the retained New entry", async () => {
     const calls: Array<{ input: string; init: RequestInit }> = [];
     const fetchImpl: FetchLike = async (input, init) => {

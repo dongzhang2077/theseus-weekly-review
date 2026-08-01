@@ -768,10 +768,16 @@ function PlanEditor({
             step="0.5"
             type="number"
             value={editor.capacityMinutes / 60}
-            onChange={(event) => setEditor((current) => ({
-              ...current,
-              capacityMinutes: Math.max(0, Math.round(Number(event.currentTarget.value) * 60))
-            }))}
+            onChange={(event) => {
+              const capacityHours = event.currentTarget.valueAsNumber;
+              const capacityMinutes = Number.isFinite(capacityHours)
+                ? Math.max(0, Math.round(capacityHours * 60))
+                : 0;
+              setEditor((current) => ({
+                ...current,
+                capacityMinutes
+              }));
+            }}
           />
           <span className="text-sm text-desk-muted">hours</span>
         </span>
