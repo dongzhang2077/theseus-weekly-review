@@ -115,6 +115,20 @@ paired account, and revoke the Theseus integration credential when the channel
 should no longer receive personal context. The plugin never accesses SQLite,
 the filesystem, or a shell.
 
+## Assistant routing rules
+
+- A question about a future week is a context read unless the user explicitly
+  asks to create, draft, prepare, or change a plan.
+- After a successful Theseus read, use its returned date window and timezone as
+  authoritative. Do not call shell, Bash, exec, or `date` to verify them.
+- When `weekly_plan` is `null`, state that no persisted plan exists and give
+  bounded guidance only from returned goals, projects, deadlines, tasks, logs,
+  and review evidence.
+- `theseus_next_action` answers what to do now in the current account week; it
+  is not a future-week planning endpoint.
+- Creating a pending proposal is not approval or execution. Keep those steps
+  explicit and separate.
+
 ## Real API smoke check
 
 After starting a local Theseus API and creating an `openclaw` pairing with

@@ -2,7 +2,7 @@
   "id": "theseus",
   "name": "Theseus",
   "description": "Read Theseus context and deterministic next actions, or manage weekly-plan proposals through scoped integration access.",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "configSchema": {
     "type": "object",
     "required": [

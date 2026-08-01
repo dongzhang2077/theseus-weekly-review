@@ -58,8 +58,14 @@ test("registers optional context, next-action, proposal, decision, execution, an
   assert.equal(registrations[0].options.optional, true);
   assert.equal(typeof registrations[0].tool.execute, "function");
   assert.deepEqual(registrations[0].tool.parameters.required, ["weekStart", "weekEnd"]);
+  assert.match(registrations[0].tool.description, /returned week_start, week_end, and timezone as authoritative/);
+  assert.match(registrations[0].tool.description, /If weekly_plan is null/);
+  assert.match(registrations[0].tool.description, /do not call shell, Bash, exec, or date/);
   assert.equal(registrations[1].options.optional, true);
+  assert.match(registrations[1].tool.description, /current week/);
+  assert.match(registrations[1].tool.description, /not a future-week planner/);
   assert.equal(registrations[2].options.optional, true);
+  assert.match(registrations[2].tool.description, /only when the user explicitly asks/);
   assert.equal(registrations[3].options.optional, true);
   assert.equal(registrations[4].options.optional, true);
   assert.equal(registrations[5].options.optional, true);

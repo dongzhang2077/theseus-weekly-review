@@ -205,7 +205,8 @@ const plugin: OpenClawPluginDefinition = definePluginEntry({
       {
       name: "theseus_context_read",
       label: "Theseus Context",
-      description: "Read the paired user's evidence-backed context for one date window.",
+      description:
+        "Read the paired user's evidence-backed context for one date window. Treat the returned week_start, week_end, and timezone as authoritative; after a successful read, do not call shell, Bash, exec, or date just to re-check them. If weekly_plan is null, say that no plan exists and answer only from the returned goals, projects, deadlines, tasks, logs, and review. Use the proposal tool only when the user explicitly asks to draft or change a weekly plan.",
       parameters: Type.Object(
         {
           weekStart: Type.String({ format: "date", description: "Start date in YYYY-MM-DD format." }),
@@ -232,7 +233,7 @@ const plugin: OpenClawPluginDefinition = definePluginEntry({
         name: nextActionToolName,
         label: "Theseus Next Action",
         description:
-          "Read one deterministic, evidence-backed next action plus alternatives and uncertainty. Preserve the returned recommendation and cite only its returned evidence when answering; do not invent ranking facts. This tool never changes user data.",
+          "Read one deterministic, evidence-backed action for what the user should do now in the account's current week. This is not a future-week planner. Preserve the returned recommendation and cite only its returned evidence when answering; do not invent ranking facts. Treat returned local_date and timezone as authoritative and do not call shell, Bash, exec, or date to re-check them. This tool never changes user data.",
         parameters: Type.Object(
           {
             availableMinutes: Type.Optional(
@@ -279,7 +280,7 @@ const plugin: OpenClawPluginDefinition = definePluginEntry({
         name: proposalToolName,
         label: "Theseus Weekly Plan Proposal",
         description:
-          "Draft a pending weekly-plan proposal for the paired user. It never approves or executes changes.",
+          "Draft a pending weekly-plan proposal only when the user explicitly asks to create, draft, prepare, or change a weekly plan. First read the reviewed week and target week with Theseus tools; never use shell, Bash, exec, or date to validate a successful Theseus date window. This tool never approves or executes changes.",
         parameters: Type.Object(
           {
             reviewWeekStart: Type.String({ format: "date", description: "Reviewed week start in YYYY-MM-DD format." }),
