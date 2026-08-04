@@ -742,12 +742,15 @@ export function TrackScreen({
       {focus ? (
         <FocusWorkspace
           focus={focus}
+          activities={activities}
+          todayDate={todayDate}
           targetMinutes={targetMinutes}
           todayTotalSeconds={todayTotal}
           runningCount={runningCount}
           notice={recommendationNotice}
           timerLocked={backgroundLocked}
           onToggle={() => onToggleActivity(focus)}
+          onSelectActivity={selectForegroundActivity}
           onChooseActivity={() => setActiveSheet("activities")}
           onOpenToday={() => {
             setSelectedTimeLog(null);

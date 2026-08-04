@@ -1,27 +1,39 @@
 import { Icon, type IconName } from "../../shared/icons/Icon";
 import type { ActivityTimer } from "../../shared/domain/track";
-import { currentRunSeconds, formatClock, formatDuration } from "./timerModel";
+import {
+  currentRunSeconds,
+  formatClock,
+  formatDuration,
+  formatLiveClock,
+  todayActivitySeconds
+} from "./timerModel";
 
 interface FocusWorkspaceProps {
   focus: ActivityTimer;
+  activities: ActivityTimer[];
+  todayDate: string;
   targetMinutes: number | null;
   todayTotalSeconds: number;
   runningCount: number;
   notice: string | null;
   timerLocked: boolean;
   onToggle: () => void;
+  onSelectActivity: (activityId: string) => void;
   onChooseActivity: () => void;
   onOpenToday: () => void;
 }
 
 export function FocusWorkspace({
   focus,
+  activities,
+  todayDate,
   targetMinutes,
   todayTotalSeconds,
   runningCount,
   notice,
   timerLocked,
   onToggle,
+  onSelectActivity,
   onChooseActivity,
   onOpenToday
 }: FocusWorkspaceProps) {
@@ -41,6 +53,11 @@ export function FocusWorkspace({
     : targetDelta >= 0
       ? formatClock(targetDelta)
       : `+${formatClock(Math.abs(targetDelta))}`;
+  const quickActivities = [...activities]
+    .sort((left, right) => (
+      quickActivityPriority(right, focus.id) - quickActivityPriority(left, focus.id)
+    ))
+    .slice(0, 4);
 
   return (
     <div
@@ -99,6 +116,48 @@ export function FocusWorkspace({
         <Icon name={focus.running ? "stop" : "play"} className="size-7" />
       </button>
 
+      {quickActivities.length > 1 ? (
+        <section className="grid w-full max-w-[340px] gap-1.5" aria-label="Quick activities">
+          {quickActivities.map((activity) => {
+            const selected = activity.id === focus.id;
+            const time = activity.running
+              ? formatLiveClock(currentRunSeconds(activity))
+              : formatDuration(todayActivitySeconds(activity, todayDate));
+            return (
+              <button
+                className="grid min-h-11 w-full grid-cols-[10px_minmax(0,1fr)_auto] items-center gap-2 rounded-[14px] border px-3 py-2 text-left shadow-[0_3px_10px_rgb(76_62_38/0.035)] transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                style={{
+                  borderColor: selected || activity.running
+                    ? activity.color
+                    : "rgba(231,222,208,0.76)",
+                  backgroundColor: selected
+                    ? activitySoftColor(activity.color)
+                    : "rgba(255,253,248,0.7)"
+                }}
+                type="button"
+                key={activity.id}
+                aria-label={`Switch focus to ${activity.name}${activity.running ? ", running" : ""}`}
+                aria-pressed={selected}
+                disabled={timerLocked}
+                onClick={() => onSelectActivity(activity.id)}
+              >
+                <span
+                  className={`size-2.5 rounded-full ${activity.running ? "ring-2 ring-offset-1" : ""}`}
+                  style={{ backgroundColor: activity.color }}
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 break-words text-sm font-semibold leading-5">
+                  {activity.name}
+                </span>
+                <span className="whitespace-nowrap text-xs font-bold tabular-nums text-desk-muted">
+                  {time}
+                </span>
+              </button>
+            );
+          })}
+        </section>
+      ) : null}
+
       <button
         className="inline-flex min-h-9 items-center gap-2 rounded-full border border-desk-line bg-desk-raised/75 px-4 text-sm font-semibold text-desk-muted shadow-[0_3px_12px_rgb(76_62_38/0.04)]"
         type="button"
@@ -122,6 +181,14 @@ export function FocusWorkspace({
       </div>
     </div>
   );
+}
+
+function quickActivityPriority(activity: ActivityTimer, focusId: string): number {
+  let priority = 0;
+  if (activity.recommended) priority += 1;
+  if (activity.id === focusId) priority += 2;
+  if (activity.running) priority += 4;
+  return priority;
 }
 
 function activitySoftColor(color: string): string {

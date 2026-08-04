@@ -18,7 +18,9 @@ describe("TrackScreen", () => {
     render(<TrackScreen track={demoWeek.track} />);
 
     const currentFocus = screen.getByRole("region", { name: "Current focus" });
-    expect(within(currentFocus).getByText("Frontend build block")).toBeInTheDocument();
+    expect(
+      within(currentFocus).getByRole("button", { name: "Change focus activity" }),
+    ).toHaveTextContent("Frontend build block");
     expect(within(currentFocus).getByText("Recommended now")).toBeInTheDocument();
     expect(within(currentFocus).getByText("00:00:00")).toBeInTheDocument();
     expect(within(currentFocus).getByText("Today total")).toBeInTheDocument();
@@ -30,6 +32,35 @@ describe("TrackScreen", () => {
     expect(screen.queryByText(/sample recommendation/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
     expect(screen.queryByText(/session target/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps multiple Activity bars visible for quick foreground switching", () => {
+    render(<TrackScreen track={demoWeek.track} />);
+
+    const currentFocus = screen.getByRole("region", { name: "Current focus" });
+    const quickActivities = within(currentFocus).getByRole("region", {
+      name: "Quick activities"
+    });
+    expect(
+      within(quickActivities).getByRole("button", {
+        name: "Switch focus to Frontend build block"
+      })
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(quickActivities).getByRole("button", {
+        name: "Switch focus to Backend polish"
+      })
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      within(quickActivities).getByRole("button", {
+        name: "Switch focus to Backend polish"
+      })
+    );
+
+    expect(within(currentFocus).getByRole("button", { name: "Change focus activity" }))
+      .toHaveTextContent("Backend polish");
+    expect(screen.getAllByRole("button", { name: "Start focus activity" })).toHaveLength(1);
   });
 
   it("opens the midterm Today sheet with grouped activities and right-aligned totals", () => {
