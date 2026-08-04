@@ -2,9 +2,10 @@
 
 ## Freeze Point And Demo Data
 
-The accepted functional checkpoint is tag `story043-accepted`. Defense-only
-data and documentation live on `release/final-defense-candidate`; do not merge
-it to `main` until product-owner and teammate checks pass.
+The accepted STORY-043 checkpoint remains tag `story043-accepted`. The final
+course-delivery snapshot, including defense polish and regression fixes, is tag
+`course-final-2026-08-03` on `release/final-defense-candidate`. Keep that tag
+immutable; continued development should start from a fork or a new branch.
 
 `data/sample/college_student_month.json` is a deterministic, sanitized persona:
 a college student balancing a summer course, research paper, part-time cafe
