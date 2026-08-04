@@ -23,6 +23,9 @@ Contract status:
   STORY-038C approved Weekly Plan execution operation.
 - Section 13.4 is the focused-test verified and product-owner accepted
   STORY-038D typed Weekly Plan Undo operation.
+- Section 12.3 is the automatically verified STORY-028 consented-outcome
+  observation baseline. It remains a candidate until product-owner browser
+  acceptance.
 
 The API uses JSON over HTTP. Every persisted personal-data operation requires a
 short-lived access JWT:
@@ -1102,6 +1105,7 @@ GET  /proposals?status=
 GET  /proposals/{proposal_id}
 POST /proposals/{proposal_id}/decisions
 POST /proposals/{proposal_id}/outcomes
+PATCH /proposals/{proposal_id}/outcomes/{outcome_id}/consent
 ```
 
 Public proposal creation records `source = deterministic`; a client cannot
@@ -1112,8 +1116,14 @@ optional edited after-state, and reason. Expired proposals return
 `409 version_conflict`.
 
 Outcome feedback may record completion, usefulness from 1-5, actual duration,
-energy feedback, and a note. A referenced Action must belong to the same
-account and Proposal.
+energy feedback, a note, and explicit personalization consent. Consent defaults
+to `false`; existing outcomes migrated to schema v13 remain unconsented. A
+referenced Action must belong to the same account and Proposal.
+
+Consent correction accepts `expected_version` and
+`personalization_consent`. It updates only the consent fields, increments
+`consent_version`, and returns `409 version_conflict` with the current safe
+outcome when stale. It does not alter the recorded result or usefulness.
 
 There is deliberately no public generic Action-create or Action-execute route
 in STORY-025B. Actions retain user-scoped idempotency, request/result,
@@ -1124,6 +1134,20 @@ neither a browser nor a model receives arbitrary operation authority.
 All requests derive `user_id` from authentication. Cross-account resources
 return a non-disclosing `404`, optimistic conflicts include the current safe
 read representation, and multi-record mutations are transactional.
+
+### 12.3 Consented Personalization Baseline
+
+```text
+GET /personalization/baseline
+```
+
+The authenticated, read-only v1 baseline counts only proposal outcomes whose
+explicit consent is currently enabled. It reports per-proposal-type outcome
+counts, usefulness averages, result counts, and a deterministic completion
+rate. Fewer than five consented outcomes returns `status =
+insufficient_data`. At five it returns `status = ready`; in both states
+`ranking_applied` remains `false`. This slice neither creates inferred
+preferences nor changes suggestion ordering.
 
 ## 13. Bounded Assistant API
 
@@ -1339,6 +1363,152 @@ Missing or foreign records return non-disclosing `404` responses. Unsupported,
 already-undone, stale-version, malformed-payload, drift, and persistence states
 return controlled `409` responses.
 
+### 13.5 Inspect A Minimum Assistant Context Envelope
+
+Implementation status: STORY-042 is implemented on
+`feature/042-local-assistant-gateway` as a backend-only, no-model-call privacy
+gate.
+
+```text
+GET  /assistant/gateway/status
+POST /assistant/gateway/envelope
+```
+
+Both operations require the normal browser account bearer token. The status
+response reports only the selected local-backend provider, whether its required
+environment configuration is present, and an optional model name:
+
+```json
+{
+  "gateway_version": "v1",
+  "provider": "openai",
+  "configured": false,
+  "model": null,
+  "cloud_calls_enabled": false
+}
+```
+
+`THESEUS_ASSISTANT_PROVIDER=local` is the deterministic default. Selecting
+`openai` requires both `OPENAI_API_KEY` and an explicit
+`THESEUS_ASSISTANT_MODEL` before status becomes configured. The raw key is
+never returned by this API, placed in an envelope, or logged by the gateway.
+An unsupported provider is reported as `provider = unsupported` and
+`configured = false`. Provider status never blocks local context preparation.
+
+Envelope preparation is itself the explicit user-triggered operation:
+
+```json
+{
+  "utterance": "Summarize the useful patterns in this week.",
+  "purpose": "weekly_review",
+  "window_start": "2026-06-08",
+  "window_end": "2026-06-14"
+}
+```
+
+`utterance` must contain between 1 and 4,000 characters. The inclusive date
+window must contain between 1 and 31 days. `purpose` is one of
+`focus_status`, `task_status`, `plan_status`, or `weekly_review`; each purpose
+selects a fixed server-side allowlist:
+
+| Purpose | Included sections |
+|---|---|
+| `focus_status` | active Project summaries, open Task summaries, running Focus summaries |
+| `task_status` | active Project summaries, open Task summaries |
+| `plan_status` | active Project summaries, open Task summaries, exact-window Plan summary |
+| `weekly_review` | active Project summaries, exact-window Plan summary, TimeLog aggregates, compact Review summary |
+
+The response is `AssistantGatewayContextEnvelope` version `v1`. It deliberately
+omits account ID and email, descriptions, notes, Preferences, generated review
+prose, finding evidence strings, raw TimeLogs, credentials, and unrelated
+history. TimeLog input becomes only totals grouped by Project, Activity type,
+and date. Lists are bounded to 20 Projects, 20 Tasks, 10 running Focus
+sessions, 20 Plan items, and five entries per Review collection. Any overflow
+is visible in `omitted_counts`.
+
+The serializer rejects denied field names and credential-, token-, or
+email-shaped values before a provider payload can be produced. Rejection
+returns:
+
+```json
+{
+  "detail": {
+    "code": "sensitive_context_rejected",
+    "message": "The request contains data that is not allowed in cloud assistant context"
+  }
+}
+```
+
+Status: `422 Unprocessable Entity`. Account scoping is inherited from
+`AssistantContextService`; another account's records are not available to the
+reducer. This slice performs no network request and grants no tool or write
+authority. A later provider adapter must serialize this same checked envelope,
+use non-persisted Responses requests, and preserve the deterministic local
+result when provider configuration or transport fails.
+
+### 13.6 Recommend A Deterministic Next Action
+
+Implementation status: STORY-043 was product-owner accepted on 2026-07-31 PDT
+after automated contract, regression, plugin, disposable-adapter verification,
+and a successful trusted Telegram conversation test.
+
+```text
+POST /assistant/next-action
+```
+
+Request:
+
+```json
+{
+  "available_minutes": 30
+}
+```
+
+`available_minutes` is optional and, when present, must be between 5 and 720.
+When omitted, the service uses the active user-stated
+`focus.default_minutes` Preference when it is a valid integer in that range,
+then a documented 30-minute local default. The response reports which source
+was used.
+
+The shared `NextActionService` ranks at most 20 candidates from running Focus
+sessions, incomplete current-week Plan items, open Tasks, under-supported or
+dormant Projects, and the first supported step of a current non-stale Review.
+Its stable tie-breakers prefer a running Focus, then explicit Plan priority,
+Goal and Task priority, due evidence, weekly-minimum gaps, Project inactivity,
+fit within available time, and stable entity IDs. The response returns one
+recommendation, at most three alternatives, structured evidence, total and
+omitted candidate counts, and uncertainty codes. A model may phrase these
+fields but cannot rank a different candidate or invent evidence.
+
+`status` is `ready`, `empty`, or `conflict`. A Plan item linked to a Task that
+is no longer open is excluded and produces `plan_task_conflict`; a stale
+Review is reported and excluded. Calendar evidence is deliberately absent
+until STORY-045, so every result reports `calendar_unavailable`. This operation
+does not call a model, provider, or network service and never changes a Task,
+Plan, Focus session, or Review.
+
+Invalid account timezones return `409 invalid_account_timezone`. Normal
+request validation returns `422`.
+
+The paired-channel equivalent is:
+
+```text
+POST /integrations/channel/next-action
+Authorization: Bearer <integration token>
+X-Channel-Type: local_test | openclaw | telegram | whatsapp
+X-External-Identity: <paired external identity>
+X-External-Message-ID: <channel message ID>
+```
+
+It accepts the same body, requires `context:read`, and delegates to the same
+service and account-scoped repositories as the App route. Exact retries are
+accepted and recomputed from the current persisted context; reusing the
+external message ID with another payload or operation returns
+`409 external_message_replay_conflict`. The
+OpenClaw `theseus_next_action` tool additionally binds the call to the
+configured trusted channel and sender before forwarding it. It grants no
+write authority.
+
 ## 14. Channel Identity And Scoped Integration Access
 
 Implementation status: STORY-039 was product-owner accepted on 2026-07-26
@@ -1351,7 +1521,9 @@ DELETE /integrations/{credential_id}
 ```
 
 Pairing accepts `label`, `channel_type`, raw `external_identity`, one or more
-of `context:read`, `proposal:create`, and `action:execute`, and an expiry from
+of `context:read`, `proposal:create`, `proposal:decide`, `action:execute`, and
+`action:undo`,
+and an expiry from
 300 to 2,592,000 seconds. The response returns the integration `access_token`
 exactly once. Lists return only its prefix and lifecycle metadata; neither raw
 token nor raw external identity is readable later. Duplicate active channel
@@ -1359,12 +1531,18 @@ identity returns `409 channel_identity_already_paired`; foreign management is
 non-disclosing `404`. Delete returns `204` and revokes the credential/binding
 without deleting domain data.
 
-The first channel-authenticated operation is:
+Schema v12 makes the durable channel constraint match the documented
+`local_test | openclaw | telegram | whatsapp` API enum. Only the active
+channel-identity unique constraint is mapped to
+`409 channel_identity_already_paired`; unrelated persistence integrity errors
+are not misreported as an existing pairing.
+
+The read-only channel operation is:
 
 ```text
 GET /integrations/channel/context?week_start=&week_end=
 Authorization: Bearer <integration token>
-X-Channel-Type: local_test | openclaw | whatsapp
+X-Channel-Type: local_test | openclaw | telegram | whatsapp
 X-External-Identity: <paired external identity>
 X-External-Message-ID: <channel message ID>
 ```
@@ -1375,4 +1553,97 @@ expired, revoked, or mismatched credentials return one redacted
 `403 integration_scope_denied`. Reusing one external message ID with another
 request returns `409 external_message_replay_conflict`. The receipt stores only
 HMAC/hash metadata, not the external identifiers or Assistant context payload.
-No channel proposal or execution operation is exposed in this candidate.
+
+### 14.1 Draft A Channel Weekly Plan Adjustment
+
+Implementation status: STORY-027 rollout gate two is a draft-only channel
+operation. It never approves or executes a proposal.
+
+```text
+POST /integrations/channel/proposals/weekly-adjustment
+Authorization: Bearer <integration token>
+X-Channel-Type: local_test | openclaw | telegram | whatsapp
+X-External-Identity: <paired external identity>
+X-External-Message-ID: <channel message ID>
+```
+
+The JSON body is the `AssistantWeeklyPlanProposalRequest` date-window shape
+from Section 13.2. The endpoint requires `proposal:create`, authenticates the
+same scoped channel binding, and delegates to
+`AssistantWeeklyPlanProposalService`. It returns `201 Created` with the normal
+`ProposalRead` response, whose status is always `pending`; it writes neither a
+WeeklyPlan nor an Action.
+
+The server derives an opaque, user-scoped Assistant idempotency key from the
+paired credential and external message ID. Thus an exact channel retry returns
+the original proposal, while reusing a message ID for another operation or
+payload returns `409 external_message_replay_conflict`. Integration receipts
+retain only HMAC/hash metadata and never store the proposal response. Invalid,
+expired, revoked, or mismatched credentials return the same redacted `401
+integration_access_denied`; missing scope returns `403
+integration_scope_denied`.
+
+### 14.2 Decide A Channel Weekly Plan Proposal
+
+Implementation status: STORY-027 rollout gate three records only a narrow
+approval response. It never executes a plan change.
+
+```text
+POST /integrations/channel/proposals/{proposal_id}/decision
+Authorization: Bearer <integration token>
+X-Channel-Type: local_test | openclaw | telegram | whatsapp
+X-External-Identity: <paired external identity>
+X-External-Message-ID: <channel message ID>
+```
+
+The JSON body accepts `expected_version`, `decision` (`approve` or `reject`),
+and an optional `reason`. It requires the distinct `proposal:decide` scope and
+delegates to `ProposalLedgerService`, which appends the decision and changes the
+owned pending Proposal to `approved` or `rejected`. It cannot accept `edit` or
+`expire`, writes neither a WeeklyPlan nor an Action, and exposes no channel
+execution endpoint.
+
+The same HMAC-protected message receipt contract applies: an exact retry
+returns the original decision, whereas reusing its message ID for a different
+proposal or payload returns `409 external_message_replay_conflict`. Stale,
+already decided, or expired proposals return controlled `409` responses;
+missing proposals return `404 proposal_not_found`. Invalid, expired, revoked,
+or mismatched credentials return redacted `401 integration_access_denied`, and
+missing scope returns `403 integration_scope_denied`.
+
+### 14.3 Execute An Approved Channel Weekly Plan Proposal
+
+```text
+POST /integrations/channel/proposals/{proposal_id}/execute-weekly-plan
+Authorization: Bearer <integration token>
+X-Channel-Type: local_test | openclaw | telegram | whatsapp
+X-External-Identity: <paired external identity>
+X-External-Message-ID: <channel message ID>
+```
+
+The body accepts only `expected_version`. The endpoint requires `action:execute`
+and delegates to `AssistantWeeklyPlanExecutionService`; it only accepts an
+approved `weekly_plan_adjustment` Proposal, derives its opaque Action idempotency
+key from the pairing and external message ID, and preserves its existing Action,
+verification, and Undo data. Exact retries return the original execution;
+different reuse returns `409 external_message_replay_conflict`. It exposes no
+generic execution or arbitrary plan-write shape.
+
+### 14.4 Undo A Channel Weekly Plan Action
+
+```text
+POST /integrations/channel/proposals/{proposal_id}/actions/{action_id}/undo-weekly-plan
+Authorization: Bearer <integration token>
+X-Channel-Type: local_test | openclaw | telegram | whatsapp
+X-External-Identity: <paired external identity>
+X-External-Message-ID: <channel message ID>
+```
+
+The body accepts only `expected_version`. This is a separately bounded
+`action:undo` permission, not an extension of `action:execute`. It delegates to
+`AssistantWeeklyPlanUndoService` and can undo only the successful, reversible
+Action belonging to the specified `weekly_plan_adjustment` Proposal. The
+existing action verification and undo record remain canonical. Exact retries
+return the original undo response; a changed request with the same message ID
+returns `409 external_message_replay_conflict`. It exposes no arbitrary plan
+delete, replace, or generic Action undo shape.

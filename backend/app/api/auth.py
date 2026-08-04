@@ -146,9 +146,11 @@ async def logout(
     context: AuthContext = Depends(get_auth_context),
     connection: sqlite3.Connection = Depends(get_connection),
     service: AuthService = Depends(get_auth_service),
-) -> None:
+) -> Response:
     service.logout(connection, context.session_id)
     _clear_auth_cookies(response, service)
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
 
 
 @router.get("/me", response_model=AccountRead)
@@ -232,7 +234,7 @@ async def delete_account(
     context: AuthContext = Depends(get_auth_context),
     connection: sqlite3.Connection = Depends(get_connection),
     service: AuthService = Depends(get_auth_service),
-) -> None:
+) -> Response:
     try:
         service.delete_account(
             connection,
@@ -246,6 +248,8 @@ async def delete_account(
             "Current password is incorrect",
         ) from exc
     _clear_auth_cookies(response, service)
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
 
 
 def _token_response(

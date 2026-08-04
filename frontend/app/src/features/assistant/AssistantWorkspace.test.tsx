@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type {
   PreferenceRecord,
@@ -75,6 +75,12 @@ describe("AssistantWorkspace", () => {
     expect(await screen.findByText("Your control")).toBeInTheDocument();
     expect(screen.queryByText(proposal.title)).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: /Baseline/ }));
+    expect(screen.getByText("Collecting feedback")).toBeInTheDocument();
+    expect(screen.getByText("5 more consented outcomes needed.")).toBeInTheDocument();
+    expect(screen.getByText("Not applied")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
     fireEvent.click(screen.getByRole("button", { name: /Pending/ }));
     fireEvent.click(screen.getByRole("button", { name: /Reduce Friday load/ }));
 
@@ -147,17 +153,169 @@ describe("AssistantWorkspace", () => {
     expect(await screen.findByText("Deleted")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
   });
+
+  it("records explicit outcome consent and lets the user withdraw it", async () => {
+    const undone = {
+      ...proposal,
+      status: "undone" as const,
+      version: 4
+    };
+    const detail = {
+      ...proposalDetail,
+      proposal: undone
+    };
+    const consentedOutcome = {
+      id: 12,
+      result: "partial" as const,
+      usefulness: 5,
+      actual_duration_minutes: null,
+      energy_feedback: null,
+      note: "The restart was realistic.",
+      personalization_consent: true,
+      consent_version: 1,
+      consent_updated_at: "2026-07-29T20:00:00Z",
+      created_at: "2026-07-29T20:00:00Z"
+    };
+    const withdrawnOutcome = {
+      ...consentedOutcome,
+      personalization_consent: false,
+      consent_version: 2,
+      consent_updated_at: "2026-07-29T20:05:00Z"
+    };
+    const fetchImpl = routeFetch({
+      "GET /proposals": [undone],
+      "GET /preferences?include_deleted=true": [],
+      "GET /proposals/9": detail,
+      "POST /proposals/9/outcomes": consentedOutcome,
+      "PATCH /proposals/9/outcomes/12/consent": withdrawnOutcome
+    });
+
+    render(
+      <AssistantWorkspace
+        open
+        apiBaseUrl="http://127.0.0.1:8000"
+        fetchImpl={fetchImpl}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByText("0/5")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /History/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Reduce Friday load/ }));
+    await screen.findByRole("heading", { name: "Outcome" });
+    fireEvent.change(screen.getByLabelText("Result"), { target: { value: "partial" } });
+    fireEvent.change(screen.getByLabelText("Usefulness"), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText("Note"), { target: { value: "The restart was realistic." } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Use for future suggestions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(fetchImpl).toHaveBeenCalledWith(
+        "http://127.0.0.1:8000/proposals/9/outcomes",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            result: "partial",
+            usefulness: 5,
+            note: "The restart was realistic.",
+            personalization_consent: true
+          })
+        })
+      );
+    });
+    const outcomeSection = screen.getByRole("heading", { name: "Outcome" }).closest("section");
+    expect(outcomeSection).not.toBeNull();
+    expect(within(outcomeSection!).getByText("Partial")).toBeInTheDocument();
+    const consent = screen.getByRole("checkbox", { name: "Use for future suggestions" });
+    expect(consent).toBeChecked();
+    fireEvent.click(consent);
+
+    await waitFor(() => {
+      expect(fetchImpl).toHaveBeenCalledWith(
+        "http://127.0.0.1:8000/proposals/9/outcomes/12/consent",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({
+            expected_version: 1,
+            personalization_consent: false
+          })
+        })
+      );
+    });
+    expect(screen.getByRole("checkbox", { name: "Use for future suggestions" })).not.toBeChecked();
+  });
+
+  it("shows inspectable aggregate metrics without claiming ranking", async () => {
+    const fetchImpl = routeFetch({
+      "GET /proposals": [],
+      "GET /preferences?include_deleted=true": [],
+      "GET /personalization/baseline": {
+        baseline_version: "v1",
+        status: "ready",
+        minimum_outcomes: 5,
+        consented_outcome_count: 5,
+        remaining_outcome_count: 0,
+        ranking_applied: false,
+        groups: [
+          {
+            proposal_type: "weekly_plan_adjustment",
+            outcome_count: 5,
+            rated_outcome_count: 5,
+            average_usefulness: 3,
+            completed_count: 2,
+            partial_count: 1,
+            not_completed_count: 1,
+            dismissed_count: 1,
+            completion_rate: 0.625
+          }
+        ]
+      }
+    });
+
+    render(
+      <AssistantWorkspace
+        open
+        apiBaseUrl="http://127.0.0.1:8000"
+        fetchImpl={fetchImpl}
+        onClose={vi.fn()}
+      />
+    );
+
+    await screen.findByText("Your control");
+    fireEvent.click(screen.getByRole("button", { name: /Baseline/ }));
+
+    expect(screen.getByText("Ready for evaluation")).toBeInTheDocument();
+    expect(screen.getByText("Weekly plan adjustment")).toBeInTheDocument();
+    expect(screen.getByText("3.0/5")).toBeInTheDocument();
+    expect(screen.getByText("63%")).toBeInTheDocument();
+    expect(
+      screen.getByText("2 done · 1 partial · 1 not done · 1 dismissed")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Not applied")).toBeInTheDocument();
+  });
 });
 
 function routeFetch(routes: Record<string, unknown>): ReturnType<typeof vi.fn<FetchLike>> {
   return vi.fn<FetchLike>().mockImplementation(async (input, init) => {
     const url = new URL(input);
     const key = `${init.method} ${url.pathname}${url.search}`;
-    if (!(key in routes)) throw new Error(`Unexpected request: ${key}`);
+    const resolvedRoutes: Record<string, unknown> = {
+      "GET /personalization/baseline": {
+        baseline_version: "v1",
+        status: "insufficient_data",
+        minimum_outcomes: 5,
+        consented_outcome_count: 0,
+        remaining_outcome_count: 5,
+        ranking_applied: false,
+        groups: []
+      },
+      ...routes
+    };
+    if (!(key in resolvedRoutes)) throw new Error(`Unexpected request: ${key}`);
     return {
       ok: true,
       status: 200,
-      json: async () => routes[key]
+      json: async () => resolvedRoutes[key]
     };
   });
 }

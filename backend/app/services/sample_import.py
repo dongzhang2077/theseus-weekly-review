@@ -128,6 +128,10 @@ def _delete_existing_fixture(
     plan = sample["weekly_plan"]
     week_start = plan["week_start"]
     week_end = plan["week_end"]
+    fixture_start = sample.get("fixture_start", week_start)
+    fixture_end = sample.get("fixture_end", week_end)
+    if fixture_end < fixture_start:
+        raise ValueError("fixture_end must be on or after fixture_start")
     reflection_dates = [row["date"] for row in sample.get("daily_reflections", [])]
     project_titles = [row["title"] for row in sample["projects"]]
     goal_titles = [row["title"] for row in sample["goals"]]
@@ -141,7 +145,7 @@ def _delete_existing_fixture(
     )
     connection.execute(
         "DELETE FROM time_logs WHERE user_id = ? AND date BETWEEN ? AND ?",
-        (user_id, week_start, week_end),
+        (user_id, fixture_start, fixture_end),
     )
     _delete_where_in(
         connection, "daily_reflections", "date", reflection_dates, user_id

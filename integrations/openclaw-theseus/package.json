@@ -1,0 +1,46 @@
+{
+  "name": "@theseus/openclaw-plugin",
+  "version": "0.1.9",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "scripts",
+    "openclaw.plugin.json",
+    "README.md"
+  ],
+  "scripts": {
+    "check:runtime": "node ./scripts/require-supported-node.mjs",
+    "prebuild": "npm run check:runtime",
+    "build": "tsc --project tsconfig.json",
+    "plugin:build": "npm run build",
+    "plugin:validate": "npm run test",
+    "smoke:workflow": "node scripts/smoke-workflow.mjs",
+    "test": "npm run build && node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "typebox": "^1.1.38"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.7.1"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "openclaw": "2026.7.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22.22.3 <23 || >=24.15.0 <25 || >=25.9.0"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  }
+}

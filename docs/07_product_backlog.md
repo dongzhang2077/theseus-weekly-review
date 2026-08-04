@@ -632,9 +632,15 @@ Acceptance criteria:
 
 - OpenClaw calls a typed Theseus adapter and does not access the database
   directly.
-- The first release is read-only.
-- Write operations require bounded permissions, approval, idempotency, audit,
-  verification, and Undo where practical.
+- Rollout gate one is read-only. Gate two may create a pending proposal only
+  from a trusted inbound message ID. Gate three may record only an `approve`
+  or `reject` decision with a distinct scope, replay protection, and audit
+  record; it cannot edit a plan change. Gate four may execute only an approved
+  proposal through the existing reversible Action service with `action:execute`.
+  Gate five may undo only the resulting successful reversible Action with the
+  independent `action:undo` scope.
+- Any approved write operation requires bounded permissions, approval,
+  idempotency, audit, verification, and Undo where practical.
 - High-risk tools are denied by default.
 - Removing the adapter does not change domain or review-engine behavior.
 
@@ -654,6 +660,49 @@ Acceptance criteria:
 - Confidence, correction, expiry, and deletion are visible to the user.
 - Optimization targets are bounded, such as usefulness, plan adherence,
   protected slack, or restart success.
+
+Implementation checkpoint (2026-07-29 PDT): the first observation slice is
+implemented on `feature/028-consented-outcome-baseline`. Schema v13 adds
+explicit, versioned outcome consent with a safe default of off. The
+authenticated Assistant can record an outcome and grant or withdraw consent.
+A read-only deterministic baseline includes only currently consented outcomes,
+reports `insufficient_data` below five observations, and never ranks
+suggestions or creates an inferred preference. Automated verification is
+complete: 214 backend tests and 145 frontend tests pass, along with Python
+compilation, deterministic sample review, frontend typecheck, and production
+build.
+
+Product-owner acceptance checkpoint (2026-07-30 PDT): the authenticated
+browser flow recorded one real Outcome, included it in the baseline only after
+explicit consent, and removed it again after consent withdrawal. Persistence
+evidence retained the Outcome, advanced only `consent_version` from 1 to 2,
+returned the consented count to zero, and passed foreign-key verification. The
+observation slice is accepted; sparse data still blocks any ranking claim.
+
+STORY-028B candidate checkpoint (2026-07-30 PDT): the existing Assistant
+Baseline summary now opens a focused read-only detail layer. It exposes the
+current consent threshold and remaining count, per-proposal-type usefulness,
+completion, and result aggregates when available, and always states that
+ranking is not applied. It adds no endpoint, schema, inferred Preference, or
+suggestion-order change. Four focused Assistant tests, all 146 frontend tests,
+TypeScript verification, and the production build pass. Product-owner browser
+acceptance passed on 2026-07-30 PDT after the Baseline row opened the
+collecting/readiness detail, exposed the current consented count and aggregate
+boundary, preserved Back navigation, and stated that ranking was not applied.
+STORY-028B is accepted.
+
+STORY-028C candidate checkpoint (2026-07-30 PDT): the offline usefulness
+evaluation protocol is frozen before enough data exists to inspect a holdout
+result. A read-only local CLI includes only currently consented, rated Outcomes,
+uses a chronological 30-record minimum with at least 10 holdout records, and
+measures a Proposal-type mean baseline with global fallback by mean absolute
+error. Its aggregate output excludes proposal titles and Outcome notes.
+Because the ledger does not record candidate-set exposure, every snapshot
+blocks ranking evaluation explicitly. Three focused evaluation tests, the
+27-test evaluation/consent/schema slice, all 217 backend tests, Python
+compilation, and the deterministic sample review pass. Product-owner protocol
+acceptance passed on 2026-07-30 PDT. STORY-028C is accepted; collecting enough
+real consented Outcomes remains an evidence gate, not an implementation claim.
 
 ## Epic 9: Agent-Ready Domain And Integration
 
@@ -850,12 +899,483 @@ Bearer credential can call only the read-only channel context endpoint when it
 has `context:read`; browser JWTs are not reused. Replay receipts contain no
 personal context copies. Pairing, OpenAPI, expiry, scope, replay conflict,
 revocation, redaction, v8 migration, and account-isolation tests pass in the
-focused candidate suite. Real OpenClaw/WhatsApp transport and propose/execute
-channel endpoints remain deferred. Product-owner acceptance passed on
+focused candidate suite. Subsequent STORY-027 work added the pending-only
+channel proposal endpoint, narrow approve/reject decision, approved-plan
+execution, and reversible undo behind distinct scopes; the native OpenClaw
+adapter remains a replaceable transport. Product-owner acceptance passed on
 2026-07-26 PDT.
+
+App-management checkpoint (2026-07-28 PDT): Account > Integrations provides
+an authenticated OpenClaw-only pairing surface for label, identity, explicit
+scopes, and expiry; it displays the raw token only in the one-time pairing
+result, lists lifecycle metadata, and requires confirmation before revocation.
+It uses the existing browser-authenticated management API and deliberately
+does not store integration tokens or identities in browser persistence.
+A one-click check creates a five-minute read-only pairing, validates the
+channel context request, and revokes that temporary credential before success
+is displayed.
+
+Telegram private-pilot checkpoint (2026-07-28 PDT): Telegram is an allowed
+scoped channel type. The first production configuration is private-chat only,
+with an exact numeric trusted sender and only `context:read` plus
+`proposal:create`; decision, execution, and undo remain disabled until a later
+explicit approval gate.
+
+Telegram decision-gate checkpoint (2026-07-29 PDT): after the pending-only
+runtime gate passed, the active pairing was rotated to add only
+`proposal:decide`, and the OpenClaw allowlist added only the narrow decision
+tool. A real trusted Telegram `approve` request returned `200`, moved the
+existing Proposal from pending version 1 to approved version 2, and appended
+exactly one Decision. Read-only verification found no Agent Action and no
+target-week WeeklyPlan. At that checkpoint, `action:execute` and `action:undo`
+remained absent from both the pairing and tool allowlist.
+
+Telegram execution-gate checkpoint (2026-07-29 PDT): the active pairing was
+rotated again to add only `action:execute`, and the OpenClaw allowlist added
+only `theseus_weekly_plan_execute`; `action:undo` and the Undo tool remained
+disabled. A real trusted Telegram execution returned `200`, advanced the
+approved Proposal from version 2 to executed version 3, and recorded exactly
+one Decision-linked, reversible, succeeded `weekly_plan.create` Action whose
+verification matched the approved after-state. Read-only verification found
+one target-week WeeklyPlan with the complete approved three-item plan,
+including the bounded 30-minute restart allocation, and no Undo Action. The
+focused execution/scope tests pass 2 cases and the OpenClaw plugin suite passes
+all 23 tests.
+
+Telegram undo-gate checkpoint (2026-07-29 PDT): after the execution state was
+verified in the App, the active pairing was rotated to add the independent
+`action:undo` scope and the runtime allowlist added only
+`theseus_weekly_plan_undo`. A real trusted Telegram Undo returned `200`,
+advanced the Proposal from executed version 3 to undone version 4, marked the
+original reversible Action undone, and recorded exactly one non-reversible,
+succeeded `weekly_plan.undo_create` Action linked to it. Read-only verification
+confirmed that the Undo matched the recorded before-state, removed the one
+target-week Plan created by the original Action, preserved the source-week
+Plan and approval Decision, and made no unrelated plan write. The focused
+Undo/scope tests pass 2 cases. Final App consistency confirmation passed, so
+the product owner accepted the complete five-gate private pilot.
+
+Persistence correction checkpoint (2026-07-29 PDT): schema v12 rebuilds the
+channel binding constraint to accept Telegram while preserving existing
+bindings, uniqueness, ownership triggers, and foreign keys. A focused
+migration regression proves a v11 database retains an existing OpenClaw
+binding and then accepts Telegram. The Integration API regression proves the
+first Telegram pairing returns `201` and only a duplicate active identity
+returns `409`. The focused backend and frontend suites, full Python suite,
+Python compilation, TypeScript, production build, and sanitized
+sample-to-stored-review path pass.
 
 Acceptance verification: 27 focused Integration/schema/migration tests pass.
 The full suite completed 196 of 197 tests; the sole failure was the previously
 tracked intermittent authenticated Activity request and passed immediately in
 isolation. Python compilation and deterministic sample review pass. This is
 not evidence that the separate authentication flake has been fixed.
+
+## Epic 10: Daily Visual Workspace and Local-First Assistant
+
+These candidate stories implement the two accepted product directions in
+`docs/17_product_direction_v2.md`. They reserve boundaries only. Each needs a
+focused issue, owner, contract, verification commands, and demo evidence before
+moving to `Ready`.
+
+### STORY-040 Freeze the visual-first workspace contract
+
+As a daily user, I want the App to summarize streams visually so that I can
+understand my day and week without reading repeated review prose.
+
+Priority: P0 next product slice, after the current candidate is integrated
+
+Planning checkpoint (2026-07-30 PDT): the product owner set UI optimization as
+the first post-pilot direction. Assistant Gateway, next-action, Calendar,
+in-App conversation, and voice stories remain sequenced after an accepted UI
+baseline. The first STORY-040 artifact is the product-owner-review wireframe in
+`docs/design/daily-workspace-wireframes-v2.md`; HTML and React work may not
+begin before its acceptance gate.
+
+Conditional-review checkpoint (2026-07-30 PDT): the three-destination
+information architecture, default Today entry, Day/Week/Month chart split, and
+Review/Signals Level 1 convergence remain approved in direction. The revised
+wireframe now defines independent live-Focus and selected-period contexts,
+Previous/Next/Today/timezone rules, concurrent Focus foreground selection and
+the running-Activities sheet, explicit Insights and Plan state matrices, and
+visible chart titles, totals, legends, and accessible data entries. STORY-040
+remained unaccepted and HTML remained blocked until product-owner re-review.
+
+Wireframe acceptance checkpoint (2026-07-30 PDT): the product owner accepted
+the final visual-first workspace contract after historical Day drill-down
+semantics, exact Month totals, visible Insights/Plan reset controls, and
+distinct Plan load, failed-save, and unknown-save recovery were reconciled.
+Responsive HTML prototyping is authorized. STORY-040 remains `In Progress`, and
+React implementation remains blocked until the app-sized portrait prototype,
+wide-screen QA preview, interactions, and represented states pass product-owner
+review.
+
+HTML review correction (2026-07-30 PDT): the product owner clarified that
+Theseus is a mobile App and rejected a landscape-oriented wide-screen
+rearrangement. The prototype and contract now keep the 430px portrait workspace,
+bottom navigation, single-column reading order, and vertically stacked Plan
+diff at wide browser sizes. Wide-screen output is QA preview evidence rather
+than a separate desktop product. STORY-040 remains `In Progress` pending review
+of this corrected portrait-first prototype.
+
+Companion placement decision (2026-07-30 PDT): the product owner retained the
+fresh stationery visual direction and the existing companion as a bounded
+brand asset, while keeping it off routine Today, Insights, and Plan Level 1
+surfaces. Allowed use is onboarding, meaningful empty/completion states, a
+compact Review detail, and the future working assistant entry. No inactive
+assistant placeholder or persistent decorative character is authorized.
+
+Tracker preservation decision (2026-07-30 PDT): the product owner confirmed
+that the existing fast, minimal Tracker is protected rather than removed. Today
+keeps direct Start/End at Level 1, and tapping Current Focus opens the full-screen
+Level 2 Tracker with Activity selection, the primary timer control, concurrent
+running access, Today total, and correctable history. Tracker is absorbed into
+Today navigation, not reduced to the compact summary row or restored as a fourth
+tab.
+
+HTML interaction correction checkpoint (2026-07-30 PDT): external review found
+that chart targets shared static detail, the current week included future
+fixtures, concurrent Focus actions were not stateful, and the Tracker timer
+surface duplicated its End action. The corrected prototype now binds every
+visual target to its selected date or period, category, and sanitized source
+record IDs; excludes Jul 31-Aug 2 from the Jul 27-Aug 2 current-week total;
+models foreground selection, running-state labels, independent End actions,
+and safe fallback selection; and leaves the timer display read-only. Chart
+semantics, touch targets, contrast, focus treatment, and long Activity wrapping
+were also corrected. Exact portrait, desktop-QA, drawer, stale, conflict,
+verified, and Tracker captures now exist. STORY-040 remains `In Progress` and
+React remains blocked until the product owner accepts this corrected screenshot
+and interaction evidence.
+
+Prototype acceptance checkpoint (2026-07-30 PDT): after the corrected evidence
+and verification were delivered, the product owner directed development to
+continue. The app-sized Day, Week, Insights, Plan, Tracker, Running Activities,
+stale, conflict, verified, 320px, 390px, and centered desktop-QA artifacts are
+accepted as the React reference. STORY-040 is accepted. Production work now
+moves to the dependent STORY-041 slice; this acceptance does not authorize a
+main-branch merge or broaden STORY-041 into Month, Insights, Plan, Assistant,
+Calendar, or voice work.
+
+Acceptance criteria:
+
+- the information architecture specifies a daily timeline, seven-day stacked
+  bars, a time-distribution donut, and a longer-range calendar heatmap;
+- each visual answers a distinct question and opens matching persisted records;
+- overlapping Review and Signals content has one accepted Level 1 hierarchy;
+- wireframes and an app-sized HTML prototype pass product-owner review before
+  React implementation begins;
+- mobile, desktop, sparse, empty, loading, error, and accessibility states are
+  represented.
+
+### STORY-040B Converge Insights and primary navigation
+
+As a daily user, I want one Insights destination instead of separate Review and
+Signals tabs so that weekly evidence has a clear hierarchy without repeated
+summaries.
+
+Priority: P1 after the accepted STORY-040 prototype and STORY-041 Today surface
+
+Ready checkpoint (2026-07-30 PDT): Dong owns the React slice on
+`feature/040b-insights-navigation-convergence`. It depends on the accepted
+STORY-040 information architecture and the accepted STORY-041 Today navigation
+target. The slice changes only primary navigation and Insights Level 1; Plan
+visual refinement, Assistant, Calendar, and voice remain outside its boundary.
+
+Acceptance criteria:
+
+- primary navigation contains only Today, Insights, and Plan, defaults to
+  Today, and maps legacy Review or Signals links to Insights;
+- Insights presents one week status, one priority, and separate Wins, Other
+  issues, Steady checks, and Weekly review collections;
+- a priority is not repeated in Other issues, while Review findings, Signal
+  evidence, source values, and actions remain distinct and inspectable below
+  Level 1;
+- historical week navigation supports Previous, Next, date selection, and a
+  direct This week reset without browsing future weeks;
+- no-review weeks distinguish missing evidence from recorded evidence awaiting
+  review generation, and loading or error recovery remains explicit;
+- focused navigation and Insights tests, the full frontend suite, TypeScript,
+  production build, `git diff --check`, and sanitized 320px/390px visual QA
+  pass before product-owner acceptance.
+
+Implementation checkpoint (2026-07-30 PDT): the bounded React slice is
+implemented on `feature/040b-insights-navigation-convergence`. Primary
+navigation now contains Today, Insights, and Plan; authenticated entry keeps
+Today as the default while Insights begins at the account-local current week.
+The merged Level 1 shows one status and one priority, then routes Wins, Other
+issues, Steady checks, and Weekly review into their existing distinct Review
+or Signal evidence paths. Legacy Review and Signals query links converge on
+Insights. All 174 frontend tests, TypeScript, the production build,
+`git diff --check`, and sanitized 320px/390px Level 1 plus 390px drawer visual
+QA pass. Product-owner browser acceptance remains pending.
+
+Product-owner acceptance (2026-07-30 PDT): Dong tested the authenticated
+Insights workspace with persisted student-routine data and accepted the
+three-destination navigation, default Today entry, weekly browsing and reset,
+merged Level 1 hierarchy, and inspectable Review and Signal evidence.
+STORY-040B is accepted at commit `c1e7189`. This acceptance does not authorize
+a PR or merge to `main`; the pushed feature branch remains available for the
+later UI integration gate.
+
+### STORY-040C Converge the Plan workspace
+
+As a daily user, I want a compact target-week Plan workspace so that capacity,
+one proposed adjustment, blocks, and Tasks are understandable without reading
+the full proposal diff.
+
+Priority: P1 after STORY-040B
+
+Ready checkpoint (2026-07-30 PDT): Dong owns the React slice on
+`feature/040c-plan-workspace-convergence`. It reuses the existing WeeklyPlan,
+Task, proposal, conflict, save, and Undo behavior. No API, schema, Assistant,
+Calendar, or plan-generation rule change is included.
+
+Acceptance criteria:
+
+- Plan defaults to the next account-local Monday-to-Sunday target week and
+  supports Previous, Next, date selection, and a conditional Next week reset;
+- target-week navigation, Edit, and duplicate Apply are disabled while a save
+  or Undo is in flight, and changing weeks cannot retain an Undo snapshot from
+  another week;
+- Level 1 shows compact planned, capacity, load, and slack evidence; proposal
+  reason and complete before/after evidence remain in Level 2;
+- missing capacity keeps blocks and Tasks inspectable but exposes Set capacity
+  and disables Apply;
+- Plan blocks and Tasks use one compact collection, and a plan block still
+  hands off to Today Focus;
+- loading, no-plan, load error, save, conflict, Undo progress, success, and
+  failure states retain an explicit recovery action where one exists;
+- focused Plan tests, the full frontend suite, TypeScript, production build,
+  `git diff --check`, and sanitized 320px/390px visual QA pass before
+  product-owner acceptance.
+
+Implementation checkpoint (2026-07-30 PDT): the bounded Plan React slice is
+implemented on `feature/040c-plan-workspace-convergence`. Plan now opens on the
+next account-local week, browses arbitrary Monday-to-Sunday target weeks, and
+clears week-specific Undo state before navigation. Level 1 retains a compact
+capacity visual, one adjustment, and a combined Plan blocks / Tasks collection;
+proposal reason and the complete diff remain in Level 2. Missing capacity and
+conflict prevent Apply, while save/Undo operations lock duplicate writes and
+week navigation. Confirmed writes now report `Plan saved and verified`. All
+179 frontend tests, TypeScript, the production build, `git diff --check`, and
+sanitized 320px/390px plus missing-capacity visual QA pass. Product-owner
+browser acceptance remains pending.
+
+Product-owner acceptance (2026-07-30 PDT): Dong tested the authenticated Plan
+workspace with persisted current- and next-week student data and accepted
+target-week navigation, compact capacity evidence, the combined Plan blocks /
+Tasks collection, safe disabled states, verified save feedback, and the
+preserved proposal and Undo boundaries. STORY-040C is accepted at commit
+`138680c`. This acceptance does not authorize a PR or merge to `main`; the
+pushed feature branch remains available for the later UI integration gate.
+
+### STORY-041 Add evidence-backed time visualizations
+
+As a daily user, I want to see time distribution and change across useful time
+scales so that I can notice imbalance and choose what to inspect.
+
+Priority: P1 after STORY-040
+
+Ready checkpoint (2026-07-30 PDT): STORY-040 is accepted. Dong owns the React
+slice. It covers authenticated TimeLog aggregation, the accepted Project donut,
+seven-day stacked bars, the density-gated Month heatmap, accessible summaries,
+and exact record-level drill-down. Insights/Plan convergence remains outside
+this slice.
+
+Implementation checkpoint (2026-07-30 PDT): the bounded React slice is
+implemented and locally verified on
+`feature/041-evidence-backed-time-visualizations`. The authenticated Today
+surface now reconciles Day/Week/Month totals and drill-down IDs from persisted
+TimeLogs, excludes current-range future dates, preserves live Focus while
+browsing history, and opens the protected full-screen Tracker. Tracker has one
+explicit Start/End control and a read-only timer; parallel Activities remain
+independently selectable and endable. All 169 frontend tests, TypeScript,
+production build, `git diff --check`, and sanitized 320px/390px Chromium visual
+QA pass.
+
+Month checkpoint (2026-07-30 PDT): the accepted Month surface is now included
+without a backend contract change. It uses a minimum of seven active dates,
+fixed duration thresholds (`Low <2h`, `Medium 2–6h`, `High >=6h`), excludes
+account-local future dates, provides arrow-key calendar navigation, and opens
+the exact TimeLog IDs for a selected date or the whole month. Sparse months
+remain explicit rather than rendering a misleading heatmap.
+
+Product-owner acceptance (2026-07-30 PDT): Dong tested the authenticated App
+with persisted student-routine data and accepted the Day, Week, and Month
+surfaces. Date navigation, future-date exclusion, mobile layout, chart totals,
+and record-level evidence behavior passed the browser gate. STORY-041 is
+accepted at commit `c174821`. This acceptance does not authorize a PR or merge
+to `main`; the feature remains on its pushed branch until the later integration
+gate.
+
+Acceptance criteria:
+
+- the first React slice implements the accepted donut and seven-day visual
+  against authenticated persisted TimeLogs;
+- totals, segments, dates, and drill-down records reconcile exactly;
+- charts retain accessible summaries and never use color as the only meaning;
+- the monthly heatmap is implemented only after enough date density exists;
+- focused tests, TypeScript, production build, and mobile/desktop browser
+  review pass.
+
+### STORY-042 Add a local Assistant Gateway and minimum-context policy
+
+As a local account user, I want cloud language help without uploading my whole
+history so that conversation remains useful and bounded.
+
+Priority: P0 within the Assistant phase, after STORY-040 and STORY-041
+
+Ready checkpoint (2026-07-30 PDT): Dong owns the backend-only slice on
+`feature/042-local-assistant-gateway`, tracked by GitHub Issue #85. It depends
+on the accepted daily UI baseline and the existing authenticated, typed
+Assistant API. The slice adds an auditable request-specific envelope, local
+provider-status boundary, sensitive-field rejection, and deterministic local
+fallback. It does not call a cloud model or add chat UI, voice, Calendar,
+assistant memory, or new write authority.
+
+Acceptance criteria:
+
+- provider API keys remain in the local backend and are absent from frontend
+  storage, model context, channel output, and logs;
+- every cloud request is triggered by explicit user interaction;
+- the gateway sends an allowlisted, request-specific context envelope;
+- serialized-envelope tests reject credentials, unrelated history, raw
+  evidence dumps, and cross-account records;
+- provider failure preserves deterministic local behavior.
+
+Implementation checkpoint (2026-07-30 PDT): the backend-only contract is
+implemented on `feature/042-local-assistant-gateway`. Authenticated status and
+envelope-preview endpoints expose no key and make no network request. Four
+request purposes select fixed context sections; record lists are bounded with
+visible omission counts; TimeLogs become aggregates; and a recursive policy
+rejects sensitive field names, credential-shaped values, account email, raw
+history, and cross-account records. Missing or unsupported provider
+configuration leaves envelope preparation and all deterministic local APIs
+available. All 15 Gateway tests and all 234 backend tests pass; Python
+compilation, deterministic sample review, and `git diff --check` pass.
+Product-owner API acceptance remains pending.
+
+Product-owner acceptance (2026-07-31 PDT): direct automated verification
+passed without requiring the product owner to copy an access token. All 15
+Gateway privacy/API tests, all 179 frontend tests, and the frontend production
+build passed; the live backend exposed both Gateway routes and the local App
+remained healthy. The product owner accepted STORY-042 at commit `80622e0` and
+authorized STORY-043. This acceptance does not authorize a PR or merge to
+`main`.
+
+### STORY-043 Add deterministic next-action recommendation
+
+As a user, I want a trustworthy answer to what I should do now so that current
+commitments do not crowd out long-running Projects.
+
+Priority: P0 within the Assistant phase, after the accepted UI baseline and
+stable Task, Plan, Focus, and review services
+
+Ready checkpoint (2026-07-31 PDT): Dong owns the shared backend and OpenClaw
+slice on `feature/043-deterministic-next-action`, tracked by GitHub Issue #86.
+It depends on accepted STORY-042 plus the existing Task, WeeklyPlan, Focus,
+TimeLog, Review, Preference, pairing, and typed-tool boundaries. The service
+uses an explicit available-time value when supplied, otherwise a supported
+user-stated Focus-duration preference or a documented local default. Calendar
+commitments remain unavailable until STORY-045 and must appear as uncertainty,
+not invented evidence. This slice adds no App chat UI, voice, model ranking,
+write authority, Calendar adapter, or proactive execution.
+
+Acceptance criteria:
+
+- a shared service ranks bounded candidates from active Focus, the next fixed
+  commitment, WeeklyPlan, open Tasks, project state, available time, and
+  explicit preferences;
+- the result includes evidence, alternatives, and uncertainty;
+- App and Telegram receive the same result for the same account and context;
+- a model may phrase but cannot invent ranking evidence;
+- empty, conflict, stale, and offline cases have deterministic tests.
+
+Implementation checkpoint (2026-07-31 PDT): the shared account-scoped
+`NextActionService`, authenticated App endpoint, paired-channel endpoint, and
+trusted OpenClaw `theseus_next_action` tool are implemented on the feature
+branch. The result is read-only and includes one recommendation, up to three
+alternatives, structured evidence, candidate counts, and explicit uncertainty;
+Calendar remains visibly unavailable until STORY-045. Verification passed 28
+focused API/service/integration tests, 249 full Python tests, Python compilation,
+the deterministic sample Review, the OpenClaw 0.1.7 plugin suite, and a
+disposable HTTP adapter workflow covering `next_action.read` alongside context,
+proposal, decision, execution, and Undo.
+
+Product-owner acceptance (2026-07-31 PDT): after the verified 0.1.7 plugin was
+loaded into the local OpenClaw Gateway, the product owner sent a natural-language
+Telegram request through the paired account and confirmed that the result was
+good. This accepts the shared deterministic recommendation behavior at commit
+`6a9cf00`, including returned evidence, alternatives, uncertainty, and the
+documented Calendar limitation. STORY-043 is accepted on its feature branch;
+Issue #86 remains the delivery record, and no PR or merge to `main` is
+authorized yet.
+
+### STORY-044 Add the in-App text assistant
+
+As a user, I want to ask Theseus questions inside the App so that conversation
+is not limited to Telegram.
+
+Priority: P1 after STORY-042 and STORY-043
+
+Acceptance criteria:
+
+- one restrained, accessible App affordance opens a focused text conversation;
+- reads use the shared Assistant Gateway and typed tools;
+- writes show typed previews and preserve approval, audit, verification, and
+  Undo;
+- Telegram and App do not maintain competing assistant memory or policy;
+- loading, cancellation, timeout, offline, provider-error, and cost-limit
+  states are visible and tested.
+
+### STORY-045 Add read-only Google Calendar commitments
+
+As a user, I want fixed Calendar commitments considered when Theseus recommends
+my next action so that the recommendation fits the time actually available.
+
+Priority: P1 after STORY-042 and STORY-043
+
+Acceptance criteria:
+
+- connection is explicit and OAuth credentials stay in protected local backend
+  storage;
+- free/busy is the default imported context and selected event detail is
+  opt-in;
+- external commitments remain distinct from Tasks and TimeLogs;
+- sync state, last refresh, error, disconnect, and credential deletion are
+  visible;
+- no Calendar write or broad scope is included.
+
+### STORY-046 Add multilingual push-to-talk
+
+As a user, I want to hold a control and speak in English or Chinese so that I
+can query and plan while reducing setup and navigation effort.
+
+Priority: P1 after STORY-044
+
+Acceptance criteria:
+
+- recording begins only after a deliberate action and is visibly active;
+- a non-long-press accessible recording control provides equivalent behavior;
+- the first release uses the bounded record, transcribe, tool, present, and
+  optional speech pipeline;
+- raw audio is not retained by default and transcript retention is visible and
+  controllable;
+- cancel, timeout, denial, transcription error, and cloud-unavailable states
+  are tested.
+
+### STORY-047 Add conversational onboarding
+
+As a new user, I want the assistant to guide initial setup one question at a
+time so that I can start using Theseus without learning every screen first.
+
+Priority: P2 after STORY-044 and STORY-045
+
+Acceptance criteria:
+
+- the assistant collects only the minimum timezone, working window, Goals,
+  Projects, commitments, focus preference, slack, and first-plan inputs;
+- the complete structured result is previewed before any write;
+- setup writes use existing authenticated domain services and approval rules;
+- conventional forms remain available for fallback and correction;
+- partial, cancelled, resumed, invalid, and duplicate setup paths are tested.

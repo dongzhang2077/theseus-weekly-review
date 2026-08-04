@@ -1,18 +1,23 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   correctPreference,
+  createProposalOutcome,
   createPreference,
   decideProposal,
   deletePreference,
+  loadPersonalizationBaseline,
   loadPreferenceDetail,
   loadPreferences,
   loadProposalDetail,
   loadProposals,
   restorePreference,
+  updateProposalOutcomeConsent,
   type JsonMap,
+  type PersonalizationBaseline,
   type PreferenceDetail,
   type PreferenceRecord,
   type ProposalDetail,
+  type ProposalOutcomeRecord,
   type ProposalRecord
 } from "../../shared/api/agentMemory";
 import type { FetchLike } from "../../shared/api/loadAppWeek";
@@ -29,6 +34,7 @@ type Section = "pending" | "history" | "memory";
 type Route =
   | { kind: "summary" }
   | { kind: "section"; section: Section }
+  | { kind: "baseline" }
   | { kind: "proposal"; id: number }
   | { kind: "preference"; id: number }
   | { kind: "new-preference" };
@@ -43,6 +49,7 @@ export function AssistantWorkspace({
   const [route, setRoute] = useState<Route>({ kind: "summary" });
   const [proposals, setProposals] = useState<ProposalRecord[]>([]);
   const [preferences, setPreferences] = useState<PreferenceRecord[]>([]);
+  const [baseline, setBaseline] = useState<PersonalizationBaseline | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
@@ -55,8 +62,12 @@ export function AssistantWorkspace({
     let ignore = false;
     setLoading(true);
     setError(null);
-    Promise.all([loadProposals(options), loadPreferences(options)]).then(
-      ([proposalResult, preferenceResult]) => {
+    Promise.all([
+      loadProposals(options),
+      loadPreferences(options),
+      loadPersonalizationBaseline(options)
+    ]).then(
+      ([proposalResult, preferenceResult, baselineResult]) => {
         if (ignore) return;
         if (proposalResult.status !== "ok" || !proposalResult.data) {
           setError(proposalResult.error ?? "Proposals could not be loaded.");
@@ -65,6 +76,9 @@ export function AssistantWorkspace({
         } else {
           setProposals(proposalResult.data);
           setPreferences(preferenceResult.data);
+          setBaseline(
+            baselineResult.status === "ok" ? baselineResult.data : null
+          );
         }
         setLoading(false);
       }
@@ -127,7 +141,9 @@ export function AssistantWorkspace({
             pending={pending}
             history={history}
             preferences={activePreferences}
+            baseline={baseline}
             onOpen={(section) => setRoute({ kind: "section", section })}
+            onOpenBaseline={() => setRoute({ kind: "baseline" })}
           />
         ) : null}
         {!loading && !error && route.kind === "section" ? (
@@ -146,12 +162,16 @@ export function AssistantWorkspace({
           <ProposalDetailView
             id={route.id}
             options={options}
+            onBaselineChanged={setBaseline}
             onChanged={(detail) => {
               setProposals((current) =>
                 current.map((item) => item.id === detail.proposal.id ? detail.proposal : item)
               );
             }}
           />
+        ) : null}
+        {!loading && !error && route.kind === "baseline" ? (
+          <BaselineDetail baseline={baseline} />
         ) : null}
         {!loading && !error && route.kind === "preference" ? (
           <PreferenceDetailView
@@ -194,12 +214,16 @@ function AssistantSummary({
   pending,
   history,
   preferences,
-  onOpen
+  baseline,
+  onOpen,
+  onOpenBaseline
 }: {
   pending: ProposalRecord[];
   history: ProposalRecord[];
   preferences: PreferenceRecord[];
+  baseline: PersonalizationBaseline | null;
   onOpen: (section: Section) => void;
+  onOpenBaseline: () => void;
 }) {
   const lastDecision = [...history].sort(byUpdatedAt)[0];
   return (
@@ -211,6 +235,16 @@ function AssistantSummary({
         <SummaryRow icon="fileText" label="Pending" value={pending.length ? String(pending.length) : "None"} onClick={() => onOpen("pending")} />
         <SummaryRow icon="check" label="History" value={lastDecision ? `${statusLabel(lastDecision.status)} · ${shortDate(lastDecision.updated_at)}` : "None"} onClick={() => onOpen("history")} />
         <SummaryRow icon="layers" label="Memory" value={String(preferences.length)} onClick={() => onOpen("memory")} />
+        <SummaryRow
+          icon="gauge"
+          label="Baseline"
+          value={baseline?.status === "ready"
+            ? "Ready"
+            : baseline
+              ? `${baseline.consented_outcome_count}/${baseline.minimum_outcomes}`
+              : "Unavailable"}
+          onClick={onOpenBaseline}
+        />
       </div>
       <div className="mt-5 rounded-[14px] border border-desk-line bg-desk-sunk px-4 py-3">
         <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-desk-muted">Your control</div>
@@ -230,6 +264,103 @@ function SummaryRow({ icon, label, value, onClick }: { icon: IconName; label: st
       <span className="max-w-36 truncate text-sm text-desk-muted">{value}</span>
       <Icon name="chevronRight" className="size-4 text-desk-subtle" />
     </button>
+  );
+}
+
+function BaselineDetail({ baseline }: { baseline: PersonalizationBaseline | null }) {
+  if (!baseline) {
+    return (
+      <WorkspaceState
+        icon="info"
+        title="Baseline unavailable"
+        body="Reopen Assistant to retry."
+      />
+    );
+  }
+
+  const ready = baseline.status === "ready";
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="m-0 text-xl leading-7">
+            {ready ? "Ready for evaluation" : "Collecting feedback"}
+          </h3>
+          <p className="mb-0 mt-1 text-sm leading-5 text-desk-muted">
+            {ready
+              ? "Enough consented outcomes for a first offline comparison."
+              : `${baseline.remaining_outcome_count} more consented ${baseline.remaining_outcome_count === 1 ? "outcome" : "outcomes"} needed.`}
+          </p>
+        </div>
+        <Tag tone={ready ? "accent" : "warn"}>{ready ? "Ready" : "Collecting"}</Tag>
+      </div>
+
+      <DetailSection title="Readiness">
+        <MetaRow
+          label="Consented outcomes"
+          value={`${baseline.consented_outcome_count}/${baseline.minimum_outcomes}`}
+        />
+        <MetaRow label="Remaining" value={String(baseline.remaining_outcome_count)} />
+        <MetaRow label="Ranking" value="Not applied" />
+      </DetailSection>
+
+      <DetailSection title="Included outcomes">
+        {baseline.groups.length ? (
+          <div className="border-t border-desk-line">
+            {baseline.groups.map((group) => (
+              <BaselineGroup key={group.proposal_type} group={group} />
+            ))}
+          </div>
+        ) : (
+          <p className={bodyClass}>No consented outcomes.</p>
+        )}
+      </DetailSection>
+
+      <Disclosure title="How it is counted">
+        <p className={bodyClass}>
+          Only feedback with current consent is included. Partial results count
+          as half completion; dismissed results are excluded.
+        </p>
+      </Disclosure>
+    </div>
+  );
+}
+
+function BaselineGroup({
+  group
+}: {
+  group: PersonalizationBaseline["groups"][number];
+}) {
+  const results = [
+    `${group.completed_count} done`,
+    `${group.partial_count} partial`,
+    `${group.not_completed_count} not done`,
+    `${group.dismissed_count} dismissed`
+  ].join(" · ");
+  return (
+    <section className="border-b border-desk-line py-3 last:border-b-0">
+      <div className="flex items-start justify-between gap-3">
+        <h4 className="m-0 min-w-0 text-sm font-bold">
+          {humanize(group.proposal_type)}
+        </h4>
+        <span className="shrink-0 text-xs text-desk-muted">
+          {group.outcome_count}
+        </span>
+      </div>
+      <MetaRow
+        label="Usefulness"
+        value={group.average_usefulness === null
+          ? "Not rated"
+          : `${group.average_usefulness.toFixed(1)}/5`}
+      />
+      <MetaRow
+        label="Completion"
+        value={group.completion_rate === null
+          ? "Not available"
+          : `${Math.round(group.completion_rate * 100)}%`}
+      />
+      <MetaRow label="Results" value={results} />
+    </section>
   );
 }
 
@@ -319,7 +450,7 @@ function PreferenceRow({ preference, onClick }: { preference: PreferenceRecord; 
   );
 }
 
-function ProposalDetailView({ id, options, onChanged }: { id: number; options: { apiBaseUrl: string; fetchImpl: FetchLike }; onChanged: (detail: ProposalDetail) => void }) {
+function ProposalDetailView({ id, options, onChanged, onBaselineChanged }: { id: number; options: { apiBaseUrl: string; fetchImpl: FetchLike }; onChanged: (detail: ProposalDetail) => void; onBaselineChanged: (baseline: PersonalizationBaseline) => void }) {
   const [detail, setDetail] = useState<ProposalDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -380,6 +511,27 @@ function ProposalDetailView({ id, options, onChanged }: { id: number; options: {
         {proposal.evidence.length ? proposal.evidence.map((item, index) => <JsonSummary key={index} value={item} />) : <p className={bodyClass}>No evidence attached.</p>}
       </Disclosure>
       <Disclosure title={`Timeline · ${detail.decisions.length + detail.actions.length + detail.outcomes.length}`}><Timeline detail={detail} /></Disclosure>
+      {proposal.status !== "pending" ? (
+        <OutcomeFeedback
+          detail={detail}
+          options={options}
+          onChanged={(outcome) => {
+            setDetail((current) => current
+              ? {
+                  ...current,
+                  outcomes: current.outcomes.some((item) => item.id === outcome.id)
+                    ? current.outcomes.map((item) => item.id === outcome.id ? outcome : item)
+                    : [...current.outcomes, outcome]
+                }
+              : current);
+            void loadPersonalizationBaseline(options).then((result) => {
+              if (result.status === "ok" && result.data) {
+                onBaselineChanged(result.data);
+              }
+            });
+          }}
+        />
+      ) : null}
       {error ? <InlineError message={error} /> : null}
       {proposal.status === "pending" ? (
         <div className="absolute inset-x-0 bottom-0 z-10 border-t border-desk-line bg-desk-paper/95 px-4 py-3 backdrop-blur-sm">
@@ -403,6 +555,121 @@ function ProposalDetailView({ id, options, onChanged }: { id: number; options: {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function OutcomeFeedback({
+  detail,
+  options,
+  onChanged
+}: {
+  detail: ProposalDetail;
+  options: { apiBaseUrl: string; fetchImpl: FetchLike };
+  onChanged: (outcome: ProposalOutcomeRecord) => void;
+}) {
+  const existing = detail.outcomes[detail.outcomes.length - 1];
+  const [result, setResult] = useState<ProposalOutcomeRecord["result"]>("completed");
+  const [usefulness, setUsefulness] = useState("3");
+  const [note, setNote] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const response = await createProposalOutcome(
+      options,
+      detail.proposal.id,
+      {
+        result,
+        usefulness: Number(usefulness),
+        note: note.trim(),
+        personalizationConsent: consent
+      }
+    );
+    setBusy(false);
+    if (response.status === "ok" && response.data) {
+      onChanged(response.data);
+      return;
+    }
+    setError(response.error ?? "Outcome could not be saved.");
+  }
+
+  async function changeConsent(personalizationConsent: boolean) {
+    if (!existing || busy) return;
+    setBusy(true);
+    setError(null);
+    const response = await updateProposalOutcomeConsent(
+      options,
+      detail.proposal.id,
+      existing,
+      personalizationConsent
+    );
+    setBusy(false);
+    if (response.status === "ok" && response.data) {
+      onChanged(response.data);
+      return;
+    }
+    setError(response.status === "conflict"
+      ? "Consent changed while open. Reopen this proposal."
+      : response.error ?? "Consent could not be updated.");
+  }
+
+  if (existing) {
+    return (
+      <DetailSection title="Outcome">
+        <MetaRow label="Result" value={humanize(existing.result)} />
+        <MetaRow label="Usefulness" value={existing.usefulness === null ? "Not rated" : `${existing.usefulness}/5`} />
+        <label className="mt-3 flex min-h-11 items-center gap-3 text-sm font-bold">
+          <input
+            type="checkbox"
+            checked={existing.personalization_consent}
+            disabled={busy}
+            onChange={(event) => changeConsent(event.currentTarget.checked)}
+          />
+          Use for future suggestions
+        </label>
+        {error ? <InlineError message={error} /> : null}
+      </DetailSection>
+    );
+  }
+
+  return (
+    <DetailSection title="Outcome">
+      <div className="grid grid-cols-2 gap-3">
+        <label className={labelClass}>
+          Result
+          <select
+            className={fieldClass}
+            value={result}
+            onChange={(event) => setResult(event.currentTarget.value as ProposalOutcomeRecord["result"])}
+          >
+            <option value="completed">Completed</option>
+            <option value="partial">Partial</option>
+            <option value="not_completed">Not completed</option>
+            <option value="dismissed">Dismissed</option>
+          </select>
+        </label>
+        <label className={labelClass}>
+          Usefulness
+          <select className={fieldClass} value={usefulness} onChange={(event) => setUsefulness(event.currentTarget.value)}>
+            {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}/5</option>)}
+          </select>
+        </label>
+      </div>
+      <label className={`${labelClass} mt-3`}>
+        Note
+        <textarea className={`${fieldClass} min-h-20 py-3`} value={note} maxLength={4000} onChange={(event) => setNote(event.currentTarget.value)} />
+      </label>
+      <label className="mt-3 flex min-h-11 items-center gap-3 text-sm font-bold">
+        <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.currentTarget.checked)} />
+        Use for future suggestions
+      </label>
+      {error ? <InlineError message={error} /> : null}
+      <button className={`${primaryButtonClass} mt-3`} type="button" disabled={busy} onClick={save}>{busy ? "Saving" : "Save"}</button>
+    </DetailSection>
   );
 }
 
@@ -582,6 +849,7 @@ function InlineError({ message }: { message: string }) {
 
 function routeTitle(route: Route): string {
   if (route.kind === "section") return sectionLabel(route.section);
+  if (route.kind === "baseline") return "Baseline";
   if (route.kind === "proposal") return "Proposal";
   if (route.kind === "preference") return "Memory";
   if (route.kind === "new-preference") return "New memory";

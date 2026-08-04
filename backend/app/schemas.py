@@ -23,9 +23,53 @@ ProposalStatus = Literal["pending", "approved", "rejected", "expired", "executed
 ProposalDecisionType = Literal["approve", "edit", "reject", "expire"]
 AgentActionStatus = Literal["pending", "succeeded", "failed", "undone"]
 ProposalOutcomeResult = Literal["completed", "partial", "not_completed", "dismissed"]
-IntegrationChannelType = Literal["local_test", "openclaw", "whatsapp"]
-IntegrationScope = Literal["context:read", "proposal:create", "action:execute"]
+IntegrationChannelType = Literal["local_test", "openclaw", "telegram", "whatsapp"]
+IntegrationScope = Literal[
+    "context:read",
+    "proposal:create",
+    "proposal:decide",
+    "action:execute",
+    "action:undo",
+]
 ReviewMode = Literal["deterministic_first", "supportive_text"]
+AssistantGatewayPurpose = Literal[
+    "focus_status",
+    "task_status",
+    "plan_status",
+    "weekly_review",
+]
+NextActionStatus = Literal["ready", "empty", "conflict"]
+NextActionCandidateKind = Literal[
+    "running_focus",
+    "planned_item",
+    "open_task",
+    "project_restart",
+    "review_step",
+]
+NextActionAvailableTimeSource = Literal["request", "preference", "default"]
+NextActionEvidenceCode = Literal[
+    "running_now",
+    "plan_priority",
+    "task_priority",
+    "task_in_progress",
+    "due_date",
+    "fits_available_time",
+    "exceeds_available_time",
+    "goal_priority",
+    "weekly_minimum_gap",
+    "project_inactivity",
+    "review_recommendation",
+]
+NextActionUncertaintyCode = Literal[
+    "calendar_unavailable",
+    "available_time_defaulted",
+    "multiple_focus_sessions",
+    "review_missing",
+    "review_stale",
+    "plan_task_conflict",
+    "candidate_limit_reached",
+    "no_candidate_evidence",
+]
 RiskType = Literal[
     "alignment_gap",
     "plan_drift",
@@ -106,7 +150,7 @@ class IntegrationPairCreate(APIModel):
     label: str = Field(min_length=1, max_length=80)
     channel_type: IntegrationChannelType
     external_identity: str = Field(min_length=1, max_length=256, repr=False)
-    scopes: list[IntegrationScope] = Field(min_length=1, max_length=3)
+    scopes: list[IntegrationScope] = Field(min_length=1, max_length=5)
     expires_in_seconds: int = Field(default=86400, ge=300, le=2592000)
 
     @field_validator("label", "external_identity")
@@ -784,6 +828,22 @@ class ProposalDecisionRequest(ProposalDecisionCreate):
     expected_version: int = Field(ge=1)
 
 
+class ChannelProposalDecisionRequest(APIModel):
+    """The intentionally narrow decision shape available to channel adapters."""
+
+    expected_version: int = Field(ge=1)
+    decision: Literal["approve", "reject"]
+    reason: str = Field(default="", max_length=1000)
+
+
+class ChannelProposalExecutionRequest(APIModel):
+    expected_version: int = Field(ge=1)
+
+
+class ChannelProposalUndoRequest(APIModel):
+    expected_version: int = Field(ge=1)
+
+
 class AgentActionCreate(APIModel):
     proposal_id: int = Field(gt=0)
     decision_id: int | None = Field(default=None, gt=0)
@@ -823,11 +883,14 @@ class ProposalOutcomeCreate(APIModel):
     actual_duration_minutes: int | None = Field(default=None, ge=0)
     energy_feedback: ActivityType | None = None
     note: str = Field(default="", max_length=4000)
+    personalization_consent: bool = False
 
 
 class ProposalOutcomeRead(ProposalOutcomeCreate):
     id: int
     user_id: int
+    consent_version: int = Field(ge=1)
+    consent_updated_at: datetime | None = None
     created_at: datetime
 
 
@@ -838,6 +901,34 @@ class ProposalOutcomeFeedback(APIModel):
     actual_duration_minutes: int | None = Field(default=None, ge=0)
     energy_feedback: ActivityType | None = None
     note: str = Field(default="", max_length=4000)
+    personalization_consent: bool = False
+
+
+class ProposalOutcomeConsentUpdate(APIModel):
+    expected_version: int = Field(ge=1)
+    personalization_consent: bool
+
+
+class PersonalizationBaselineGroup(APIModel):
+    proposal_type: ProposalType
+    outcome_count: int = Field(ge=1)
+    rated_outcome_count: int = Field(ge=0)
+    average_usefulness: float | None = Field(default=None, ge=1.0, le=5.0)
+    completed_count: int = Field(ge=0)
+    partial_count: int = Field(ge=0)
+    not_completed_count: int = Field(ge=0)
+    dismissed_count: int = Field(ge=0)
+    completion_rate: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class PersonalizationBaselineRead(APIModel):
+    baseline_version: Literal["v1"] = "v1"
+    status: Literal["insufficient_data", "ready"]
+    minimum_outcomes: int = Field(ge=1)
+    consented_outcome_count: int = Field(ge=0)
+    remaining_outcome_count: int = Field(ge=0)
+    ranking_applied: Literal[False] = False
+    groups: list[PersonalizationBaselineGroup] = Field(default_factory=list)
 
 
 class ProposalDetailRead(APIModel):
@@ -930,6 +1021,207 @@ class AssistantContextRead(APIModel):
     time_logs: list[TimeLogRead] = Field(default_factory=list)
     latest_review: AssistantReviewSummary | None = None
     preferences: list[PreferenceRead] = Field(default_factory=list)
+
+
+class AssistantGatewayEnvelopeRequest(APIModel):
+    utterance: str = Field(min_length=1, max_length=4000, repr=False)
+    purpose: AssistantGatewayPurpose
+    window_start: date
+    window_end: date
+
+    @field_validator("utterance")
+    @classmethod
+    def strip_gateway_utterance(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+
+    @model_validator(mode="after")
+    def validate_gateway_window(self) -> AssistantGatewayEnvelopeRequest:
+        window_days = (self.window_end - self.window_start).days + 1
+        if window_days < 1 or window_days > 31:
+            raise ValueError("window must cover between 1 and 31 days")
+        return self
+
+
+class AssistantGatewayProviderStatusRead(APIModel):
+    gateway_version: Literal["v1"] = "v1"
+    provider: Literal["local", "openai", "unsupported"]
+    configured: bool
+    model: str | None = None
+    cloud_calls_enabled: Literal[False] = False
+
+
+class AssistantGatewayWindow(APIModel):
+    start: date
+    end: date
+
+
+class AssistantGatewayProjectSummary(APIModel):
+    id: int
+    title: str
+    stage: ProjectStage
+    deadline: date | None = None
+    weekly_min_minutes: int = Field(ge=0)
+    weekly_target_minutes: int = Field(ge=0)
+    last_activity_date: date | None = None
+
+
+class AssistantGatewayTaskSummary(APIModel):
+    id: int
+    project_id: int
+    title: str
+    status: TaskStatus
+    priority: int = Field(ge=1)
+    estimated_minutes: int | None = Field(default=None, gt=0)
+    due_date: date | None = None
+
+
+class AssistantGatewayFocusSummary(APIModel):
+    id: int
+    activity_id: int
+    task_id: int | None = None
+    project_id: int | None = None
+    activity_name: str
+    activity_type: ActivityType
+    task_title: str | None = None
+    elapsed_seconds: int = Field(ge=0)
+    started_at: datetime
+
+
+class AssistantGatewayPlanItemSummary(APIModel):
+    id: int
+    project_id: int | None = None
+    task_id: int | None = None
+    title: str
+    planned_minutes: int = Field(gt=0)
+    priority: int = Field(ge=1)
+    is_completed: bool
+
+
+class AssistantGatewayPlanSummary(APIModel):
+    id: int
+    week_start: date
+    week_end: date
+    planned_capacity_minutes: int = Field(ge=0)
+    planned_minutes: int = Field(ge=0)
+    slack_target_percent: int = Field(ge=0, le=100)
+    items: list[AssistantGatewayPlanItemSummary] = Field(default_factory=list)
+
+
+class AssistantGatewayProjectTimeSummary(APIModel):
+    project_id: int | None = None
+    duration_minutes: int = Field(ge=0)
+
+
+class AssistantGatewayActivityTypeTimeSummary(APIModel):
+    activity_type: ActivityType
+    duration_minutes: int = Field(ge=0)
+
+
+class AssistantGatewayDateTimeSummary(APIModel):
+    date: date
+    duration_minutes: int = Field(ge=0)
+
+
+class AssistantGatewayTimeSummary(APIModel):
+    total_minutes: int = Field(ge=0)
+    record_count: int = Field(ge=0)
+    by_project: list[AssistantGatewayProjectTimeSummary] = Field(
+        default_factory=list
+    )
+    by_activity_type: list[AssistantGatewayActivityTypeTimeSummary] = Field(
+        default_factory=list
+    )
+    by_date: list[AssistantGatewayDateTimeSummary] = Field(default_factory=list)
+
+
+class AssistantGatewayRiskSummary(APIModel):
+    type: RiskType
+    severity: RiskSeverity
+
+
+class AssistantGatewayReviewSummary(APIModel):
+    id: int
+    week_start: date
+    week_end: date
+    win_titles: list[str] = Field(default_factory=list)
+    risks: list[AssistantGatewayRiskSummary] = Field(default_factory=list)
+    next_step_titles: list[str] = Field(default_factory=list)
+    stale: bool
+
+
+class AssistantGatewayContextEnvelope(APIModel):
+    gateway_version: Literal["v1"] = "v1"
+    purpose: AssistantGatewayPurpose
+    utterance: str
+    timezone: str
+    locale: str
+    window: AssistantGatewayWindow
+    included_sections: list[
+        Literal[
+            "projects",
+            "tasks",
+            "running_focus",
+            "weekly_plan",
+            "time_summary",
+            "review_summary",
+        ]
+    ]
+    projects: list[AssistantGatewayProjectSummary] = Field(default_factory=list)
+    tasks: list[AssistantGatewayTaskSummary] = Field(default_factory=list)
+    running_focus: list[AssistantGatewayFocusSummary] = Field(default_factory=list)
+    weekly_plan: AssistantGatewayPlanSummary | None = None
+    time_summary: AssistantGatewayTimeSummary | None = None
+    review_summary: AssistantGatewayReviewSummary | None = None
+    omitted_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class NextActionRequest(APIModel):
+    available_minutes: int | None = Field(default=None, ge=5, le=720)
+
+
+class NextActionEvidence(APIModel):
+    code: NextActionEvidenceCode
+    summary: str
+    value: str
+
+
+class NextActionCandidate(APIModel):
+    candidate_key: str
+    kind: NextActionCandidateKind
+    title: str
+    score: int
+    estimated_minutes: int = Field(gt=0)
+    project_id: int | None = None
+    task_id: int | None = None
+    activity_id: int | None = None
+    focus_session_id: int | None = None
+    weekly_plan_id: int | None = None
+    planned_item_id: int | None = None
+    review_id: int | None = None
+    evidence: list[NextActionEvidence] = Field(default_factory=list)
+
+
+class NextActionUncertainty(APIModel):
+    code: NextActionUncertaintyCode
+    message: str
+
+
+class NextActionRead(APIModel):
+    context_version: Literal["next-action-v1"] = "next-action-v1"
+    status: NextActionStatus
+    generated_at: datetime
+    local_date: date
+    timezone: str
+    available_minutes: int = Field(ge=5, le=720)
+    available_time_source: NextActionAvailableTimeSource
+    recommendation: NextActionCandidate | None = None
+    alternatives: list[NextActionCandidate] = Field(default_factory=list)
+    uncertainties: list[NextActionUncertainty] = Field(default_factory=list)
+    candidate_count: int = Field(ge=0)
+    omitted_candidate_count: int = Field(ge=0)
 
 
 class AssistantWeeklyPlanProposalRequest(APIModel):

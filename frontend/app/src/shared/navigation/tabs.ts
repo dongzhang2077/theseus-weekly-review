@@ -1,6 +1,6 @@
 import type { IconName } from "../icons/Icon";
 
-export type AppTab = "review" | "signals" | "track" | "plan";
+export type AppTab = "track" | "insights" | "plan";
 
 export interface TabItem {
   id: AppTab;
@@ -9,13 +9,13 @@ export interface TabItem {
 }
 
 export const tabs: TabItem[] = [
-  { id: "review", label: "Review", icon: "book" },
-  { id: "signals", label: "Signals", icon: "activity" },
-  { id: "track", label: "Focus", icon: "timer" },
+  { id: "track", label: "Today", icon: "timer" },
+  { id: "insights", label: "Insights", icon: "activity" },
   { id: "plan", label: "Plan", icon: "calendar" }
 ];
 
 export function resolveInitialTab(search: string): AppTab {
   const requested = new URLSearchParams(search).get("tab");
-  return tabs.some((tab) => tab.id === requested) ? requested as AppTab : "review";
+  if (requested === "review" || requested === "signals") return "insights";
+  return tabs.some((tab) => tab.id === requested) ? requested as AppTab : "track";
 }

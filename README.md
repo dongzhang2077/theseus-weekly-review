@@ -1,204 +1,214 @@
 # Theseus: Weekly AI Review for Goal-Time Alignment
 
-Theseus is an AI-assisted weekly execution review system for students and knowledge workers who manage multiple goals at the same time. It compares long-term goals, weekly plans, actual time logs, activity energy-impact labels, and optional reflection notes. It then generates a supportive weekly review with realistic next-week adjustments.
+Theseus is a local-first personal planning and weekly review assistant for
+students and knowledge workers balancing study, work, projects, and recovery.
+It connects plans with persisted time evidence, explains where the week went,
+and proposes bounded next actions without silently changing the user's plan.
 
-The MVP is intentionally narrow. Theseus is not a full autonomous planner, not a calendar replacement, and not a mental health tool. It is the missing review layer between what a user intended to do and where their time actually went.
+This repository is the final course-delivery snapshot from Team **Zisyphuz**
+(Dong Zhang and Zhi Kang). The reproducible submission is tagged
+`course-final-2026-08-03`; continued development should start from a fork or a
+new branch instead of changing that tag.
 
-## Current Project Stage
+## Final Course Scope
 
-- Proposal submitted: 2026-06-09
-- Progress Report 1: 2026-06-15
-- Midterm implementation checkpoint: 2026-07-18
-- Final defense and report: 2026-08-01
-- GitHub Project board: [Theseus MVP Development](https://github.com/users/dongzhang2077/projects/3)
+The delivered system includes:
 
-## MVP Scope
+- local accounts with user-scoped SQLite data;
+- goals, projects, tasks, weekly plans, Activities, FocusSessions, and TimeLogs;
+- a mobile-first React workspace with Today, Insights, and Plan navigation;
+- Day project-distribution donut, Week daily bars, and Month activity heatmap;
+- a focused time tracker with parallel running Activities and correctable
+  persisted history;
+- deterministic weekly review signals with links back to exact evidence;
+- capacity-aware weekly planning and reversible proposal execution;
+- a bounded Assistant gateway and deterministic “what should I do next?” flow;
+- an optional OpenClaw adapter used from Telegram for context queries and the
+  proposal, approval, execution, and Undo workflow;
+- scoped channel pairing, trusted inbound-message references, replay
+  protection, explicit approval, and an auditable action ledger.
 
-The MVP supports:
+The course snapshot does **not** include native in-app voice, Google Calendar
+sync, cloud synchronization, wearable integration, or autonomous background
+changes. Telegram voice transcription and conversational model access belong
+to the external Telegram/OpenClaw runtime. LangGraph is not part of the active
+application workflow in this snapshot.
 
-- Goal and project setup
-- Local profile creation and user-scoped SQLite persistence
-- Weekly plan input
-- Time log input
-- Activity energy-impact labels: `consuming`, `neutral`, `restore`, `destroy`
-- Optional daily reflection notes
-- Weekly review generation
-- Evidence-backed findings
-- Positive review format: `win`, `insight`, `next_step`
-- Dormancy, overload, slack, and plan-vs-actual checks
-- Review quality evaluation with sample weeks and user feedback
-
-The MVP does not support:
-
-- Automatic calendar rewriting
-- Wearable device dependency
-- Fully autonomous actions
-- Full multi-agent orchestration
-- Mental health diagnosis
-
-## Repository Structure
-
-For a visual overview, see [Project Map](docs/project_map.md).
+## Architecture
 
 ```text
-theseus-weekly-review/
-  README.md
-  docs/
-    project_map.md
-    00_project_charter.md
-    01_product_requirements.md
-    02_system_architecture.md
-    03_data_model.md
-    04_api_contract.md
-    05_review_engine_design.md
-    06_agile_delivery_plan.md
-    07_product_backlog.md
-    08_progress_report_1.md
-    09_decision_log.md
-    10_github_workflow.md
-  slides/
-    progress_report_1.html
-    progress_report_1_script.md
-    progress_report_1_visuals.md
-  backend/
-    app/
-      main.py
-      schemas.py
-    requirements.txt
-  review_engine/
-    README.md
-    __init__.py
-    rules.py
-  frontend/
-    README.md
-  data/
-    sample/
-      sample_week.json
-  evaluation/
-    review_quality_rubric.md
+React mobile web app ─┐
+                      ├─> FastAPI services ─> SQLite repositories
+Telegram + OpenClaw ──┘          │
+                                 ├─> framework-independent review_engine
+                                 └─> proposal/action audit trail
 ```
 
-## Architecture Summary
+- The React app and Telegram are interfaces to the same account-scoped API;
+  Telegram is not a second database.
+- FastAPI handles authentication, validation, and orchestration. Domain rules
+  remain outside route handlers, and SQL remains inside repositories.
+- SQLite is the course-MVP source of truth. Foreign keys are enabled on every
+  connection.
+- Core review and next-action decisions remain deterministic. Optional model
+  output is bounded by structured evidence and does not receive database
+  access.
+
+Detailed references:
+
+- [System architecture](docs/02_system_architecture.md)
+- [Data model](docs/03_data_model.md)
+- [API contract](docs/04_api_contract.md)
+- [Product backlog](docs/07_product_backlog.md)
+- [Architectural runway](docs/11_architectural_runway.md)
+- [Final defense demo runbook](docs/18_final_defense_demo_runbook.md)
+
+## Repository Layout
 
 ```text
-Frontend
-  Goal setup, weekly plan, time logs, review report
-
-FastAPI Backend
-  Validation, persistence, API contracts, review orchestration
-
-SQLite Database
-  Local users, goals, projects, weekly plans, time logs, reflections, weekly reviews
-
-Review Engine
-  Deterministic checks + structured AI generation
-
-Evaluation Layer
-  Sample weeks, review quality rubric, user feedback records
+backend/                       FastAPI routes, services, SQLite repositories
+review_engine/                 framework-independent review rules
+frontend/app/                  production React + TypeScript mobile web app
+integrations/openclaw-theseus/ native OpenClaw plugin and contract tests
+data/sample/                   sanitized deterministic fixtures
+evaluation/                    review-quality evaluation assets
+scripts/                       setup, import, review, and verification tools
+docs/                          product, architecture, contract, and runbooks
+slides/                        tracked presentation source material
 ```
 
-See [System Architecture](docs/02_system_architecture.md) for the full design.
-Use the [Product and Agent Development Strategy](docs/13_product_agent_development_strategy.md)
-for the 2026-07-18 stabilization priorities and the gated path toward
-LangGraph, OpenClaw, long-term memory, and learned personalization.
+Local databases, credentials, `.env` files, raw personal exports, and
+`node_modules` are intentionally excluded from version control and from the
+course ZIP. Generated frontend bundles are not versioned; the course ZIP adds
+one clean, verified production build under `frontend/app/dist/`.
 
-## Development Priorities
+## Prerequisites
 
-1. Build a clean backend schema and sample-data loader.
-2. Implement deterministic review checks without LLM dependency.
-3. Add structured LLM review generation after the checks are stable.
-4. Build frontend input and review pages.
-5. Validate generated reviews using the quality rubric.
+- Python 3.12
+- Node.js 22.22.3 or later in the supported OpenClaw ranges
+- npm
 
-## Quick Start
+The React app can run on older supported Node releases, but using Node 22.22.3+
+for the whole repository avoids a separate OpenClaw runtime.
 
-Progress Report 1 presentation deliverables:
+## Install
 
-- [Slide deck](slides/progress_report_1.html)
-- [Speaker script](slides/progress_report_1_script.md)
-- [Architecture and roadmap visuals](slides/progress_report_1_visuals.md)
-
-Run the sample rule-based review:
+From the repository root:
 
 ```bash
-python3 scripts/run_sample_review.py
-```
-
-Expected output:
-
-- `wins`
-- `insights`
-- `risk_flags`
-- `next_steps`
-- `evidence`
-- `generated_text`
-
-Prepare a fresh, sanitized database for the July 18 integrated demo:
-
-```bash
-.venv/bin/python scripts/prepare_midterm_demo.py
-```
-
-The command prints the temporary database path, login email, and the path to a
-permission-restricted local credentials file. Follow
-the [Midterm Demo Runbook](docs/14_midterm_demo_runbook.md) for startup,
-preflight, the five-minute flow, screenshots, fallback behavior, and known
-limitations.
-
-Start the backend after installing dependencies:
-
-```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-pip install -r backend/requirements.txt
-uvicorn backend.app.main:app --reload
+pip install -r backend/requirements-dev.txt
+npm --prefix frontend/app ci
+npm --prefix integrations/openclaw-theseus ci
 ```
 
-Load and verify the sanitized persisted demo path in a separate terminal:
+Do not put API keys or pairing tokens in tracked files. If optional providers
+are configured, keep their secrets in the backend process environment or a
+Git-ignored local `.env`.
+
+## Run the Sanitized Demo
+
+Create a disposable database containing one month of ordinary college-student
+data:
 
 ```bash
-python3 scripts/load_sample_data.py --database /tmp/theseus-demo.db --user-name "Demo User"
-python3 scripts/run_persisted_review.py --database /tmp/theseus-demo.db --user-id 1 --week-start 2026-06-08 --week-end 2026-06-14
+.venv/bin/python scripts/prepare_midterm_demo.py \
+  --database /tmp/theseus-final-course.db \
+  --sample data/sample/college_student_month.json \
+  --user-name "Final Defense Student" \
+  --login-email final-defense@example.com
 ```
 
-These are low-level data-loader and review-engine utilities. Browser and HTTP
-use should start with `prepare_midterm_demo.py` or `/auth/register`; all
-personal API routes require a Bearer access token and do not accept a selected
-user ID.
+The command prints the path to a permission-restricted credentials file; it
+does not print the generated password. Keep both that file and the database
+outside the submission.
 
-Run the React app against the local API:
+Start the API:
 
 ```bash
-VITE_THESEUS_API_BASE_URL=http://127.0.0.1:8000 npm --prefix frontend/app run dev
+THESEUS_DB_PATH=/tmp/theseus-final-course.db \
+  .venv/bin/python -m uvicorn backend.app.main:app \
+    --host 127.0.0.1 --port 8000
 ```
 
-## GitHub Setup
-
-This workspace is initialized as a local Git repository. On Windows-mounted WSL paths, Git may require a safe-directory override:
+In a second terminal, start the app:
 
 ```bash
-git config --global --add safe.directory /mnt/d/DouglasLearning/6-AppliedResearchProject/theseus-weekly-review
+VITE_THESEUS_API_BASE_URL=http://127.0.0.1:8000 \
+  npm --prefix frontend/app run dev -- --host 127.0.0.1
 ```
 
-After creating the GitHub remote:
+Open <http://127.0.0.1:5173>. The API health endpoint is
+<http://127.0.0.1:8000/health>.
+
+When the repository is on a Windows-mounted WSL path such as `/mnt/d`, Vite
+can occasionally miss a filesystem event. Restart Vite and hard-refresh the
+browser if a verified source change appears stale.
+
+## Verification
+
+Run the backend and domain tests:
 
 ```bash
-git remote add origin https://github.com/dongzhang2077/theseus-weekly-review.git
-git branch -M main
-git add .
-git commit -m "chore: initialize theseus project workspace"
-git push -u origin main
+PYTHONDONTWRITEBYTECODE=1 \
+  .venv/bin/python -m pytest -p no:cacheprovider -q
 ```
 
-Use the [Theseus MVP Development](https://github.com/users/dongzhang2077/projects/3) Project board for sprint tracking. The board has a `Workflow Status` field with these options:
+Run the required sample review and Python compilation check:
 
-```text
-Backlog
-Ready
-In Progress
-Review
-Done
+```bash
+.venv/bin/python scripts/run_sample_review.py
+.venv/bin/python -m compileall backend review_engine scripts
 ```
+
+Run the frontend tests and production build:
+
+```bash
+npm --prefix frontend/app test
+npm --prefix frontend/app run build
+```
+
+Run the OpenClaw plugin tests and secret-free end-to-end workflow:
+
+```bash
+npm --prefix integrations/openclaw-theseus test
+
+THESEUS_NODE=/path/to/supported/node \
+  .venv/bin/python scripts/run_openclaw_adapter_e2e.py
+```
+
+The end-to-end script creates a temporary database and credential, starts a
+temporary API, verifies context read, next action, proposal, approval,
+execution, and Undo, then removes its temporary state.
+
+## Final Verified Baseline
+
+The course freeze candidate was verified on 2026-08-03 with:
+
+- backend/domain tests: **253 passed**;
+- frontend tests: **181 passed**;
+- OpenClaw plugin tests: **27 passed**;
+- frontend TypeScript check and production build: passed;
+- sample review and Python compilation: passed;
+- secret-free OpenClaw end-to-end workflow: passed.
+
+Two FastAPI/Starlette deprecation warnings remain in invalid-window validation
+tests; they do not change runtime behavior or test results.
+
+## Security and Privacy Boundaries
+
+- Personal records stay in the selected local SQLite database by default.
+- Browser access uses short-lived Bearer tokens and rotating HttpOnly refresh
+  cookies with CSRF protection.
+- OpenClaw receives a scoped integration credential, never browser refresh
+  credentials or direct SQLite access.
+- External writes require the configured channel and sender, a short-lived
+  trusted message reference, the matching scope, and an explicit proposal
+  lifecycle.
+- Executed plan changes can be verified and undone through persisted records.
+- Sample fixtures are synthetic and sanitized; no real personal database or
+  raw export belongs in Git or the submission archive.
 
 ## Team Responsibilities
 
@@ -207,3 +217,18 @@ Done
 | Backend, database, review engine, integration | Dong Zhang |
 | Frontend, report layout, dashboard, benchmark material | Zhi Kang |
 | Research, evaluation, final report, presentation | Both |
+
+## Course Submission and Continuation
+
+The source submission is `Zisyphuz_Code.zip`, generated from tracked files at
+the final tag plus the verified `frontend/app/dist/` production build. It
+intentionally excludes Git history, local runtime data, credentials, dependency
+directories, and untracked personal presentation files.
+
+For later development:
+
+1. fork the repository or branch from `course-final-2026-08-03`;
+2. keep the course tag unchanged as the reproducible baseline;
+3. install dependencies locally instead of committing them;
+4. continue with app-native assistant/voice, read-only calendar context, and
+   optional cloud capabilities only behind explicit privacy controls.

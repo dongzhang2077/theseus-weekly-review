@@ -21,16 +21,25 @@ from .assistant import (
     AssistantUndoUnavailable,
     InvalidAssistantContextWindow,
 )
+from .assistant_gateway import (
+    AssistantContextPolicyViolation,
+    AssistantGatewayService,
+    assistant_gateway_provider_status,
+    serialize_provider_envelope,
+)
 from .agent_memory import (
     ActionIdempotencyConflict,
     ActionNotFound,
     ActionUndoConflict,
+    PersonalizationBaselineService,
     PreferenceNotFound,
     PreferenceService,
     PreferenceVersionConflict,
     ProposalExpired,
     ProposalLedgerService,
     ProposalNotFound,
+    ProposalOutcomeConsentVersionConflict,
+    ProposalOutcomeNotFound,
     ProposalVersionConflict,
 )
 from .auth_service import (
@@ -64,6 +73,7 @@ from .integrations import (
     IntegrationScopeDenied,
     IntegrationService,
 )
+from .next_action import InvalidNextActionTimezone, NextActionService
 from .review_service import ReviewService, WeeklyPlanNotFound
 from .review_writer import (
     OpenCodeGoReviewWriter,
@@ -75,6 +85,11 @@ from .review_writer import (
 )
 from .sample_import import SampleImportResult, import_sample_week, load_sample_payload
 from .planning import InvalidPlanTaskReference, WeeklyPlanService
+from .personalization_evaluation import (
+    PersonalizationEvaluationService,
+    PersonalizationEvaluationSnapshot,
+    UsefulnessBaselineMetrics,
+)
 from .tasks import (
     InvalidTaskTransition,
     TaskInUse,
@@ -98,6 +113,8 @@ __all__ = [
     "ActivityVersionConflict",
     "AssistantActionInProgress",
     "AssistantContextService",
+    "AssistantContextPolicyViolation",
+    "AssistantGatewayService",
     "AssistantPlanPersistenceConflict",
     "AssistantPlanStateConflict",
     "AssistantProposalNotApproved",
@@ -137,15 +154,22 @@ __all__ = [
     "IntegrationService",
     "InvalidAssistantContextWindow",
     "InvalidFocusTransition",
+    "InvalidNextActionTimezone",
     "InvalidPlanTaskReference",
     "InvalidTaskTransition",
+    "PersonalizationBaselineService",
+    "PersonalizationEvaluationService",
+    "PersonalizationEvaluationSnapshot",
     "PreferenceNotFound",
     "PreferenceService",
     "PreferenceVersionConflict",
     "ProposalExpired",
     "ProposalLedgerService",
     "ProposalNotFound",
+    "ProposalOutcomeConsentVersionConflict",
+    "ProposalOutcomeNotFound",
     "ProposalVersionConflict",
+    "NextActionService",
     "ReviewService",
     "RefreshTokenReuse",
     "OpenCodeGoReviewWriter",
@@ -164,10 +188,13 @@ __all__ = [
     "TimeLogRevisionNotFound",
     "TimeLogService",
     "TimeLogVersionConflict",
+    "UsefulnessBaselineMetrics",
     "WeeklyPlanNotFound",
     "WeeklyPlanService",
     "build_structured_review_prompt",
     "import_sample_week",
     "load_sample_payload",
     "review_writer_from_environment",
+    "assistant_gateway_provider_status",
+    "serialize_provider_envelope",
 ]

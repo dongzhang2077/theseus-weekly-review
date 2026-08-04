@@ -1,0 +1,166 @@
+{
+  "id": "theseus",
+  "name": "Theseus",
+  "description": "Read Theseus context and deterministic next actions, or manage weekly-plan proposals through scoped integration access.",
+  "version": "0.1.9",
+  "configSchema": {
+    "type": "object",
+    "required": [
+      "baseUrl",
+      "accessToken",
+      "channelType",
+      "externalIdentity"
+    ],
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "minLength": 1
+      },
+      "accessToken": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 16
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "source": {
+                "type": "string",
+                "enum": [
+                  "env",
+                  "file",
+                  "exec"
+                ]
+              },
+              "provider": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "source",
+              "provider",
+              "id"
+            ]
+          }
+        ]
+      },
+      "channelType": {
+        "anyOf": [
+          {
+            "type": "string",
+            "const": "local_test"
+          },
+          {
+            "type": "string",
+            "const": "openclaw"
+          },
+          {
+            "type": "string",
+            "const": "telegram"
+          },
+          {
+            "type": "string",
+            "const": "whatsapp"
+          }
+        ]
+      },
+      "externalIdentity": {
+        "type": "string",
+        "minLength": 1
+      },
+      "timeoutMs": {
+        "type": "integer",
+        "minimum": 1000,
+        "maximum": 30000
+      },
+      "trustedChannelId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "trustedSenderId": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "additionalProperties": false
+  },
+  "activation": {
+    "onStartup": false
+  },
+  "uiHints": {
+    "baseUrl": {
+      "label": "Theseus API URL"
+    },
+    "accessToken": {
+      "label": "Integration token",
+      "sensitive": true
+    },
+    "channelType": {
+      "label": "Channel type"
+    },
+    "externalIdentity": {
+      "label": "Paired identity",
+      "sensitive": true
+    },
+    "timeoutMs": {
+      "label": "Timeout (ms)",
+      "advanced": true
+    },
+    "trustedChannelId": {
+      "label": "Trusted OpenClaw channel",
+      "advanced": true
+    },
+    "trustedSenderId": {
+      "label": "Trusted OpenClaw sender",
+      "sensitive": true,
+      "advanced": true
+    }
+  },
+  "contracts": {
+    "tools": [
+      "theseus_context_read",
+      "theseus_next_action",
+      "theseus_weekly_plan_proposal",
+      "theseus_weekly_plan_decision",
+      "theseus_weekly_plan_execute",
+      "theseus_weekly_plan_undo"
+    ]
+  },
+  "configContracts": {
+    "secretInputs": {
+      "paths": [
+        {
+          "path": "accessToken",
+          "expected": "string"
+        }
+      ]
+    }
+  },
+  "toolMetadata": {
+    "theseus_context_read": {
+      "replaySafe": true,
+      "optional": true
+    },
+    "theseus_next_action": {
+      "replaySafe": true,
+      "optional": true
+    },
+    "theseus_weekly_plan_proposal": {
+      "optional": true
+    },
+    "theseus_weekly_plan_decision": {
+      "optional": true
+    },
+    "theseus_weekly_plan_execute": {
+      "optional": true
+    },
+    "theseus_weekly_plan_undo": {
+      "optional": true
+    }
+  }
+}

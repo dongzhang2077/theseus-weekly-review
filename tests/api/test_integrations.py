@@ -14,6 +14,12 @@ WEEK_QUERY = {
     "week_start": "2026-06-08",
     "week_end": "2026-06-14",
 }
+WEEKLY_PROPOSAL_REQUEST = {
+    "review_week_start": "2026-06-08",
+    "review_week_end": "2026-06-14",
+    "target_week_start": "2026-06-15",
+    "target_week_end": "2026-06-21",
+}
 
 
 async def _pair(
@@ -36,11 +42,16 @@ async def _pair(
     return response.json()
 
 
-def _channel_headers(pairing: dict, *, message_id: str = "message-001") -> dict:
+def _channel_headers(
+    pairing: dict,
+    *,
+    message_id: str = "message-001",
+    identity: str = "local-user-001",
+) -> dict:
     return {
         "Authorization": f"Bearer {pairing['access_token']}",
         "X-Channel-Type": "local_test",
-        "X-External-Identity": "local-user-001",
+        "X-External-Identity": identity,
         "X-External-Message-ID": message_id,
     }
 
@@ -88,6 +99,35 @@ async def test_pairing_shows_secret_once_and_hashes_sensitive_values(database) -
     assert "response_json" not in receipt_columns
 
 
+async def test_telegram_pairing_succeeds_and_only_duplicate_identity_conflicts(
+    database,
+) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    payload = {
+        "label": "Telegram private pilot",
+        "channel_type": "telegram",
+        "external_identity": "8891353746",
+        "scopes": ["context:read", "proposal:create"],
+        "expires_in_seconds": 2592000,
+    }
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client, "Telegram owner")
+        first = await client.post("/integrations/pair", json=payload)
+        duplicate = await client.post("/integrations/pair", json=payload)
+        listed = await client.get("/integrations")
+
+    assert first.status_code == 201, first.text
+    assert first.json()["credential"]["channel_type"] == "telegram"
+    assert first.json()["credential"]["scopes"] == [
+        "context:read",
+        "proposal:create",
+    ]
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"]["code"] == "channel_identity_already_paired"
+    assert listed.json() == [first.json()["credential"]]
+
+
 async def test_channel_context_is_scoped_and_replay_is_idempotent(database) -> None:
     app = create_app(database.path)
     transport = httpx.ASGITransport(app=app)
@@ -113,6 +153,406 @@ async def test_channel_context_is_scoped_and_replay_is_idempotent(database) -> N
             "SELECT COUNT(*) FROM integration_message_receipts"
         ).fetchone()[0]
     assert receipt_count == 1
+
+
+async def test_channel_next_action_matches_authenticated_service(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client, "Next action channel owner")
+        goal = (
+            await client.post(
+                "/goals",
+                json={"title": "Finish course work", "priority": 1},
+            )
+        ).json()
+        project = (
+            await client.post(
+                "/projects",
+                json={
+                    "goal_id": goal["id"],
+                    "title": "Course assignment",
+                    "stage": "startup",
+                    "weekly_min_minutes": 60,
+                    "weekly_target_minutes": 180,
+                },
+            )
+        ).json()
+        task = (
+            await client.post(
+                "/tasks",
+                json={
+                    "project_id": project["id"],
+                    "title": "Draft the assignment",
+                    "priority": 1,
+                    "estimated_minutes": 30,
+                },
+            )
+        ).json()
+        app_result = await client.post(
+            "/assistant/next-action",
+            json={"available_minutes": 30},
+        )
+        pairing = await _pair(client)
+        channel_result = await client.post(
+            "/integrations/channel/next-action",
+            json={"available_minutes": 30},
+            headers=_channel_headers(pairing, message_id="next-action-message-001"),
+        )
+
+    assert app_result.status_code == 200
+    assert channel_result.status_code == 200
+    assert channel_result.json()["recommendation"]["task_id"] == task["id"]
+    for field in (
+        "status",
+        "local_date",
+        "timezone",
+        "available_minutes",
+        "available_time_source",
+        "recommendation",
+        "alternatives",
+        "uncertainties",
+        "candidate_count",
+        "omitted_candidate_count",
+    ):
+        assert channel_result.json()[field] == app_result.json()[field]
+
+
+async def test_channel_next_action_requires_context_scope(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client, "Next action scope owner")
+        pairing = await _pair(client, scopes=["proposal:create"])
+        response = await client.post(
+            "/integrations/channel/next-action",
+            json={"available_minutes": 30},
+            headers=_channel_headers(pairing, message_id="next-action-scope-001"),
+        )
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "integration_scope_denied"
+
+
+async def test_channel_next_action_replay_rejects_changed_request(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client, "Next action replay owner")
+        pairing = await _pair(client)
+        headers = _channel_headers(pairing, message_id="next-action-replay-001")
+        first = await client.post(
+            "/integrations/channel/next-action",
+            json={"available_minutes": 30},
+            headers=headers,
+        )
+        replay = await client.post(
+            "/integrations/channel/next-action",
+            json={"available_minutes": 30},
+            headers=headers,
+        )
+        conflict = await client.post(
+            "/integrations/channel/next-action",
+            json={"available_minutes": 60},
+            headers=headers,
+        )
+
+    assert first.status_code == 200
+    assert replay.status_code == 200
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["code"] == "external_message_replay_conflict"
+    with database.session() as connection:
+        receipt = connection.execute(
+            "SELECT operation FROM integration_message_receipts"
+        ).fetchone()
+    assert receipt["operation"] == "next_action.read"
+
+
+async def test_channel_proposal_is_scoped_pending_and_replay_safe(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        user = await create_and_select_api_user(client, "Channel proposal owner")
+        with database.session() as connection:
+            import_sample_week(connection, user["id"], load_sample_payload())
+        generated = await client.post("/reviews/weekly/generate", json=WEEK_QUERY)
+        plans_before = (await client.get("/weekly-plans")).json()
+        pairing = await _pair(client, scopes=["proposal:create"])
+        headers = _channel_headers(pairing, message_id="proposal-message-001")
+
+        first = await client.post(
+            "/integrations/channel/proposals/weekly-adjustment",
+            json=WEEKLY_PROPOSAL_REQUEST,
+            headers=headers,
+        )
+        replay = await client.post(
+            "/integrations/channel/proposals/weekly-adjustment",
+            json=WEEKLY_PROPOSAL_REQUEST,
+            headers=headers,
+        )
+        conflict = await client.post(
+            "/integrations/channel/proposals/weekly-adjustment",
+            json={**WEEKLY_PROPOSAL_REQUEST, "target_week_end": "2026-06-22"},
+            headers=headers,
+        )
+        plans_after = (await client.get("/weekly-plans")).json()
+        schema = (await client.get("/openapi.json")).json()
+
+    assert generated.status_code == 200
+    assert first.status_code == 201
+    assert replay.status_code == 201
+    assert replay.json()["id"] == first.json()["id"]
+    assert first.json()["status"] == "pending"
+    assert first.json()["user_id"] == user["id"]
+    assert plans_after == plans_before
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["code"] == "external_message_replay_conflict"
+    operation = schema["paths"]["/integrations/channel/proposals/weekly-adjustment"][
+        "post"
+    ]
+    assert operation["security"] == [{"HTTPBearer": []}]
+    assert operation["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/AssistantWeeklyPlanProposalRequest"
+    }
+    assert operation["responses"]["201"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ProposalRead"
+    }
+    with database.session() as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM integration_message_receipts"
+        ).fetchone()[0] == 1
+
+
+async def test_channel_proposal_rolls_back_receipts_when_source_is_missing(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        user = await create_and_select_api_user(client, "Retry channel proposal owner")
+        pairing = await _pair(client, scopes=["proposal:create"])
+        headers = _channel_headers(pairing, message_id="proposal-retry-001")
+        missing = await client.post(
+            "/integrations/channel/proposals/weekly-adjustment",
+            json=WEEKLY_PROPOSAL_REQUEST,
+            headers=headers,
+        )
+        with database.session() as connection:
+            import_sample_week(connection, user["id"], load_sample_payload())
+        generated = await client.post("/reviews/weekly/generate", json=WEEK_QUERY)
+        retry = await client.post(
+            "/integrations/channel/proposals/weekly-adjustment",
+            json=WEEKLY_PROPOSAL_REQUEST,
+            headers=headers,
+        )
+
+    assert missing.status_code == 404
+    assert generated.status_code == 200
+    assert retry.status_code == 201
+    with database.session() as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM integration_message_receipts"
+        ).fetchone()[0] == 1
+
+
+async def test_channel_proposal_requires_proposal_scope(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client, "Read-only proposal owner")
+        pairing = await _pair(client, scopes=["context:read"])
+        denied = await client.post(
+            "/integrations/channel/proposals/weekly-adjustment",
+            json=WEEKLY_PROPOSAL_REQUEST,
+            headers=_channel_headers(pairing, message_id="proposal-denied-001"),
+        )
+
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "integration_scope_denied"
+    assert "proposal:create" not in denied.text
+
+
+async def test_channel_proposal_decision_is_scoped_replay_safe_and_never_executes(
+    database,
+) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        user = await create_and_select_api_user(client, "Channel decision owner")
+        with database.session() as connection:
+            import_sample_week(connection, user["id"], load_sample_payload())
+        generated = await client.post("/reviews/weekly/generate", json=WEEK_QUERY)
+        identity = f"decision-user-{id(client)}"
+        pairing = await _pair(
+            client,
+            identity=identity,
+            scopes=["proposal:create", "proposal:decide"],
+        )
+        proposal = await client.post(
+            "/integrations/channel/proposals/weekly-adjustment",
+            json=WEEKLY_PROPOSAL_REQUEST,
+            headers=_channel_headers(
+                pairing,
+                message_id="proposal-decision-source",
+                identity=identity,
+            ),
+        )
+        plans_before = (await client.get("/weekly-plans")).json()
+        payload = {"expected_version": proposal.json()["version"], "decision": "approve"}
+        first = await client.post(
+            f"/integrations/channel/proposals/{proposal.json()['id']}/decision",
+            json=payload,
+            headers=_channel_headers(
+                pairing,
+                message_id="proposal-decision-001",
+                identity=identity,
+            ),
+        )
+        replay = await client.post(
+            f"/integrations/channel/proposals/{proposal.json()['id']}/decision",
+            json=payload,
+            headers=_channel_headers(
+                pairing,
+                message_id="proposal-decision-001",
+                identity=identity,
+            ),
+        )
+        conflict = await client.post(
+            f"/integrations/channel/proposals/{proposal.json()['id']}/decision",
+            json={**payload, "decision": "reject"},
+            headers=_channel_headers(
+                pairing,
+                message_id="proposal-decision-001",
+                identity=identity,
+            ),
+        )
+        edit = await client.post(
+            f"/integrations/channel/proposals/{proposal.json()['id']}/decision",
+            json={"expected_version": proposal.json()["version"], "decision": "edit"},
+            headers=_channel_headers(
+                pairing,
+                message_id="proposal-decision-edit",
+                identity=identity,
+            ),
+        )
+        plans_after = (await client.get("/weekly-plans")).json()
+        detail = await client.get(f"/proposals/{proposal.json()['id']}")
+        schema = (await client.get("/openapi.json")).json()
+
+    assert generated.status_code == 200
+    assert proposal.status_code == 201
+    assert first.status_code == 200
+    assert replay.status_code == 200
+    assert replay.json() == first.json()
+    assert first.json()["decision"] == "approve"
+    assert first.json()["proposal_id"] == proposal.json()["id"]
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["code"] == "external_message_replay_conflict"
+    assert edit.status_code == 422
+    assert plans_after == plans_before
+    assert detail.json()["proposal"]["status"] == "approved"
+    assert len(detail.json()["decisions"]) == 1
+    assert detail.json()["actions"] == []
+    operation = schema["paths"][
+        "/integrations/channel/proposals/{proposal_id}/decision"
+    ]["post"]
+    assert operation["security"] == [{"HTTPBearer": []}]
+    assert operation["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ChannelProposalDecisionRequest"
+    }
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ProposalDecisionRead"
+    }
+    with database.session() as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM integration_message_receipts"
+        ).fetchone()[0] == 2
+
+
+async def test_channel_proposal_decision_requires_its_own_scope(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        user = await create_and_select_api_user(client, "Proposal-only channel owner")
+        identity = f"decision-user-{id(client)}"
+        pairing = await _pair(
+            client, identity=identity, scopes=["proposal:create"]
+        )
+        denied = await client.post(
+            "/integrations/channel/proposals/1/decision",
+            json={"expected_version": 1, "decision": "approve"},
+            headers=_channel_headers(
+                pairing,
+                message_id="proposal-decision-denied",
+                identity=identity,
+            ),
+        )
+
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "integration_scope_denied"
+    assert "proposal:decide" not in denied.text
+
+
+async def test_channel_execution_requires_approval_scope_and_replays_once(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        user = await create_and_select_api_user(client, "Channel execution owner")
+        with database.session() as connection:
+            import_sample_week(connection, user["id"], load_sample_payload())
+        assert (await client.post("/reviews/weekly/generate", json=WEEK_QUERY)).status_code == 200
+        identity = f"execution-user-{id(client)}"
+        pairing = await _pair(client, identity=identity, scopes=["proposal:create", "proposal:decide", "action:execute", "action:undo"])
+        proposal = await client.post("/integrations/channel/proposals/weekly-adjustment", json=WEEKLY_PROPOSAL_REQUEST, headers=_channel_headers(pairing, message_id="execution-source", identity=identity))
+        pending = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/execute-weekly-plan", json={"expected_version": proposal.json()["version"]}, headers=_channel_headers(pairing, message_id="execution-pending", identity=identity))
+        approved = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/decision", json={"expected_version": proposal.json()["version"], "decision":"approve"}, headers=_channel_headers(pairing, message_id="execution-approve", identity=identity))
+        first = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/execute-weekly-plan", json={"expected_version": 2}, headers=_channel_headers(pairing, message_id="execution-001", identity=identity))
+        replay = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/execute-weekly-plan", json={"expected_version": 2}, headers=_channel_headers(pairing, message_id="execution-001", identity=identity))
+        conflict = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/execute-weekly-plan", json={"expected_version": 3}, headers=_channel_headers(pairing, message_id="execution-001", identity=identity))
+        undo = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/actions/{first.json()['action']['id']}/undo-weekly-plan", json={"expected_version": 3}, headers=_channel_headers(pairing, message_id="undo-001", identity=identity))
+        undo_replay = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/actions/{first.json()['action']['id']}/undo-weekly-plan", json={"expected_version": 3}, headers=_channel_headers(pairing, message_id="undo-001", identity=identity))
+        undo_conflict = await client.post(f"/integrations/channel/proposals/{proposal.json()['id']}/actions/{first.json()['action']['id']}/undo-weekly-plan", json={"expected_version": 4}, headers=_channel_headers(pairing, message_id="undo-001", identity=identity))
+        detail = await client.get(f"/proposals/{proposal.json()['id']}")
+        schema = (await client.get("/openapi.json")).json()
+
+    assert proposal.status_code == 201
+    assert pending.status_code == 409 and pending.json()["detail"]["code"] == "proposal_not_approved"
+    assert approved.status_code == 200
+    assert first.status_code == replay.status_code == 200
+    assert first.json() == replay.json()
+    assert first.json()["proposal"]["status"] == "executed"
+    assert first.json()["action"]["status"] == "succeeded"
+    assert conflict.status_code == 409 and conflict.json()["detail"]["code"] == "external_message_replay_conflict"
+    assert undo.status_code == undo_replay.status_code == 200
+    assert undo.json() == undo_replay.json()
+    assert undo.json()["proposal"]["status"] == "undone"
+    assert undo.json()["action"]["status"] == "succeeded"
+    assert undo.json()["undone_action"]["id"] == first.json()["action"]["id"]
+    assert undo.json()["undone_action"]["status"] == "undone"
+    assert undo_conflict.status_code == 409 and undo_conflict.json()["detail"]["code"] == "external_message_replay_conflict"
+    assert len(detail.json()["actions"]) == 2
+    operation = schema["paths"]["/integrations/channel/proposals/{proposal_id}/execute-weekly-plan"]["post"]
+    assert operation["requestBody"]["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/ChannelProposalExecutionRequest"}
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/AssistantWeeklyPlanExecutionRead"}
+    undo_operation = schema["paths"]["/integrations/channel/proposals/{proposal_id}/actions/{action_id}/undo-weekly-plan"]["post"]
+    assert undo_operation["requestBody"]["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/ChannelProposalUndoRequest"}
+    assert undo_operation["responses"]["200"]["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/AssistantWeeklyPlanUndoRead"}
+
+
+async def test_channel_undo_requires_its_own_scope(database) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client, "Undo scope owner")
+        identity = f"undo-scope-{id(client)}"
+        pairing = await _pair(client, identity=identity, scopes=["action:execute"])
+        denied = await client.post(
+            "/integrations/channel/proposals/1/actions/1/undo-weekly-plan",
+            json={"expected_version": 1},
+            headers=_channel_headers(pairing, message_id="undo-denied", identity=identity),
+        )
+
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "integration_scope_denied"
+    assert "action:undo" not in denied.text
 
 
 async def test_scope_expiry_identity_and_replay_conflicts_are_controlled(

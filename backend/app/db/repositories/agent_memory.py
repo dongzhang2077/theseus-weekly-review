@@ -36,6 +36,15 @@ class StoredPreferenceRevision:
     created_at: str
 
 
+@dataclass(frozen=True)
+class PersonalizationOutcomeObservation:
+    outcome_id: int
+    proposal_type: str
+    result: str
+    usefulness: int | None
+    created_at: str
+
+
 class PreferenceRepository:
     def __init__(self, connection: sqlite3.Connection, user_id: int) -> None:
         self.connection = connection
@@ -486,8 +495,9 @@ class ProposalRepository:
             """
             INSERT INTO proposal_outcomes (
                 user_id, proposal_id, action_id, result, usefulness,
-                actual_duration_minutes, energy_feedback, note
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                actual_duration_minutes, energy_feedback, note,
+                personalization_consent, consent_updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP END)
             """,
             (
                 self.user_id,
@@ -498,6 +508,8 @@ class ProposalRepository:
                 values["actual_duration_minutes"],
                 values["energy_feedback"],
                 values["note"],
+                int(values["personalization_consent"]),
+                int(values["personalization_consent"]),
             ),
         )
         row = self.connection.execute(
@@ -505,6 +517,78 @@ class ProposalRepository:
             (cursor.lastrowid, self.user_id),
         ).fetchone()
         return _outcome_read(require_row(row, "ProposalOutcome", cursor.lastrowid))
+
+    def get_outcome(
+        self, proposal_id: int, outcome_id: int
+    ) -> ProposalOutcomeRead:
+        row = self.connection.execute(
+            """
+            SELECT * FROM proposal_outcomes
+            WHERE id = ? AND proposal_id = ? AND user_id = ?
+            """,
+            (outcome_id, proposal_id, self.user_id),
+        ).fetchone()
+        return _outcome_read(require_row(row, "ProposalOutcome", outcome_id))
+
+    def update_outcome_consent(
+        self,
+        proposal_id: int,
+        outcome_id: int,
+        *,
+        expected_version: int,
+        personalization_consent: bool,
+    ) -> ProposalOutcomeRead:
+        cursor = self.connection.execute(
+            """
+            UPDATE proposal_outcomes
+            SET personalization_consent = ?,
+                consent_version = consent_version + 1,
+                consent_updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND proposal_id = ?
+              AND user_id = ?
+              AND consent_version = ?
+            """,
+            (
+                int(personalization_consent),
+                outcome_id,
+                proposal_id,
+                self.user_id,
+                expected_version,
+            ),
+        )
+        if cursor.rowcount != 1:
+            self.get_outcome(proposal_id, outcome_id)
+            raise RuntimeError("outcome_consent_version_conflict")
+        return self.get_outcome(proposal_id, outcome_id)
+
+    def list_personalization_outcomes(
+        self,
+    ) -> list[PersonalizationOutcomeObservation]:
+        rows = self.connection.execute(
+            """
+            SELECT o.id AS outcome_id, p.proposal_type, o.result,
+                   o.usefulness, o.created_at
+            FROM proposal_outcomes AS o
+            JOIN proposals AS p
+              ON p.id = o.proposal_id
+             AND p.user_id = o.user_id
+            WHERE o.user_id = ?
+              AND o.personalization_consent = 1
+            ORDER BY o.created_at, o.id
+            """,
+            (self.user_id,),
+        ).fetchall()
+        return [
+            PersonalizationOutcomeObservation(
+                outcome_id=row["outcome_id"],
+                proposal_type=row["proposal_type"],
+                result=row["result"],
+                usefulness=row["usefulness"],
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
 
     def list_decisions(self, proposal_id: int) -> list[ProposalDecisionRead]:
         self.get(proposal_id)

@@ -78,6 +78,11 @@ backend/
     services/         authenticated domain commands and orchestration
       tasks.py        Task lifecycle and Project ownership
       activities.py   durable Activity creation and correction
+      assistant_gateway.py
+                      request-specific provider context reduction and privacy
+                      validation; no SQL, model policy, or write authority
+      next_action.py  deterministic evidence ranking shared by App and channel
+                      adapters; no model calls or mutation authority
       focus.py        transitions, segments, allocation, idempotency
       time_logs.py    correction, revisions, invalidation, project recalc
       review_service.py
@@ -112,6 +117,7 @@ Theseus should support several data sources through adapters:
 | Source | Near-Term Role | Long-Term Role |
 |---|---|---|
 | `sample_week.json` | Demo and tests | Regression fixture |
+| `college_student_month.json` | Final defense demo and tests | Sanitized month-scale visualization fixture |
 | Manual web form | MVP input path | Still useful for editing/correction |
 | Mobile capture module | Planned capture path | Primary time capture path |
 | Historical RefTime CSV | Evaluation/test material | Optional import source |
@@ -334,6 +340,64 @@ high-entropy credentials, HMAC-protects channel/message identifiers, stores
 explicit read/propose/execute scopes, and supports immediate revocation. The
 first channel operation is read-only Assistant context through the same typed
 domain service. Channel code has no direct repository or SQLite access.
+Schema v12 preserves that boundary and its active-identity uniqueness while
+bringing the durable channel-type constraint into line with the Telegram
+private-pilot API contract.
+
+STORY-027 gate-three implementation checkpoint (2026-07-27 PDT): the native
+OpenClaw adapter now registers optional context, pending-proposal, and narrow
+proposal-decision tools. Proposal-changing invocation is blocked unless the
+host supplies either a matching inbound `messageId`/`runId`, or matching
+host-controlled canonical session keys across the trusted message and tool
+hooks. Telegram direct messages use OpenClaw's recommended
+`session.dmScope=per-channel-peer` so those hooks share an isolated canonical
+session instead of the default collapsed main session. The session fallback is
+channel/sender scoped, retained for at most 60 seconds, promoted once to the
+host tool run, and cleared at `agent_end`.
+Isolated runtimes may also bridge a host-authoritative run only when the
+configured channel/sender and `senderIsOwner: true` all match. The runtime
+passes only a short-lived HMAC-authenticated reference into the tool, allowing
+separate OpenClaw hook/tool plugin instances to verify it without shared
+mutable memory; model input never becomes the external message ID, session
+key, runtime run ID, or signing key. A decision is
+limited to `approve` or `reject`, requires a distinct integration scope, and
+only appends to the Proposal ledger; it cannot edit or execute a plan change.
+Gate four adds a fourth optional execution tool. It requires `action:execute`,
+accepts no plan content, and delegates to the existing approved-proposal Action
+service, preserving verification and Undo data. Gate five adds a fifth optional
+undo tool with the independent `action:undo` scope; it accepts only a proposal,
+Action, and expected version, then delegates to the same undo service.
+
+STORY-027 gate-three runtime checkpoint (2026-07-29 PDT): the Telegram private
+pilot rotated its scoped credential from read/create to
+read/create/decision and added only the decision tool to the OpenClaw
+allowlist. A trusted inbound approval appended one Decision and advanced the
+Proposal to approved, while read-only persistence verification confirmed zero
+Agent Actions and zero target-week WeeklyPlans. At that checkpoint, execution
+and Undo remained disabled at both the credential and runtime-tool layers.
+
+STORY-027 gate-four runtime checkpoint (2026-07-29 PDT): the pilot rotated the
+credential to read/create/decision/execute and added only the execution tool to
+the runtime allowlist. A trusted inbound request called the typed channel
+execution endpoint with only the Proposal ID and expected version. The
+existing execution service created and verified one target WeeklyPlan, moved
+the Proposal to executed, and recorded exactly one reversible, succeeded,
+Decision-linked Action. Read-only persistence verification confirmed the
+approved three-item Plan, including the bounded 30-minute restart allocation,
+and no Undo Action. The independent `action:undo` scope and Undo tool remain
+disabled for the next explicit rollout gate.
+
+STORY-027 gate-five runtime checkpoint (2026-07-29 PDT): the pilot added the
+independent Undo scope and tool only after the executed Plan was verified in
+the App. A trusted inbound request supplied only the Proposal ID, Action ID,
+and expected Proposal version to the typed Undo endpoint. The existing Undo
+service matched the persisted Plan against the original Action result,
+restored the null before-state by deleting that exact created Plan, marked the
+original Action and Proposal undone, and appended one verified,
+non-reversible Undo Action. Read-only persistence verification confirmed that
+the source-week Plan and approval Decision remained intact and that no
+unrelated Plan was written. Final App consistency confirmation passed, and the
+five-gate private-pilot rollout is product-owner accepted.
 
 ## 10. Anti-Patterns to Avoid
 
@@ -371,3 +435,11 @@ This gives the team a real product foundation while still keeping the course MVP
 Current status: the persistence foundation is implemented. The active runway
 continues in `docs/13_product_agent_development_strategy.md` with truthful
 Signals/Plan states before any LangGraph or OpenClaw integration.
+
+STORY-028 observation checkpoint (2026-07-29 PDT): schema v13 keeps recorded
+proposal outcomes as canonical ledger evidence while adding separately
+versioned, default-off personalization consent. The first personalization
+service is a deterministic, read-only aggregate over currently consented
+outcomes. It returns `insufficient_data` below five observations and never
+applies ranking. This preserves the repository/service/API boundary and avoids
+turning sparse pilot data into a claimed learned preference.

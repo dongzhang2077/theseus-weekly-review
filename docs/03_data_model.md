@@ -16,6 +16,11 @@ automatically verified, and product-owner accepted through STORY-025A for
 inspectable preferences and the proposal-to-outcome ledger.
 Schema version 9 is implemented, automatically verified, and product-owner
 accepted through STORY-039 for scoped conversation channel identity.
+Schema versions 10 and 11 extend the explicit integration scopes. Schema
+version 12 preserves existing bindings while adding `telegram` to the durable
+channel-type constraint so the persistence contract matches the public API.
+Schema version 13 adds explicit, versioned personalization consent to proposal
+outcomes. Existing outcomes migrate with consent disabled.
 
 ```text
 Account (users + auth_credentials)
@@ -462,7 +467,9 @@ These accepted schema-v8 tables form the trust ledger:
 - `agent_actions` preserve bounded operation requests, results, verification,
   errors, reversibility, Undo links, and a user-scoped idempotency key;
 - `proposal_outcomes` record completion, usefulness, actual duration, optional
-  energy feedback, and a user note.
+  energy feedback, a user note, and separately versioned personalization
+  consent. Consent defaults off and may be withdrawn without rewriting the
+  outcome.
 
 Ownership triggers reject cross-account scopes and ledger links. These records
 remain canonical Theseus domain data; future LangGraph checkpoints may refer to
@@ -476,7 +483,9 @@ Theseus database and are hydrated through user-scoped services when read.
 
 ### integration_credentials, channel_bindings, integration_message_receipts
 
-Schema v9 stores high-entropy integration credential hashes, explicit scopes,
+Schema v12 stores high-entropy integration credential hashes, explicit scopes
+(`context:read`, `proposal:create`, `proposal:decide`, `action:execute`, and
+`action:undo`),
 expiry/revocation timestamps, and one HMAC-protected channel identity binding.
 Raw tokens and raw external identities are never stored. Replay receipts keep
 only the credential ID, HMAC-protected message ID, operation, and request hash;
@@ -530,6 +539,11 @@ STORY-025A foundation:
 | 6 | STORY-037 | `focus_sessions`, segments, idempotency receipts, Focus provenance/exact seconds, and a TimeLog constraint rebuild allowing exact sub-minute slices |
 | 7 | STORY-034 | TimeLog versions/soft deletion, revisions, and WeeklyReview invalidation |
 | 8 | STORY-025A | Preferences/revisions and the Proposal/Decision/Action/Outcome trust ledger |
+| 9 | STORY-027 | Integration credentials, explicit scopes, protected channel bindings, and replay receipts |
+| 10 | STORY-027 | Adds the independent `proposal:decide` integration scope |
+| 11 | STORY-027 | Adds the independent `action:undo` integration scope |
+| 12 | STORY-027 | Preserves bindings while adding `telegram` to the channel constraint |
+| 13 | STORY-028 | Versioned proposal-outcome personalization consent, default off |
 
 STORY-033 uses the existing `activities` table plus the `version` column
 introduced by the accepted v5 foundation. It does not require another

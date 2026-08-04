@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { AccountSheet } from "./features/auth/AccountSheet";
 import { AssistantWorkspace } from "./features/assistant/AssistantWorkspace";
 import { AuthScreen, type AuthGatePhase } from "./features/auth/AuthScreen";
+import { InsightsScreen } from "./features/insights/InsightsScreen";
 import { PlanScreen, type PlanDetail } from "./features/plan/PlanScreen";
-import { ReviewScreen } from "./features/review/ReviewScreen";
-import type { ReviewWeekRange } from "./features/review/reviewWeek";
-import { SignalsScreen } from "./features/signals/SignalsScreen";
-import { TrackScreen } from "./features/track/TrackScreen";
+import {
+  weekContainingDate,
+  type ReviewWeekRange
+} from "./features/review/reviewWeek";
+import { TodayScreen } from "./features/today/TodayScreen";
 import { AuthClient, type AuthAccount, type LoginPayload, type RegisterPayload } from "./shared/auth/AuthClient";
 import {
   activityRecordToTimer,
@@ -70,8 +72,9 @@ export function App() {
   const [activityProjects, setActivityProjects] = useState<PlanProject[]>([]);
   const [focusSessionDrafts, setFocusSessionDrafts] = useState<Record<string, FocusSessionDraft>>({});
   const [focusResultOpen, setFocusResultOpen] = useState(false);
-  const [reviewDetailOpen, setReviewDetailOpen] = useState(false);
-  const [signalsDetailOpen, setSignalsDetailOpen] = useState(false);
+  const [trackerOpen, setTrackerOpen] = useState(false);
+  const [foregroundActivityId, setForegroundActivityId] = useState<string | null>(null);
+  const [insightsDetailOpen, setInsightsDetailOpen] = useState(false);
   const [planDetailOpen, setPlanDetailOpen] = useState(false);
   const [trackHistoryError, setTrackHistoryError] = useState<string | null>(null);
   const hasRunningTrackActivity = trackActivities.some((activity) => activity.running);
@@ -229,12 +232,15 @@ export function App() {
     setActivityProjects([]);
     setFocusSessionDrafts({});
     setFocusResultOpen(false);
-    setReviewDetailOpen(false);
-    setSignalsDetailOpen(false);
+    setTrackerOpen(false);
+    setForegroundActivityId(null);
+    setInsightsDetailOpen(false);
     setPlanDetailOpen(false);
     setTrackHistoryError(null);
     setWeekReload(0);
-    setSelectedReviewWeek(demoWeekRange);
+    setSelectedReviewWeek(
+      weekContainingDate(calendarDate(nextAccount.timezone)) ?? demoWeekRange
+    );
     setTrackTodayDate(calendarDate(nextAccount.timezone));
     setWeekLoading(true);
     setAppPhase("signed_in");
@@ -267,8 +273,9 @@ export function App() {
     setActivityProjects([]);
     setFocusSessionDrafts({});
     setFocusResultOpen(false);
-    setReviewDetailOpen(false);
-    setSignalsDetailOpen(false);
+    setTrackerOpen(false);
+    setForegroundActivityId(null);
+    setInsightsDetailOpen(false);
     setPlanDetailOpen(false);
     setTrackHistoryError(null);
     setWeekReload(0);
@@ -277,13 +284,8 @@ export function App() {
     setAppPhase("signed_out");
   }
 
-  function openPlanSuggestion() {
-    setPlanEntryRequest({ id: Date.now(), detail: "suggestion" });
-    setActiveTab("plan");
-  }
-
   function openSignalAction(action: AppSignalAction) {
-    setSignalsDetailOpen(false);
+    setInsightsDetailOpen(false);
     setPlanEntryRequest({
       id: Date.now(),
       detail: action.detail,
@@ -331,6 +333,7 @@ export function App() {
         ...current
       ];
     });
+    setForegroundActivityId(activityId);
     setActiveTab("track");
   }
 
@@ -344,7 +347,7 @@ export function App() {
   }
 
   function changeReviewWeek(range: ReviewWeekRange) {
-    setReviewDetailOpen(false);
+    setInsightsDetailOpen(false);
     setSelectedReviewWeek(range);
   }
 
@@ -360,9 +363,13 @@ export function App() {
   }
 
   const appWeek = loadedWeek.week;
-  const signalsAreEmpty = loadedWeek.source === "empty" && activeTab === "signals";
-  const trackIsError = activeTab === "track" && Boolean(trackHistoryError);
-  const contentIsError = loadedWeek.source === "error" && (activeTab === "review" || activeTab === "signals");
+  const contentIsError = loadedWeek.source === "error" && activeTab === "insights";
+  const selectedWeekHasTimeLogs = trackTimeLogs.some(
+    (log) =>
+      log.deleted_at === null &&
+      log.date >= selectedReviewWeek.start &&
+      log.date <= selectedReviewWeek.end
+  );
   const notice = weekLoading
     ? "Loading"
     : loadedWeek.source === "empty"
@@ -377,10 +384,10 @@ export function App() {
     <AppShell
       activeTab={activeTab}
       onTabChange={(tab) => {
-        if (!focusResultOpen && !reviewDetailOpen && !signalsDetailOpen && !planDetailOpen && !assistantOpen) setActiveTab(tab);
+        if (!focusResultOpen && !trackerOpen && !insightsDetailOpen && !planDetailOpen && !assistantOpen) setActiveTab(tab);
       }}
-      interactionLocked={focusResultOpen || reviewDetailOpen || signalsDetailOpen || planDetailOpen || assistantOpen}
-      navigationHidden={reviewDetailOpen || signalsDetailOpen || planDetailOpen || assistantOpen}
+      interactionLocked={focusResultOpen || trackerOpen || insightsDetailOpen || planDetailOpen || assistantOpen}
+      navigationHidden={trackerOpen || insightsDetailOpen || planDetailOpen || assistantOpen}
       profileName={account.display_name}
       onProfileChange={() => setAccountOpen(true)}
       notice={notice}
@@ -394,6 +401,8 @@ export function App() {
             onClose={() => setAccountOpen(false)}
             onAccountChange={setAccount}
             onSignedOut={signedOut}
+            apiBaseUrl={apiBaseUrl}
+            fetchImpl={authClient.fetch}
             onOpenAssistant={() => {
               setAccountOpen(false);
               setAssistantOpen(true);
@@ -409,15 +418,6 @@ export function App() {
       }
     >
       {weekLoading ? <StateSurface icon="book" title="Loading your workspace" /> : null}
-      {!weekLoading && signalsAreEmpty ? (
-        <StateSurface
-          icon="calendar"
-          title="No review for this week"
-          actionLabel="Create a plan"
-          actionIcon="calendar"
-          onAction={() => setActiveTab("plan")}
-        />
-      ) : null}
       {!weekLoading && contentIsError ? (
         <StateSurface
           icon="info"
@@ -427,36 +427,22 @@ export function App() {
           onAction={() => setWeekReload((value) => value + 1)}
         />
       ) : null}
-      {!weekLoading && trackIsError ? (
-        <StateSurface
-          icon="info"
-          title="Focus history could not load"
-          actionLabel="Retry"
-          actionIcon="activity"
-          onAction={() => setWeekReload((value) => value + 1)}
-        />
-      ) : null}
-      {!weekLoading && !contentIsError && activeTab === "review" ? (
-        <ReviewScreen
+      {!weekLoading && !contentIsError && activeTab === "insights" ? (
+        <InsightsScreen
           review={loadedWeek.source === "empty" ? null : appWeek.review}
+          signals={loadedWeek.source === "empty" ? null : appWeek.signals}
           weekRange={selectedReviewWeek}
+          accountToday={trackTodayDate}
+          hasTimeLogs={selectedWeekHasTimeLogs}
           onWeekChange={changeReviewWeek}
-          onPlan={openPlanSuggestion}
-          onAction={openSignalAction}
-          onDetailOpenChange={setReviewDetailOpen}
-        />
-      ) : null}
-      {!weekLoading && !signalsAreEmpty && !contentIsError && activeTab === "signals" ? (
-        <SignalsScreen
-          signals={appWeek.signals}
-          weekLabel={appWeek.review.weekLabel}
+          onGenerate={() => setWeekReload((value) => value + 1)}
           onAction={openSignalAction}
           onTrack={() => setActiveTab("track")}
-          onDetailOpenChange={setSignalsDetailOpen}
+          onDetailOpenChange={setInsightsDetailOpen}
         />
       ) : null}
-      {!weekLoading && !trackIsError && !contentIsError && activeTab === "track" ? (
-        <TrackScreen
+      {!weekLoading && !contentIsError && activeTab === "track" ? (
+        <TodayScreen
           apiBaseUrl={apiBaseUrl}
           timeZone={account.timezone}
           todayDate={trackTodayDate}
@@ -465,12 +451,17 @@ export function App() {
           activities={trackActivities}
           timeLogs={trackTimeLogs}
           projects={activityProjects}
+          historyError={trackHistoryError}
+          onRetryHistory={() => setWeekReload((value) => value + 1)}
           onActivitiesChange={setTrackActivities}
           onTimeLogsChange={setTrackTimeLogs}
           sessionDrafts={focusSessionDrafts}
           onSessionDraftChange={updateFocusSessionDraft}
           onResultModalChange={setFocusResultOpen}
           onSessionSaved={() => setWeekReload((value) => value + 1)}
+          foregroundActivityId={foregroundActivityId}
+          onForegroundActivityChange={setForegroundActivityId}
+          onTrackerOpenChange={setTrackerOpen}
         />
       ) : null}
       {!weekLoading && activeTab === "plan" ? (
@@ -479,8 +470,9 @@ export function App() {
           fetchImpl={authClient.fetch}
           planData={appWeek.plan}
           reviewSource={loadedWeek.source}
+          accountToday={trackTodayDate}
           entryRequest={planEntryRequest}
-          onReview={() => setActiveTab("review")}
+          onReview={() => setActiveTab("insights")}
           onFocusItem={focusPlanItem}
           onDetailOpenChange={setPlanDetailOpen}
         />

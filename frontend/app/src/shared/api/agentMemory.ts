@@ -87,7 +87,30 @@ export interface ProposalOutcomeRecord {
   actual_duration_minutes: number | null;
   energy_feedback: string | null;
   note: string;
+  personalization_consent: boolean;
+  consent_version: number;
+  consent_updated_at: string | null;
   created_at: string;
+}
+
+export interface PersonalizationBaseline {
+  baseline_version: "v1";
+  status: "insufficient_data" | "ready";
+  minimum_outcomes: number;
+  consented_outcome_count: number;
+  remaining_outcome_count: number;
+  ranking_applied: false;
+  groups: Array<{
+    proposal_type: ProposalRecord["proposal_type"];
+    outcome_count: number;
+    rated_outcome_count: number;
+    average_usefulness: number | null;
+    completed_count: number;
+    partial_count: number;
+    not_completed_count: number;
+    dismissed_count: number;
+    completion_rate: number | null;
+  }>;
 }
 
 export interface ProposalDetail {
@@ -202,6 +225,47 @@ export function decideProposal(
       ? "Edited and approved in Assistant"
       : `${decision[0]?.toUpperCase()}${decision.slice(1)}d in Assistant`
   });
+}
+
+export function createProposalOutcome(
+  options: AgentMemoryOptions,
+  proposalId: number,
+  input: {
+    result: ProposalOutcomeRecord["result"];
+    usefulness: number;
+    note: string;
+    personalizationConsent: boolean;
+  }
+): Promise<AgentMemoryResult<ProposalOutcomeRecord>> {
+  return request(options, `/proposals/${proposalId}/outcomes`, "POST", {
+    result: input.result,
+    usefulness: input.usefulness,
+    note: input.note,
+    personalization_consent: input.personalizationConsent
+  });
+}
+
+export function updateProposalOutcomeConsent(
+  options: AgentMemoryOptions,
+  proposalId: number,
+  outcome: ProposalOutcomeRecord,
+  personalizationConsent: boolean
+): Promise<AgentMemoryResult<ProposalOutcomeRecord>> {
+  return request(
+    options,
+    `/proposals/${proposalId}/outcomes/${outcome.id}/consent`,
+    "PATCH",
+    {
+      expected_version: outcome.consent_version,
+      personalization_consent: personalizationConsent
+    }
+  );
+}
+
+export function loadPersonalizationBaseline(
+  options: AgentMemoryOptions
+): Promise<AgentMemoryResult<PersonalizationBaseline>> {
+  return request(options, "/personalization/baseline", "GET");
 }
 
 async function request<T>(

@@ -397,7 +397,8 @@ Rollout gates:
 1. read-only review and context;
 2. proposal creation;
 3. approval response;
-4. bounded, approved writes.
+4. bounded execution of an approved proposal;
+5. bounded undo of the resulting reversible Action.
 
 Acceptance:
 
@@ -603,16 +604,149 @@ Verification checkpoint: all 191 backend/workflow tests pass in one run;
 Python compilation, `pip check`, deterministic sample review, and a real
 four-process start/status/resume/replay CLI demonstration pass.
 
-Current sequential gate: STORY-039 Channel Identity And Scoped Integration
-Access. Candidate schema v9, pairing/list/revoke management, hashed expiring
-credentials, HMAC-protected channel/message identities, explicit scopes, and a
-read-only channel context operation are implemented. Replay receipts store
-only minimized request metadata. Focused pairing, OpenAPI, scope, expiry,
-replay, revocation, redaction, v8 migration, and account-isolation verification
-passes. OpenClaw/WhatsApp transport and channel proposal/execution remain out
-of scope. Product-owner acceptance passed on 2026-07-26 PDT.
+Completed sequential gate: STORY-027 OpenClaw Conversation Adapter. The
+schema-v12 pairing/list/revoke path, HMAC-protected channel/message identities,
+explicit scopes, read-only context operation, pending-only channel proposal
+endpoint, and narrow channel proposal-decision endpoint are implemented. The
+native OpenClaw package binds the host-provided inbound
+message ID to the single runtime `runId` when channel and tool hooks are
+co-located. When Telegram omits the message-hook run ID, the package matches
+the exact configured channel and sender, holds the message under the
+host-controlled canonical session key for at most 60 seconds, promotes it once
+to the matching tool run, and clears unused state at `agent_end`. Telegram
+direct messages use `session.dmScope=per-channel-peer`, OpenClaw's recommended
+isolated DM scope, so the message and tool hooks share that canonical key. An
+isolated Agent runtime may instead require the configured channel/sender plus
+host-authoritative `senderIsOwner: true`. It rejects missing or mismatched
+trust metadata and passes only a short-lived HMAC-authenticated reference to
+proposal-changing tools. The signed reference remains verifiable when
+OpenClaw registers hook and tool callbacks in separate plugin instances,
+without exposing the message ID or signing key to the model.
+The decision endpoint accepts only `approve` or `reject`, requires the distinct
+`proposal:decide` scope, appends a decision record, and never edits a plan
+change. Gate four adds the separately scoped `action:execute` operation, which
+accepts no plan content and delegates to the accepted reversible execution
+service. Gate five adds independent `action:undo`, which can only undo that
+successful reversible Action through the same service. Product-owner acceptance
+passed after the final App consistency confirmation recorded below.
+
+App-management checkpoint (2026-07-28 PDT): authenticated users can open
+Account > Integrations in the Theseus app to create an OpenClaw pairing,
+choose explicit scopes and expiry, copy the one-time token, inspect credential
+lifecycle metadata, and revoke a pairing after confirmation. The browser uses
+only its existing authenticated API client; it does not retain the one-time
+integration token or raw external identity after pairing. This is management
+UI only: it does not embed an OpenClaw runtime or bypass the typed channel API.
+The same surface offers a one-click API connection check: it creates a
+five-minute, read-only temporary pairing, reads channel context, and revokes
+the credential before reporting success.
+
+Adapter E2E checkpoint (2026-07-28 PDT):
+`scripts/run_openclaw_adapter_e2e.py` prepares a disposable sanitized database
+and pairing, starts a temporary local API, then drives the OpenClaw client
+through context read, proposal draft, approval, execution, and undo. It revokes
+the credential and removes temporary data afterward, so developer verification
+does not require copying a token or identity into a shell.
+
+Telegram private-pilot checkpoint (2026-07-29 PDT): OpenClaw plugin `0.1.6`
+completed a real trusted inbound Telegram proposal flow against the local
+Theseus API. The channel request returned `201 Created` and produced exactly
+one pending weekly-plan adjustment. Read-only database verification found no
+proposal decision, Agent Action, or target-week WeeklyPlan, confirming that the
+proposal-only scope did not approve or execute a change. The final plugin suite
+passes 23 tests, including separate hook/tool registration instances, signature
+tampering, expiry, and session cleanup; the five-operation disposable adapter
+E2E also passes. The local pilot keeps `session.dmScope=per-channel-peer`,
+SecretRef-backed credentials and exact channel/sender trust.
+
+Telegram decision-gate checkpoint (2026-07-29 PDT): the active pairing was
+rotated to read/create/decision and the runtime allowlist added only
+`theseus_weekly_plan_decision`. A real trusted Telegram approval returned
+`200`, advanced the existing Proposal to approved version 2, and appended
+exactly one Decision. Read-only verification found zero Agent Actions and zero
+target-week WeeklyPlans. At this checkpoint, the production pairing and tool
+allowlist still omitted execution and Undo, so approval could not mutate the
+plan.
+
+Telegram execution-gate checkpoint (2026-07-29 PDT): after focused
+execution/scope tests passed 2 cases and the plugin suite passed all 23 tests,
+the pairing was rotated to add only `action:execute` and the runtime allowlist
+added only `theseus_weekly_plan_execute`. A real trusted Telegram execution
+returned `200`, advanced the approved Proposal to executed version 3, created
+one verified target-week WeeklyPlan, and recorded exactly one reversible,
+succeeded, Decision-linked `weekly_plan.create` Action. The complete approved
+Plan contains three items, including the bounded 30-minute restart allocation.
+Read-only verification found no Undo Action. `action:undo` and
+`theseus_weekly_plan_undo` remain disabled pending the separate gate-five
+approval.
+
+Telegram undo-gate checkpoint (2026-07-29 PDT): after the executed state was
+verified in the App, the pairing and runtime allowlist added only the
+independent `action:undo` scope and `theseus_weekly_plan_undo` tool. A real
+trusted Telegram Undo returned `200`, advanced the Proposal from executed
+version 3 to undone version 4, marked the original reversible Action undone,
+and appended exactly one non-reversible, succeeded
+`weekly_plan.undo_create` Action linked to it. Its verification matched the
+recorded null before-state. Read-only persistence verification found no target
+week Plan, retained the source-week Plan and the original approval Decision,
+and found no unrelated Plan write. Focused Undo/scope tests pass 2 cases.
+Final App consistency confirmation passed; the five-gate private pilot is
+accepted. The next sequential product stage is STORY-028 bounded preference
+observation and baseline evaluation, not broader channel authority.
 
 Acceptance verification: 27 focused tests pass. The complete inventory reached
 196 of 197 with one previously tracked intermittent authenticated Activity
 request failure, which passed in isolation. Compilation and deterministic
 sample review pass; STORY-031 remains responsible for the unrelated flake.
+
+Current sequential gate: STORY-028 bounded personalization, observation slice.
+The candidate schema-v13 and Assistant flow collect explicit proposal outcome
+feedback while keeping personalization consent off by default and independently
+withdrawable through optimistic versioning. Its read-only baseline counts only
+currently consented outcomes, requires five observations before reporting
+`ready`, and keeps `ranking_applied = false`. This gate does not train a model,
+create inferred preferences, or reorder suggestions. Automated verification
+passes 214 backend tests and 145 frontend tests, plus Python compilation,
+deterministic sample review, frontend typecheck, and production build.
+Product-owner browser acceptance must pass before the observation period or
+any ranking experiment begins.
+
+STORY-028 observation acceptance (2026-07-30 PDT): the product owner completed
+the authenticated App flow against the local v13 database. One real Outcome
+was saved, explicit consent raised the Baseline count, and withdrawing consent
+returned the count to zero without deleting or rewriting the Outcome.
+`consent_version` advanced from 1 to 2 and the foreign-key check remained
+clean. The first observation slice is accepted. The next bounded slice may
+make the baseline inputs and readiness explanation inspectable; learned
+ranking remains blocked until enough real consented outcomes exist and an
+offline evaluation protocol is frozen.
+
+STORY-028B inspectability candidate (2026-07-30 PDT): the Assistant Baseline
+row now opens a separate mobile-first detail layer using the accepted read-only
+aggregate. It distinguishes collecting from evaluation-ready state, shows the
+consented threshold, remaining count, usefulness, completion, and result
+breakdown, and explicitly reports that ranking is not applied. The candidate
+does not add persistence, API behavior, inferred Preferences, or ranking.
+Four focused Assistant tests, all 146 frontend tests, TypeScript verification,
+and the production build pass. Product-owner browser acceptance passed on
+2026-07-30 PDT after verifying the clickable Baseline entry, truthful
+collecting/readiness state, aggregate boundary, Back navigation, and explicit
+`Ranking: Not applied` status. The first two STORY-028 observation and
+inspectability slices are accepted. The next gate is a frozen offline
+evaluation protocol plus enough real consented outcomes; it is not a learned
+ranker implementation.
+
+Current sequential gate: STORY-028C frozen offline evaluation protocol. The
+candidate separates the five-Outcome readable aggregate from a conservative
+30-rated-Outcome evaluation threshold, holds out at least the latest 10
+observations, and measures a Proposal-type usefulness mean with global
+fallback. The CLI is local, read-only, account-scoped, and aggregate-only.
+Ranking evaluation remains blocked because candidate-set exposure is not
+recorded. The current real database truthfully reports zero eligible Outcomes,
+30 remaining, no baseline metric, and no ranking support. Three focused
+evaluation tests, the 27-test evaluation/consent/schema slice, all 217 backend
+tests, Python compilation, and the deterministic sample review pass.
+Product-owner acceptance of the frozen protocol and aggregate CLI output
+passed on 2026-07-30 PDT. The next personalization gate is accumulation of 30
+real, currently consented, rated Outcomes; no learned or ranking method is
+authorized while that evidence and candidate-set exposure remain absent.

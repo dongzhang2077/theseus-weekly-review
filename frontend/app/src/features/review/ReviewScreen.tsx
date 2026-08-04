@@ -197,7 +197,7 @@ function ReviewWeekHeader({
   );
 }
 
-function ReviewDetailPage({
+export function ReviewDetailPage({
   item,
   weekLabel,
   onBack,

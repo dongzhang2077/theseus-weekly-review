@@ -272,8 +272,144 @@ async def test_proposal_api_records_decision_action_history_and_outcome(
     assert detail.json()["actions"][0]["status"] == "succeeded"
     assert detail.json()["actions"][0]["verification"] == {"planned_minutes": 20}
     assert detail.json()["outcomes"][0]["usefulness"] == 5
+    assert detail.json()["outcomes"][0]["personalization_consent"] is False
+    assert detail.json()["outcomes"][0]["consent_version"] == 1
     assert pending.json() == []
     assert [item["id"] for item in approved.json()] == [created["id"]]
+
+
+async def test_personalization_baseline_uses_only_versioned_consent(
+    database,
+) -> None:
+    app = create_app(database.path)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        await create_and_select_api_user(client, "Personalization owner")
+
+        async def add_outcome(
+            *,
+            result: str,
+            usefulness: int,
+            consent: bool,
+        ) -> tuple[int, dict]:
+            proposal = (
+                await client.post(
+                    "/proposals",
+                    json={
+                        "proposal_type": "weekly_plan_adjustment",
+                        "title": f"Outcome {result} {usefulness}",
+                        "before": {},
+                        "after": {},
+                    },
+                )
+            ).json()
+            response = await client.post(
+                f"/proposals/{proposal['id']}/outcomes",
+                json={
+                    "result": result,
+                    "usefulness": usefulness,
+                    "personalization_consent": consent,
+                },
+            )
+            assert response.status_code == 201
+            return proposal["id"], response.json()
+
+        proposal_id, first = await add_outcome(
+            result="completed",
+            usefulness=5,
+            consent=False,
+        )
+        empty = await client.get("/personalization/baseline")
+        granted = await client.patch(
+            f"/proposals/{proposal_id}/outcomes/{first['id']}/consent",
+            json={
+                "expected_version": first["consent_version"],
+                "personalization_consent": True,
+            },
+        )
+        stale = await client.patch(
+            f"/proposals/{proposal_id}/outcomes/{first['id']}/consent",
+            json={
+                "expected_version": first["consent_version"],
+                "personalization_consent": False,
+            },
+        )
+        for result, usefulness in (
+            ("completed", 4),
+            ("partial", 3),
+            ("not_completed", 2),
+            ("dismissed", 1),
+        ):
+            await add_outcome(
+                result=result,
+                usefulness=usefulness,
+                consent=True,
+            )
+        ready = await client.get("/personalization/baseline")
+        withdrawn = await client.patch(
+            f"/proposals/{proposal_id}/outcomes/{first['id']}/consent",
+            json={
+                "expected_version": granted.json()["consent_version"],
+                "personalization_consent": False,
+            },
+        )
+        after_withdrawal = await client.get("/personalization/baseline")
+        schema = (await client.get("/openapi.json")).json()
+
+        await create_and_select_api_user(client, "Other personalization owner")
+        isolated = await client.get("/personalization/baseline")
+        foreign = await client.patch(
+            f"/proposals/{proposal_id}/outcomes/{first['id']}/consent",
+            json={
+                "expected_version": 2,
+                "personalization_consent": False,
+            },
+        )
+
+    assert empty.status_code == 200
+    assert empty.json()["status"] == "insufficient_data"
+    assert empty.json()["consented_outcome_count"] == 0
+    assert empty.json()["groups"] == []
+    assert granted.status_code == 200
+    assert granted.json()["personalization_consent"] is True
+    assert granted.json()["consent_version"] == 2
+    assert granted.json()["consent_updated_at"] is not None
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["current"]["consent_version"] == 2
+    assert ready.status_code == 200
+    assert ready.json()["status"] == "ready"
+    assert ready.json()["consented_outcome_count"] == 5
+    assert ready.json()["remaining_outcome_count"] == 0
+    assert ready.json()["ranking_applied"] is False
+    assert ready.json()["groups"] == [
+        {
+            "proposal_type": "weekly_plan_adjustment",
+            "outcome_count": 5,
+            "rated_outcome_count": 5,
+            "average_usefulness": 3.0,
+            "completed_count": 2,
+            "partial_count": 1,
+            "not_completed_count": 1,
+            "dismissed_count": 1,
+            "completion_rate": 0.625,
+        }
+    ]
+    assert withdrawn.status_code == 200
+    assert withdrawn.json()["personalization_consent"] is False
+    assert withdrawn.json()["consent_version"] == 3
+    assert after_withdrawal.status_code == 200
+    assert after_withdrawal.json()["status"] == "insufficient_data"
+    assert after_withdrawal.json()["consented_outcome_count"] == 4
+    assert after_withdrawal.json()["remaining_outcome_count"] == 1
+    assert isolated.status_code == 200
+    assert isolated.json()["consented_outcome_count"] == 0
+    assert foreign.status_code == 404
+    assert (
+        schema["paths"]["/personalization/baseline"]["get"]["responses"]["200"][
+            "content"
+        ]["application/json"]["schema"]
+        == {"$ref": "#/components/schemas/PersonalizationBaselineRead"}
+    )
 
 
 async def test_proposal_api_rejects_expired_stale_and_cross_account_decisions(

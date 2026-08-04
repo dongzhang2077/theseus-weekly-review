@@ -18,7 +18,7 @@ describe("AppShell", () => {
       </AppShell>
     );
 
-    ["Review", "Signals", "Focus", "Plan"].forEach((label) => {
+    ["Today", "Insights", "Plan"].forEach((label) => {
       expect(screen.getByRole("button", { name: label })).toBeDisabled();
     });
     const account = screen.getByRole("button", { name: /Open account/ });
@@ -33,7 +33,7 @@ describe("AppShell", () => {
   it("gives full-screen detail pages the complete phone canvas", () => {
     render(
       <AppShell
-        activeTab="review"
+        activeTab="insights"
         onTabChange={vi.fn()}
         navigationHidden
         profileName="Theseus Demo"
@@ -50,15 +50,15 @@ describe("AppShell", () => {
 
   it("keeps bottom navigation icon-only while preserving accessible names", () => {
     render(
-      <AppShell activeTab="signals" onTabChange={vi.fn()}>
-        Signals content
+      <AppShell activeTab="insights" onTabChange={vi.fn()}>
+        Insights content
       </AppShell>
     );
 
-    ["Review", "Signals", "Focus", "Plan"].forEach((label) => {
+    ["Today", "Insights", "Plan"].forEach((label) => {
       expect(screen.getByRole("button", { name: label })).toHaveAttribute("title", label);
       expect(screen.queryByText(label, { selector: "nav span" })).not.toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: "Signals" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Insights" })).toHaveAttribute("aria-current", "page");
   });
 });

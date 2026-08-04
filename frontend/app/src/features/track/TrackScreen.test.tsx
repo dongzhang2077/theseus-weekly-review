@@ -18,15 +18,49 @@ describe("TrackScreen", () => {
     render(<TrackScreen track={demoWeek.track} />);
 
     const currentFocus = screen.getByRole("region", { name: "Current focus" });
-    expect(within(currentFocus).getByText("Frontend build block")).toBeInTheDocument();
+    expect(
+      within(currentFocus).getByRole("button", { name: "Change focus activity" }),
+    ).toHaveTextContent("Frontend build block");
     expect(within(currentFocus).getByText("Recommended now")).toBeInTheDocument();
     expect(within(currentFocus).getByText("00:00:00")).toBeInTheDocument();
     expect(within(currentFocus).getByText("Today total")).toBeInTheDocument();
     expect(within(currentFocus).getByText("2h 46m")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Start focus activity" })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: "Start focus activity" })).toHaveLength(1);
+    expect(screen.getByRole("timer", { name: /current focus duration/i })).toHaveTextContent(
+      "00:00:00"
+    );
     expect(screen.queryByText(/sample recommendation/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
     expect(screen.queryByText(/session target/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps multiple Activity bars visible for quick foreground switching", () => {
+    render(<TrackScreen track={demoWeek.track} />);
+
+    const currentFocus = screen.getByRole("region", { name: "Current focus" });
+    const quickActivities = within(currentFocus).getByRole("region", {
+      name: "Quick activities"
+    });
+    expect(
+      within(quickActivities).getByRole("button", {
+        name: "Switch focus to Frontend build block"
+      })
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(quickActivities).getByRole("button", {
+        name: "Switch focus to Backend polish"
+      })
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      within(quickActivities).getByRole("button", {
+        name: "Switch focus to Backend polish"
+      })
+    );
+
+    expect(within(currentFocus).getByRole("button", { name: "Change focus activity" }))
+      .toHaveTextContent("Backend polish");
+    expect(screen.getAllByRole("button", { name: "Start focus activity" })).toHaveLength(1);
   });
 
   it("opens the midterm Today sheet with grouped activities and right-aligned totals", () => {
@@ -58,7 +92,7 @@ describe("TrackScreen", () => {
     const currentFocus = screen.getByRole("region", { name: "Current focus" });
     expect(currentFocus).toHaveTextContent("Backend polish");
     expect(currentFocus).toHaveTextContent("Project");
-    expect(screen.getAllByRole("button", { name: "End focus activity" })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: "End focus activity" })).toHaveLength(1);
   });
 
   it("starts a durable FocusSession before showing the Activity as running", async () => {
@@ -84,9 +118,9 @@ describe("TrackScreen", () => {
       />
     );
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Start focus activity" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Start focus activity" }));
 
-    expect(await screen.findAllByRole("button", { name: "End focus activity" })).toHaveLength(3);
+    expect(await screen.findAllByRole("button", { name: "End focus activity" })).toHaveLength(1);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(fetchImpl.mock.calls[0][0]).toBe(
       "http://127.0.0.1:8000/focus-sessions"
@@ -105,7 +139,7 @@ describe("TrackScreen", () => {
     vi.useFakeTimers();
     render(<TrackScreen track={demoWeek.track} />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Start focus activity" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Start focus activity" }));
     act(() => vi.advanceTimersByTime(1_000));
     fireEvent.click(screen.getByRole("button", { name: "Choose activity" }));
     const chooser = screen.getByRole("dialog", { name: "Activities" });
